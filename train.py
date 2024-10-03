@@ -21,7 +21,7 @@ from tensorboardX import SummaryWriter
 from conf.config import Config, TrainConfig
 from envs.pcgrl_env import (gen_dummy_queued_state, gen_dummy_queued_state_old,
                             OldQueuedState)
-from purejaxrl.experimental.s5.wrappers import LogWrapper
+from purejaxrl.experimental.s5.wrappers import LogWrapper, LLMRewardWrapper
 from utils import (get_ckpt_dir, get_exp_dir, init_network, gymnax_pcgrl_make,
                    init_config)
 
@@ -48,8 +48,7 @@ class Transition(NamedTuple):
 
 
 def log_callback(metric, steps_prev_complete, config, writer, train_start_time):
-    timesteps = metric["timestep"][metric["returned_episode"]
-                                    ] * config.n_envs
+    timesteps = metric["timestep"][metric["returned_episode"]] * config.n_envs
     return_values = metric["returned_episode_returns"][metric["returned_episode"]]
 
     # for t in range(len(timesteps)):
@@ -57,7 +56,7 @@ def log_callback(metric, steps_prev_complete, config, writer, train_start_time):
     #         f"global step={timesteps[t]}, episodic return={return_values[t]}")
 
     if len(timesteps) > 0:
-        t = timesteps[0]
+        t = timesteps[-1].item()
         ep_return_mean = return_values.mean()
         ep_return_max = return_values.max()
         ep_return_min = return_values.min()
@@ -92,7 +91,19 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
     )
     env_r, env_params = gymnax_pcgrl_make(config.env_name, config=config)
     # env = FlattenObservationWrapper(env)
-    env = LogWrapper(env_r)
+
+
+    env = LLMRewardWrapper(env_r)
+    env = LogWrapper(env)
+
+    # TODO example of how to change reward function
+    def compute_reward(state):
+        print(state)
+        return jnp.count_nonzero(state)
+
+    env.set_reward_fn(compute_reward)
+
+
     env_r.init_graphics()
 
     def linear_schedule(count):
@@ -119,7 +130,7 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
         network_params = network.init(_rng, init_x)
 
         # Print network architecture and number of learnable parameters
-        # print(network.subnet.tabulate(_rng, init_x.map_obs, init_x.flat_obs))
+        print(network.subnet.tabulate(_rng, init_x.map_obs, init_x.flat_obs))
         # print(network.subnet.tabulate(_rng, init_x, jnp.zeros((init_x.shape[0], 0))))
 
         if config.ANNEAL_LR:
@@ -284,26 +295,25 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
                 'save_args': save_args})
 
         def save_checkpoint(runner_state, info, steps_prev_complete):
-            try:
-                timesteps = info["timestep"][info["returned_episode"]
-                                             ] * config.n_envs
-            except jax.errors.NonConcreteBooleanIndexError:
-                return
+            # Get the global env timestep numbers corresponding to the points at which different episodes were finished
+            timesteps = info["timestep"][info["returned_episode"]] * config.n_envs
 
-            for t in timesteps:
-                if t > 0:
-                    latest_ckpt_step = checkpoint_manager.latest_step()
-                    if (latest_ckpt_step is None or
-                            t - latest_ckpt_step >= config.ckpt_freq):
-                        print(f"Saving checkpoint at step {t}")
-                        ckpt = {'runner_state': runner_state,
-                                # 'config': config,
-                                'step_i': t}
-                        # ckpt = {'step_i': t}
-                        save_args = orbax_utils.save_args_from_target(ckpt)
-                        checkpoint_manager.save(t, ckpt, save_kwargs={
-                                                'save_args': save_args})
-                    break
+            if len(timesteps) > 0:
+                # Get the latest global timestep at which some episode was finished
+                t = timesteps[-1].item()
+                latest_ckpt_step = checkpoint_manager.latest_step()
+                if (latest_ckpt_step is None or
+                        t - latest_ckpt_step >= config.ckpt_freq):
+                    print(f"Saving checkpoint at step {t}")
+                    ckpt = {'runner_state': runner_state,
+                            # 'config': OmegaConf.to_container(config),
+                            'step_i': t}
+                    # ckpt = {'step_i': t}
+                    # save_args = orbax_utils.save_args_from_target(ckpt)
+                    # checkpoint_manager.save(t, ckpt, save_kwargs={
+                    #                         'save_args': save_args})
+                    checkpoint_manager.save(t, args=ocp.args.StandardSave(ckpt))
+
 
         # frames, states = render_episodes(train_state.params)
         # jax.debug.callback(render_frames, frames, runner_state.update_i)
@@ -525,9 +535,9 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
 
         # One final logging/checkpointing call to ensure things finish off
         # neatly.
-        jax.debug.callback(_log_callback, metric)
-        jax.debug.callback(save_checkpoint, runner_state, metric,
-                           steps_prev_complete)
+        # jax.debug.callback(_log_callback, metric)
+        # jax.debug.callback(save_checkpoint, runner_state, metric,
+        #                    steps_prev_complete)
 
         return {"runner_state": runner_state, "metrics": metric}
 
@@ -551,7 +561,9 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
     # Create a dummy checkpoint so we can restore it to the correct dataclasses
     env, env_params = gymnax_pcgrl_make(config.env_name, config=config)
     # env = FlattenObservationWrapper(env)
+    env = LLMRewardWrapper(env)
     env = LogWrapper(env)
+
     rng, _rng = jax.random.split(rng)
     network = init_network(env, env_params, config)
     init_x = env.gen_dummy_obs(env_params)
@@ -665,6 +677,9 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
 
     
 def main_chunk(config, rng, exp_dir):
+    """When jax jits the training loop, it pre-allocates an array with size equal to number of training steps. So, when training for a very long time, we sometimes need to break training up into multiple
+    chunks to save on VRAM.
+    """
     checkpoint_manager, restored_ckpt = init_checkpointer(config)
 
     # if restored_ckpt is not None:
