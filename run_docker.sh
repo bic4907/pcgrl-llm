@@ -1,0 +1,1 @@
+docker run --rm -it -v $(pwd):/app -v /mnt/nas:/mnt/nas --network host pcgrl:latest /bin/bash

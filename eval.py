@@ -34,8 +34,9 @@ class EvalData:
 
 @hydra.main(version_base=None, config_path='./conf', config_name='eval_pcgrl')
 def main_eval(eval_config: EvalConfig = None):
-    # if not hasattr(eval_config, 'INIT_CONFIG'):
-    #    eval_config = init_config(eval_config)
+    if eval_config.initialize is None or eval_config.initialize:
+        eval_config = init_config(eval_config)
+
 
     exp_dir = eval_config.exp_dir
     if not eval_config.random_agent:
