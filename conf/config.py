@@ -81,6 +81,8 @@ class Config:
     # results.
     profile_fps: bool = False
 
+    # NOTE: DO NOT MODIFY THESE. WILL BE SET AUTOMATICALLY AT RUNTIME. ########
+    initialize: Optional[bool] = None
 
 @dataclass
 class EvoMapConfig(Config):
@@ -273,8 +275,6 @@ class TrainLLMConfig(Config):
     reevaluate: bool = True
     n_eps: int = 2
 
-    # NOTE: DO NOT MODIFY THESE. WILL BE SET AUTOMATICALLY AT RUNTIME. ########
-    INIT_CONFIG: Optional[bool] = None
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)

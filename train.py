@@ -98,7 +98,6 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
 
     # TODO example of how to change reward function
     def compute_reward(state):
-        print(state)
         return jnp.count_nonzero(state)
 
     env.set_reward_fn(compute_reward)
@@ -130,7 +129,7 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
         network_params = network.init(_rng, init_x)
 
         # Print network architecture and number of learnable parameters
-        print(network.subnet.tabulate(_rng, init_x.map_obs, init_x.flat_obs))
+        # print(network.subnet.tabulate(_rng, init_x.map_obs, init_x.flat_obs))
         # print(network.subnet.tabulate(_rng, init_x, jnp.zeros((init_x.shape[0], 0))))
 
         if config.ANNEAL_LR:
@@ -704,7 +703,10 @@ def main_chunk(config, rng, exp_dir):
     
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrl')
 def main(config: TrainConfig):
-    config = init_config(config)
+
+    if config.initialize is None or config.initialize:
+        config = init_config(config)
+
     rng = jax.random.PRNGKey(config.seed)
 
     exp_dir = config.exp_dir
@@ -723,33 +725,6 @@ def main(config: TrainConfig):
 
     else:
         out = main_chunk(config, rng, exp_dir)
-
-@hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrl')
-def main_noinit(config: TrainConfig):
-    rng = jax.random.PRNGKey(config.seed)
-
-    exp_dir = config.exp_dir
-
-    import logging
-    logger = logging.getLogger(basename(__file__))
-    logger.info(f'running experiment at {exp_dir}\n')
-
-    # Need to do this before setting up checkpoint manager so that it doesn't refer to old checkpoints.
-    if config.overwrite and os.path.exists(exp_dir):
-        shutil.rmtree(exp_dir)
-
-    if config.timestep_chunk_size != -1:
-        n_chunks = config.total_timesteps // config.timestep_chunk_size
-        for i in range(n_chunks):
-            config.total_timesteps = config.timestep_chunk_size + (i * config.timestep_chunk_size)
-            print(f"Running chunk {i + 1}/{n_chunks}")
-            out = main_chunk(config, rng, exp_dir)
-
-    else:
-        out = main_chunk(config, rng, exp_dir)
-
-
-        #   ep_returns = out["runner_state"].ep_returns
 
 
 if __name__ == "__main__":

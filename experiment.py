@@ -331,12 +331,12 @@ class Experiment:
 
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
-        config.total_timesteps = 100 # TODO Debug
+        config.total_timesteps = int(1e6)
         os.makedirs(config.exp_dir, exist_ok=True)
 
         config.overwrite = False
 
-        from train import main_noinit as train
+        from train import main as train
 
         train(config)
 
