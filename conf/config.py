@@ -232,8 +232,9 @@ class TrainLLMConfig(Config):
     reward_function_path: Optional[str] = None
 
 
-    # debug options
-
+    # reward generation setting
+    n_generation_trials: int = 10
+    bypass_reward_path: Optional[str] = None
 
 
 cs = ConfigStore.instance()

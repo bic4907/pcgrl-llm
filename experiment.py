@@ -1,5 +1,5 @@
 from distutils.command.config import config
-from os.path import basename
+from os.path import basename, dirname
 
 import hydra
 import json
@@ -103,7 +103,7 @@ class Experiment:
         source_dir = path.join(path.dirname(__file__), 'pcgrllm', 'prompt')
         dest_dir = path.join(self._experiment_path, 'prompt')
 
-        print(self.logging(f"Copying prompt directory to the experiment directory: {source_dir} -> {dest_dir}"))
+        self.logging(f"Copying prompt directory to the experiment directory: {source_dir} -> {dest_dir}")
 
         try:
             shutil.copytree(source_dir, dest_dir)
@@ -151,7 +151,7 @@ class Experiment:
             'gpt_max_token': 4096,
             'verbose': None,
             'previous_reward_function': self._current_reward_function_filename,
-            'trial_count': 3,
+            'trial_count': self.config.n_generation_trials,
             'n_outer': self._iteration,
             'n_inner': 1,
             # 'reference_csv': self._reference_csv,
@@ -167,6 +167,20 @@ class Experiment:
         reward_name = generate_reward(config=self.config, generate_args=args_dict)
 
         return reward_name
+
+    def bypass_reward_function(self):
+        # copy the reward function
+
+        os.makedirs(self.reward_functions_dir, exist_ok=True)
+
+        reward_filename = f'{basename(self.config.bypass_reward_path)}.py'
+        origin_path = path.join(dirname(__file__), 'pcgrllm', 'example', reward_filename)
+        target_path = path.join(self.reward_functions_dir, reward_filename)
+
+        self.logging(f"Copying reward function to the experiment directory: {origin_path} -> {target_path}", logging.WARNING)
+        shutil.copy(origin_path, target_path)
+
+        return target_path
 
     def validate_reward_function(self):
         config = copy.deepcopy(self.config)
@@ -233,10 +247,9 @@ class Experiment:
         from eval import main_eval as run_eval
 
         config = copy.deepcopy(self.config)
+        config.initialize = False
         config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id))
         config.random_agent = False
-        # config.INIT_CONFIG = False
-        # get parametrer for eval
 
         run_eval(config)
 
@@ -312,8 +325,12 @@ class Experiment:
 
             elif self._stage == Stage.RewardGeneration:
 
+                if self.config.bypass_reward_path is not None:
+                    reward_generation_fn = self.bypass_reward_function
+                else:
+                    reward_generation_fn = self.generate_reward_function
 
-                self._current_reward_function_filename = self.generate_reward_function()
+                self._current_reward_function_filename = reward_generation_fn()
 
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.")
@@ -375,13 +392,9 @@ class Experiment:
 
 
 
-
-
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrllm')
 def main(config: TrainConfig):
     init_config(config)
-
-
 
     experiment = Experiment(config)
     experiment.run()
