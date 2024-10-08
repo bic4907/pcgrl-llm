@@ -135,10 +135,25 @@ class LLMRewardWrapper(GymnaxWrapper):
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
 
         reward_fn = self.get_reward_fn()
-        print(state.__dict__)
 
-        llm_reward_prev = reward_fn(state.env_map)
-        llm_reward_curr = reward_fn(state.env_map)
+
+        metrics_enum = self._env.prob.metrics_enum
+
+        # Previous state
+        prev_stats = dict()
+        for metric in metrics_enum:
+            prev_stats[metric.name] = state.prob_state.stats[metric.value]
+        prev_array = state.env_map
+
+        # Current state
+        curr_stats = dict()
+        for metric in metrics_enum:
+            curr_stats[metric.name] = env_state.prob_state.stats[metric.value]
+
+        curr_array = env_state.env_map
+
+        llm_reward_prev = reward_fn(prev_array, prev_stats)
+        llm_reward_curr = reward_fn(curr_array, curr_stats)
 
         reward += llm_reward_curr - llm_reward_prev
 
@@ -149,7 +164,6 @@ class LLMRewardWrapper(GymnaxWrapper):
 
     def get_reward_fn(self):
         return self.reward_fn
-
 
 
 class LLMRewardWrapperDebug(GymnaxWrapper):
@@ -172,6 +186,7 @@ class LLMRewardWrapperDebug(GymnaxWrapper):
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
 
         metrics_enum = self._env.prob.metrics_enum
+
 
         # Stats 출력
 

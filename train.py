@@ -21,6 +21,7 @@ from tensorboardX import SummaryWriter
 from conf.config import Config, TrainConfig
 from envs.pcgrl_env import (gen_dummy_queued_state, gen_dummy_queued_state_old,
                             OldQueuedState)
+from pcgrllm.validate_reward import read_file
 from purejaxrl.experimental.s5.wrappers import LogWrapper, LLMRewardWrapper
 from utils import (get_ckpt_dir, get_exp_dir, init_network, gymnax_pcgrl_make,
                    init_config)
@@ -97,11 +98,12 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
     env = LLMRewardWrapper(env_r)
     env = LogWrapper(env)
 
-    # TODO example of how to change reward function
-    def compute_reward(state):
-        return jnp.count_nonzero(state)
+    reward_fn_str = read_file(config.reward_function_path)
 
-    env.set_reward_fn(compute_reward)
+    exec_scope = {}
+    exec(reward_fn_str, exec_scope)
+    reward_fn = exec_scope['compute_reward']
+    env.set_reward_fn(reward_fn)
 
 
     env_r.init_graphics()

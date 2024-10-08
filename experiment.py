@@ -1,3 +1,4 @@
+from distutils.command.config import config
 from os.path import basename
 
 import hydra
@@ -21,6 +22,8 @@ import os
 import site
 import platform
 import pprint
+
+from scipy.stats import dweibull
 
 from conf.config import TrainConfig
 from eval import main_eval
@@ -54,8 +57,9 @@ class Experiment:
 
         os.makedirs(self.config.exp_dir, exist_ok=True)
 
-        self.initialize()
         self._setup_logger()
+        self.initialize()
+
 
         self.logging(pprint.pformat(self.config, indent=4), level=logging.INFO)
 
@@ -63,6 +67,8 @@ class Experiment:
         self._iteration = 1
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
+
+        self._copy_prompt()
 
     @property
     def _experiment_path(self):
@@ -84,44 +90,20 @@ class Experiment:
             self.logger.log(level, formatted_message)
 
 
-
     @property
     def reward_function_log_path(self):
         return path.join(self._experiment_path, self._reward_function_log_filename)
 
-    def _create_experiment_dir(self):
-        # make directory
-        if not path.exists(self._root_path):
-            os.makedirs(self._root_path)
-
-        self.logging(f"Creating experiment directory: {self._experiment_path}")
-
-        try:
-            os.makedirs(self._experiment_path, exist_ok=self._resume or self._overwrite)
-        except FileExistsError:
-            self.logging(f"Experiment directory already exists: {self._experiment_path}")
-            raise
-
-        self._create_reward_functions_dir()
-        self._create_feedback_dir()
-        self._copy_prompt()
-        self._copy_example()
 
     def _copy_prompt(self):
         """Copies the prompt log file to the experiment directory."""
-        source_dir = path.join(path.dirname(__file__), 'prompt')
+
+        self.logging("Copying prompt directory to the experiment directory", level=logging.INFO)
+
+        source_dir = path.join(path.dirname(__file__), 'pcgrllm', 'prompt')
         dest_dir = path.join(self._experiment_path, 'prompt')
 
-        try:
-            shutil.copytree(source_dir, dest_dir)
-        except FileExistsError:
-            self.logging(f"Prompt directory already exists: {dest_dir}")
-            pass
-
-    def _copy_example(self):
-        """Copies the prompt log file to the experiment directory."""
-        source_dir = path.join(path.dirname(__file__), 'example')
-        dest_dir = path.join(self._experiment_path, 'example')
+        print(self.logging(f"Copying prompt directory to the experiment directory: {source_dir} -> {dest_dir}"))
 
         try:
             shutil.copytree(source_dir, dest_dir)
@@ -131,11 +113,11 @@ class Experiment:
 
     @property
     def reward_functions_dir(self):
-        return path.join(self._experiment_path, 'RewardFunctions')
+        return path.join(self._experiment_path, 'reward_functions')
 
     @property
     def feedback_dir(self):
-        return path.join(self._experiment_path, 'Feedback')
+        return path.join(self._experiment_path, 'feedbacks')
 
 
     def _create_reward_functions_dir(self):
@@ -152,155 +134,60 @@ class Experiment:
             self.logging(f"Feedback directory already exists: {self.feedback_dir}")
             raise
 
+    def _bypass_reward_function(self) -> str:
+        raise NotImplementedError
 
-    def generate_reward_function(self, bypass_reward_function: str = None):
+
+    def generate_reward_function(self):
         """Generates a reward function using the reward generator script."""
+        self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
 
-        generated_reward_str = \
-        '''
-            def compute_reward(state):
-            return jnp.count_nonzero(state)
-        '''
-
-        return generated_reward_str
-
-        # tgt_path = os.path.join(self._experiment_path, 'GeneratedSkill.csv')
-
-        # feedback_type = self._get_env_args(self._config_dict, 'feedbackType')
-        # if feedback_type == "t-SNE" and gpt_model != "gpt-4o":
-        #     self.logging(create_message_box("You should use gpt-4o for vision feedback"))
-        #     self._exit()
-        #     exit(1)
-
-        message = ''
-        if self._iteration == 1:
-            self._reference_csv = 'random_dataset.txt'
-        else:
-            self._reference_csv = tgt_path
-
-        if self._iteration != 1:
-            # if feedback_type == "t-SNE":
-            #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "t-SNE.png")
-            # elif feedback_type == "statistics":
-            #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "statistics.json")
-
-            feedback_args_dict = {
-                'shared_storage_path': self._experiment_path,
-                'postfix': f"outer_{self._iteration}",
-                # 'feedback_type': feedback_type,
-                'skill_log_csv': self._reference_csv
-            }
-            feedback_args_list = [item for key, value in feedback_args_dict.items() if value is not None for item in
-                         (f'--{key}', str(value))]
-
-            generate_feedback_py = os.path.join(path.dirname(__file__), 'generate_feedback.py')
-            command_line = ['python', generate_feedback_py, *feedback_args_list]
-
-            process = subprocess.Popen(command_line,
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            while True:
-                error = process.stderr.readline()
-                if error == '' and process.poll() is not None:
-                    break
-                if error:
-                    message = f'Fail:{error.strip()}'
-                    return None, message
-
-        arbitrary_dataset = path.abspath(path.join(path.dirname(__file__), 'example', 'arbitrary_dataset.txt'))
-
-        if self._current_reward_function_filename is not None:
-            previous_reward_function = self._current_reward_function_filename
-        else:
-            previous_reward_function = None
 
         args_dict = {
-            # 'api_key': api_key,
             'shared_storage_path': self._experiment_path,
             'postfix': f"reward_outer_{self._iteration}",
-            'reward_functions_dir': 'RewardFunctions',
+            'reward_functions_dir': 'reward_functions',
             # 'gpt_model': gpt_model,
             'gpt_max_token': 4096,
             'verbose': None,
-            'previous_reward_function': previous_reward_function,
-            'trial_count': self._reward_generation_settings['trial_count'],
-            'n_inner': self._reward_generation_settings['inner_loop'],
+            'previous_reward_function': self._current_reward_function_filename,
+            'trial_count': 3,
             'n_outer': self._iteration,
-            'reference_csv': self._reference_csv,
+            'n_inner': 1,
+            # 'reference_csv': self._reference_csv,
             'iteration_num': self._iteration,
-            'feedback_path': self._feedback_path,
-            'arbitrary_dataset': arbitrary_dataset,
+            'feedback_path': None
         }
 
-        self.logging(f"Generating reward function (iteration {self._iteration})")
-
-        args_list = [item for key, value in args_dict.items() if value is not None for item in
-                     (f'--{key}', str(value))]
-
-        is_bypassed = (bypass_reward_function is not None) and (self._iteration == 1)
+        self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
 
 
+        # Start of the 'generate_reward.py'
+        from pcgrllm.generate_reward import generate_reward
+        is_success, error_output = generate_reward(config=self.config, generate_args=args_dict)
 
-        if not is_bypassed:
+        self.logging(f"Generated reward function for iteration {self._iteration}", level=logging.INFO)
 
-            # Start of the 'generate_reward.py'
-
-            generate_reward_py = os.path.join(path.dirname(__file__), 'generate_reward.py')
-            command_line = ['python', generate_reward_py, *args_list]
-            process = subprocess.Popen(command_line, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-            is_success = False
-            error_output = ''
-            while True:
-                output = process.stdout.readline()
-                error = process.stderr.readline()
-
-                if output == '' and error == '' and process.poll() is not None:
-                    break
-
-                if output:
-                    if 'Done' in output:
-                        is_success = True
-                    self.logging(output, end='')
-
-                if error:
-                    error_output += error
-
-            # End of the 'generate_reward.py'
-        else:
-            # Copy the bypass reward function to the reward functions directory
-            src_path = bypass_reward_function
-
-            reward_name = f"{args_dict['postfix']}_inner_{args_dict['n_inner']}"
-            dir_path = os.path.join(self.reward_functions_dir, reward_name)
-
-            # create directory if not exists
-            os.makedirs(dir_path, exist_ok=True)
-
-            tgt_path = os.path.join(dir_path, f"{reward_name}.py")
-            shutil.copy(src_path, tgt_path)
-
-            is_success = True
-            error_output = ''
 
         message = 'Success' if is_success else f'Fail: {error_output.strip()}'
 
-        reward_name = f"{args_dict['postfix']}_inner_{args_dict['n_inner']}.py"
-        self.append_reward_generation_log(trial_num=0, result=message,
-                                          previous_reward_function=previous_reward_function,
-                                          current_reward_function=reward_name)
+        reward_name = f"{args_dict['postfix']}_inner_{args_dict['n_inner']}/{args_dict['postfix']}_inner_{args_dict['n_inner']}.py"
+
+        # TODO 이거 살리기
+        # self.append_reward_generation_log(trial_num=0, result=message,
+        #                                   previous_reward_function=self._current_reward_function_filename,
+        #                                   current_reward_function=reward_name)
 
         if is_success:
             # copy the reward function as iteration_2.py
-            if not is_bypassed:
-                message = f"Reward function generated successfully: {reward_name}"
-            else:
-                message = f"Reward function bypassed: {reward_name}"
+            message = f"Reward function generated successfully: {reward_name}"
+        else:
+            message = f"Reward function bypassed: {reward_name}"
             # src_path = os.path.join(self.reward_functions_dir, f"reward_{args_dict['postfix']}.py")
             # tgt_path = os.path.join(self.reward_functions_dir, reward_name)
             # shutil.copy(src_path, tgt_path)
 
-            return reward_name, message
-        return None, message
+        return reward_name
 
     def validate_reward_function(self):
         config = copy.deepcopy(self.config)
@@ -342,6 +229,7 @@ class Experiment:
 
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
+        config.reward_function_path = path.join(self.reward_functions_dir, self._current_reward_function_filename)
         config.total_timesteps = int(1e6)
         os.makedirs(config.exp_dir, exist_ok=True)
 
@@ -367,8 +255,40 @@ class Experiment:
 
 
     # 파일 분석
-    def analyze_output(self, output):
+    def analyze_output(self, output) -> None:
         self.logging("Output analyzed")
+
+        raise NotImplementedError
+
+        # if feedback_type == "t-SNE":
+        #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "t-SNE.png")
+        # elif feedback_type == "statistics":
+        #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "statistics.json")
+
+        feedback_args_dict = {
+            'shared_storage_path': self._experiment_path,
+            'postfix': f"outer_{self._iteration}",
+            # 'feedback_type': feedback_type,
+            'skill_log_csv': self._reference_csv
+        }
+        feedback_args_list = [item for key, value in feedback_args_dict.items() if value is not None for item in
+                              (f'--{key}', str(value))]
+
+        generate_feedback_py = os.path.join(path.dirname(__file__), 'generate_feedback.py')
+        command_line = ['python', generate_feedback_py, *feedback_args_list]
+
+        process = subprocess.Popen(command_line,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        while True:
+            error = process.stderr.readline()
+            if error == '' and process.poll() is not None:
+                break
+            if error:
+                message = f'Fail:{error.strip()}'
+                return None, message
+
+        return None
+
 
     def save_state(self):
         # target variables: iteration, current_reward_function_filename
@@ -401,11 +321,13 @@ class Experiment:
             if self._stage == Stage.StartIteration:
                 self._stage = Stage.RewardGeneration
 
+
+
             elif self._stage == Stage.RewardGeneration:
 
-                self.generate_reward_function()
-                self.logging(
-                    f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
+
+                self._current_reward_function_filename = self.generate_reward_function()
+
                 # reward_function_path, message = self.generate_reward_function() # TODO (self._reward_generation_settings.get('first_iter_reward', None))
                 #
                 # if reward_function_path is None:
@@ -414,14 +336,15 @@ class Experiment:
                 # else:
                 #     self._current_reward_function_filename = reward_function_path
 
-                self._stage = Stage.RewardValidation
+                self._stage = Stage.TrainPCGRL
 
-            elif self._stage == Stage.RewardValidation:
-                # Validate the reward function
-                if self.validate_reward_function():
-                    self._stage = Stage.TrainPCGRL
-                else:
-                    self._stage = Stage.RewardGeneration
+            # elif self._stage == Stage.RewardValidation:
+                # # Validate the reward function
+                # if self.validate_reward_function():
+                #     self.exit("Good!") # TODO remove this before push
+                #     self._stage = Stage.TrainPCGRL
+                # else:
+                #     self._stage = Stage.RewardGeneration
 
 
             elif self._stage == Stage.TrainPCGRL:
