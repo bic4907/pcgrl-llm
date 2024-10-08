@@ -1,0 +1,7 @@
+
+### Reward Function Inputs
+def compute_reward(array: jnp.array, stats: dict) -> float:
+
+1. array (jnp.array): {array_shape}
+2. stats: (dict[int]): ({stats_keys})
+

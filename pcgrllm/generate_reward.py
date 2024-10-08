@@ -1,9 +1,11 @@
 import copy
 import datetime
 import os, re, ast, sys, time, argparse, json, pickle
+import pprint
 import shutil
 import multiprocessing
-import astor
+from copy import deepcopy
+
 import pandas as pd
 import numpy as np
 from os import path
@@ -13,52 +15,25 @@ import subprocess
 import traceback
 import logging
 
-from example.utils.preprocessing import preprocessing
+from absl.logging import warning
+from tensorflow_probability.substrates.jax.stats import expected_calibration_error
+
+from conf.config import TrainLLMConfig, TrainConfig, Config
+from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
+from pcgrllm.validate_reward import run_validate, read_file
 
 logging.getLogger('openai').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
 
-def make_sure_package(package_name, package):
-    try:
-        globals()[package_name] = __import__(package_name)
-    except ImportError:
-        print(f'installing {package}')
-        os.system(f'pip install {package}')
-        globals()[package_name] = __import__(package_name)
 
-
-make_sure_package('openai', 'openai==1.33.0')
-make_sure_package('astor', 'astor')
-make_sure_package('mlagents', 'mlagents')
-make_sure_package('pkg_resources', 'pkg_resources')
-
-
-def change_package_version(package_name, version=None):
-    try:
-        if version:
-            installed_version = pkg_resources.get_distribution(package_name).version
-            if installed_version != version:
-                print(
-                    f'{package_name} version {installed_version} is installed, but version {version} is required. Installing the required version.')
-                raise ImportError
-        globals()[package_name] = __import__(package_name)
-    except ImportError:
-        package = package_name if version is None else f'{package_name}=={version}'
-        print(f'Installing {package}')
-        subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
-        globals()[package_name] = __import__(package_name)
-        print(f'{package_name} has been installed and imported.')
-
-change_package_version('importlib_metadata', '4.4.0')
-
-
-from llm_client.llm import ChatContext, UnifiedLLMClient
-from llm_client.utils import *
+from pcgrllm.llm_client.llm import ChatContext, UnifiedLLMClient
+from pcgrllm.llm_client.utils import *
 
 # Configure logging
 log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
-logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
+logger = logging.getLogger(basename(__file__))
+logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
 class RewardGenerator:
@@ -75,7 +50,6 @@ class RewardGenerator:
         self.n_inner = config.get('n_inner', 3)
 
         self.current_inner = config.get('current_inner', 1)
-        self.logging(f"Current Inner: {self.current_inner}", logging.DEBUG)
 
         self.n_outer = config.get('n_outer', 3)
         self._current_trial = 0
@@ -90,24 +64,27 @@ class RewardGenerator:
         self.current_state_path = path.abspath(path.join(self.shared_storage_path, 'example', 'testState.json'))
         self.reward_function_path = path.join(self.shared_storage_path, self.reward_functions_dir,
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
-        self.initial_system = file_to_string(path.join(self.file_path, "initial_system.txt"))
+        self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
         self.task_description = file_to_string(path.join(self.file_path, "task_description.txt"))
         self.second_user = file_to_string(path.join(self.file_path, "second_user.txt"))
 
-        self.reward_template = file_to_string(path.join(self.example_path, "compute_reward_template.py"))
-        self.sampled_data_example = file_to_string(path.join(self.example_path, "sampled_data_example.txt"))
-        self.reward_example = file_to_string(path.join(self.example_path, "compute_reward_example.py"))
+        self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
+
+        self.reward_template = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
+        # self.sampled_data_example = file_to_string(path.join(self.file_path, "sampled_data_example.txt"))
+        # self.reward_example = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
 
         # previous 나중에 변경하기
-        self.previous_reward_function = config.get('previous_reward_function', 'compute_reward_example.py')
-        if self.previous_reward_function == 'compute_reward_example.py':
-            self.previous_reward_function = file_to_string(path.join(self.example_path, self.previous_reward_function))
+        self.previous_reward_function_path = config.get('previous_reward_function', None)
+        if self.previous_reward_function_path is None:
+            self.previous_reward_function_path = path.join(self.file_path, 'compute_reward_example.py')
+            self.previous_reward_function = file_to_string(self.previous_reward_function_path)
         else:
-            self.previous_reward_function = file_to_string(path.join(self.shared_storage_path, self.reward_functions_dir, self.previous_reward_function[:-3], self.previous_reward_function))
+            self.previous_reward_function = file_to_string(path.join(self.shared_storage_path, self.reward_functions_dir, self.previous_reward_function, self.previous_reward_function))
 
         os.makedirs(self.reward_function_path, exist_ok=True)
-        self._ensure_utility_files(self.reward_function_path)
+        # self._ensure_utility_files(self.reward_function_path)
 
 
 
@@ -117,18 +94,9 @@ class RewardGenerator:
             self._prepare_initial_reward_function()
 
 
-        self.logging(str(config), logging.INFO)
+        self.logging(f'Reward generation arguments:\n{pprint.pformat(config, indent=4)}', logging.INFO)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
-        if self.api_key is not None:
-            openai.api_key = self.api_key
-        else:
-            try:
-                openai.api_key = file_to_string(path.join(path.expanduser("~"), "API_key.txt"))
-            except:
-                self.logging(logging.CRITICAL, "API key not found. Please provide the API key using 'api_key' in config")
-                raise Exception("Raise Error")
-
 
 
     def logging(self, message, level=logging.DEBUG):
@@ -141,13 +109,13 @@ class RewardGenerator:
         }
 
         # Define the prefix format
-        prefix = '[ol: {outer_loop}, il: {inner_loop} / {n_inner}, trial: {trial} / {trial_count}]'.format(**info_dict)
+        prefix = '[iter: {outer_loop}, self-alignment: {inner_loop} / {n_inner}, trial: {trial} / {trial_count}]'.format(**info_dict)
 
         # Split the message by line breaks and log each line with the prefix
         message = str(message)
         for line in message.splitlines():
             formatted_message = f'{prefix} {line}'
-            logging.log(level, formatted_message)
+            logger.log(level, formatted_message)
 
     def _prepare_initial_reward_function(self):
         # Copy the initial reward function to the reward function path
@@ -161,6 +129,8 @@ class RewardGenerator:
         self.previous_reward_function = file_to_string(self.generating_function_path)
 
         self.logging(f"Copied the initial reward function to the reward function path: {self.initial_reward_function} -> {initial_reward_function_path}", logging.INFO)
+
+
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
                    verbose=False, seed=42):
@@ -223,6 +193,8 @@ class RewardGenerator:
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
                                                                         trial=i_trial)
+
+
                     self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
@@ -232,39 +204,76 @@ class RewardGenerator:
                                                                         trial=i_trial)
                     self.logging(f'Called the second_user_response function')
 
-                execute_output, execute_msg = self.execute_reward_function(generating_function_path)
 
-                if is_convertible_to_float(execute_output):
+                error_message = None
+
+                try:
+                    self.logging(f"Parsing the reward function: {generating_function_path}", logging.DEBUG)
+                    reward_function = self.parse_reward_function(generating_function_path)
+
+                    # Overwrite the reward function
+                    with open(generating_function_path, 'w') as f:
+                        f.write(reward_function)
+
+
+                    if hasattr(self, '_execution_config'):
+                        self.logging(f"Validating the reward function: {generating_function_path}", logging.DEBUG)
+                        self.execute_reward_function(generating_function_path)
+                    else:
+                        self.logging(f'Execution config is not set. Skipping the validation.', logging.WARNING)
+
+                    is_success = True
+
+                except Exception as e:
+                    error_message = str(e)
+                    self.logging(f"Failed to validate the reward function: {generating_function_path}", logging.INFO)
+                    self.logging(error_message, logging.DEBUG)
+                    is_success = False
+
+
+                if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
-                    is_success = True
+
                     break
                 else:
-                    error_message = execute_msg
                     generating_function_error = error_message
 
             if not is_success:
-                raise Exception(f"Failed to generate the reward function. Please check the error message.\n{error_message}")
+                self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
+                return False
 
             self.current_inner += 1
 
         # Save the reward function to the file
+
         reward_function_string = file_to_string(generating_function_path)
         reward_function_file_path = path.join(self.reward_function_path, f"{reward_function_name}.py")
         with open(reward_function_file_path, 'w') as f:
+            self.logging(f"Saving the reward function to the file: {reward_function_file_path}", logging.INFO)
             f.write(reward_function_string)
 
-        print("Done")
+        return reward_function_file_path
+
+
+    def set_execution_config(self, config: Config):
+        self.logging(f"Setting the execution config: {config}", logging.INFO)
+        self._execution_config = config
 
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
             i='{i}',
             reward_signature=self.reward_template,
-            sampled_data_example=self.sampled_data_example
+            # sampled_data_example=self.sampled_data_example
         )
 
         initial_user = copy.deepcopy(self.initial_user)
+
+        reward_function_inputs = self.reward_function_inputs_template.format(
+            array_shape='(16, 16, 1)',
+            stats_keys='DIAMETER = 0, N_REGIONS = 1',
+        )
 
         if generating_function_path is not None and generating_function_error is not None:
 
@@ -282,7 +291,8 @@ class RewardGenerator:
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
-                few_shot_code_string=sample_code
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs
             )
         else:
             sample_code = """
@@ -292,10 +302,11 @@ class RewardGenerator:
             ```python
             {task_obs_code_string}
             ```
-            """.format(task_obs_code_string=self.reward_example)
+            """.format(task_obs_code_string="")
 
             initial_user = initial_user.format(
-                few_shot_code_string=sample_code
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs
             )
 
         messages = [
@@ -334,11 +345,10 @@ class RewardGenerator:
         with open(log_file_path, 'w') as f:
             json.dump(log_dict, f, indent=4)
 
-        # if the preprocessing code do not exists in the reward path, copy it to the past
-        self._ensure_utility_files(self.reward_function_path)
 
         return reward_file_path
 
+    # FIX ME: Implement the function
     def second_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
         playtesting_result = ""
         parsed_code = ast.parse(self.previous_reward_function)
@@ -487,8 +497,6 @@ class RewardGenerator:
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
 
-        parsed_reward_function = parse_reward_function(response)
-
         log_dict = {
             'request': messages,
             'response': response,
@@ -497,7 +505,7 @@ class RewardGenerator:
         # Save reward function to .py
         reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
         with open(reward_file_path, 'w') as f:
-            f.write(parsed_reward_function)
+            f.write(response)
 
         # Save the log to .json file
         log_file_path = path.join(self.reward_function_path, f"{basename}.json")
@@ -506,149 +514,32 @@ class RewardGenerator:
 
         return reward_file_path
 
-    def _ensure_utility_files(self, path: str) -> None:
-        # Get the directory where the script is located
-        original_dir = os.path.dirname(__file__)
 
-        # Define the utility directory within the original directory (assuming it's called 'utils')
-        utility_dir = os.path.join(original_dir, 'example', 'utils')
-
-        # Copy all files from utility_dir to the destination path
-        for filename in os.listdir(utility_dir):
-            file_path = os.path.join(utility_dir, filename)
-            if os.path.isfile(file_path):
-                shutil.copy(file_path, path)
-
-        return None
-
-    def execute_reward_function(self, reward_function_path: str, current_state_path: str = None) -> (str, str):
-        """
-        보상 함수를 실행하는 함수. current_state_path를 인자로 받아 임시 경로를 사용할 수 있으며,
-        기본값으로 self.current_state_path를 사용한다.
-        """
-
-        # current_state_path가 None이면 self.current_state_path 사용
-        if current_state_path is None:
-            current_state_path = self.current_state_path
-
-        # Build the command line to execute the reward function
-        code_execution_command_line = ['python', abspath(reward_function_path), current_state_path]
-
-        # Logging the command that will be executed
-        self.logging(f"Executing the reward function with the command line: {' '.join(code_execution_command_line)}", logging.INFO)
-
-        # Execute the reward function and capture output and error
-        process = subprocess.run(code_execution_command_line, capture_output=True, text=True)
-
-        # Capture stdout and stderr
-        output = process.stdout
-        error = process.stderr
-
-        if output == '' and error == '':
-            error = 'no output'
-
-        # Logging the result of the execution
-        if error:
-            self.logging(f"Error occurred while executing the reward function (len: {len(error)}) - error:\n{error}", logging.WARNING)
-        else:
-            self.logging(f"Executed the reward function - result: {output}", logging.INFO)
-
-        # Return the output and error
-        return output, error
-
-    def execute_reward_function(self, reward_function_path: str, current_state_path: str = None, verbose: bool = False) -> (str, str):
-        """
-        보상 함수를 실행하는 함수. current_state_path를 인자로 받아 임시 경로를 사용할 수 있으며,
-        기본값으로 self.current_state_path를 사용한다.
-        """
-
-        # current_state_path가 None이면 self.current_state_path 사용
-        if current_state_path is None:
-            current_state_path = self.current_state_path
-
-        # Build the command line to execute the reward function
-        code_execution_command_line = ['python', abspath(reward_function_path), current_state_path]
-
-        # Logging the command that will be executed
-        if verbose:
-            self.logging(f"Executing the reward function with the command line: {' '.join(code_execution_command_line)}", logging.INFO)
-
-        # Execute the reward function and capture output and error
-        process = subprocess.run(code_execution_command_line, capture_output=True, text=True)
-
-        # Capture stdout and stderr
-        output = process.stdout
-        error = process.stderr
-
-        if output == '' and error == '':
-            error = 'no output'
-
-        # Logging the result of the execution
-        if error:
-            if verbose:
-                self.logging(f"Error occurred while executing the reward function (len: {len(error)}) - error:\n{error}", logging.WARNING)
-        else:
-            if verbose:
-                self.logging(f"Executed the reward function - result: {output}", logging.INFO)
-
-        # Return the output and error
-        return output, error
-
-    def execute_single(self, reward_function_path: str, state_data: dict, verbose: bool = True) -> (str, str):
-        """
-        개별 보상 함수를 실행하는 메서드. state_data(dict)를 임시 파일로 저장하고,
-        그 파일의 경로를 보상 함수에 넘겨준다.
-        """
-        # 임시 파일에 state_data 저장
-        with tempfile.NamedTemporaryFile('w', delete=False) as temp_file:
-            json.dump(state_data, temp_file)
-            temp_file_path = temp_file.name
-
-        # 보상 함수 실행
-        result = self.execute_reward_function(reward_function_path, temp_file_path, verbose)
-
-        # 임시 파일 삭제
+    def parse_reward_function(self, reward_function_path: str) -> str:
+        # Return the parsed reward function
         try:
-            os.remove(temp_file_path)
-        except OSError as e:
-            self.logging(f"Error deleting temp file: {e}", logging.ERROR)
+            code = parse_reward_function(file_to_string(reward_function_path))
+        except Exception as e:
+            raise RewardParsingException(file_to_string(reward_function_path), "Failed to parse the reward function")
+
+        return code
+
+    def execute_reward_function(self, reward_function_path: str) -> bool:
+        config = deepcopy(self._execution_config)
+        config.reward_function_path = reward_function_path
+
+        try:
+            result = run_validate(config)
+        except Exception as e:
+            code = read_file(reward_function_path)
+            raise RewardExecutionException(code, e)
 
         return result
 
-    def execute_reward_functions_parallel(self, reward_function_path: str, state_dicts: list) -> list:
-        """
-        여러 개의 보상 함수를 병렬로 실행하는 함수.
-        state_dicts는 각 보상 함수에서 사용할 상태 데이터 딕셔너리들의 리스트다.
-        """
-
-        self.logging(f"Executing reward functions in parallel: {len(state_dicts)} state dicts", logging.INFO)
-
-        # 병렬 처리를 위한 프로세스 풀 생성
-        with multiprocessing.Pool(processes=multiprocessing.cpu_count()) as pool:
-            # 각 상태 데이터를 임시 파일로 저장하고 병렬로 작업 실행
-            results = pool.starmap(self.execute_single, [(reward_function_path, state_data, False) for state_data in state_dicts])
-
-        self.logging(f"Executed reward functions in parallel: {len(state_dicts)} state dicts", logging.INFO)
-
-        reward_values = list()
-        error_messages = list()
-        for result, error in results:
-            if is_convertible_to_float(result):
-                reward_values.append(float(result))
-            else:
-                error_messages.append(error)
-
-        # Get the mean and std
-        mean_reward = np.mean(reward_values)
-        std_reward = np.std(reward_values)
-
-        num_inputs = len(state_dicts)
-        num_success = len(reward_values)
-        success_rate = num_success / num_inputs * 100
-
-        # 모든 결과 반환
-        return mean_reward, std_reward, success_rate
-
+def generate_reward(config: Config, generate_args: dict):
+    reward_generator = RewardGenerator(generate_args)
+    reward_generator.set_execution_config(config)
+    return reward_generator.run()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

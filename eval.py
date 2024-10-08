@@ -1,7 +1,9 @@
 import copy
 import json
 import os
+from os.path import basename
 from typing import Optional
+from venv import logger
 
 import chex
 from flax import struct
@@ -20,6 +22,11 @@ from purejaxrl.experimental.s5.wrappers import LogWrapper, LossLogWrapper
 from train import init_checkpointer
 from utils import get_exp_dir, init_network, gymnax_pcgrl_make, init_config
 
+import logging
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+logger = logging.getLogger(basename(__file__))
+logger.setLevel(getattr(logging, log_level, logging.INFO))
+
 
 @struct.dataclass
 class EvalData:
@@ -37,10 +44,10 @@ def main_eval(eval_config: EvalConfig = None):
     if eval_config.initialize is None or eval_config.initialize:
         eval_config = init_config(eval_config)
 
-
     exp_dir = eval_config.exp_dir
+
     if not eval_config.random_agent:
-        print(f'Attempting to load checkpoint from {exp_dir}')
+        logger.info(f'Attempting to load checkpoint from {exp_dir}')
         checkpoint_manager, restored_ckpt = init_checkpointer(eval_config)
         network_params = restored_ckpt['runner_state'].train_state.params
     elif not os.path.exists(exp_dir):
