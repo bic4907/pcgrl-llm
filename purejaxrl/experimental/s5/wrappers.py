@@ -130,6 +130,8 @@ class LLMRewardWrapper(GymnaxWrapper):
         params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
 
+        assert self.reward_fn is not None, "Reward function not set."
+
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
 
         reward_fn = self.get_reward_fn()

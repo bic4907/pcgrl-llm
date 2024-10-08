@@ -40,7 +40,7 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
 
 logging.getLogger('hydra').setLevel(logging.INFO)
-logging.getLogger('absl').setLevel(logging.WARNING)
+logging.getLogger('absl').setLevel(logging.INFO)
 
 
 class Experiment:
@@ -403,8 +403,9 @@ class Experiment:
                 # else:
                 #     self._current_reward_function_filename = reward_function_path
 
-
                 self._stage = Stage.TrainPCGRL
+
+
             elif self._stage == Stage.TrainPCGRL:
                 # Run ML-Agents
                 self.train_pcgrl()
