@@ -164,28 +164,7 @@ class Experiment:
 
         # Start of the 'generate_reward.py'
         from pcgrllm.generate_reward import generate_reward
-        is_success, error_output = generate_reward(config=self.config, generate_args=args_dict)
-
-        self.logging(f"Generated reward function for iteration {self._iteration}", level=logging.INFO)
-
-
-        message = 'Success' if is_success else f'Fail: {error_output.strip()}'
-
-        reward_name = f"{args_dict['postfix']}_inner_{args_dict['n_inner']}/{args_dict['postfix']}_inner_{args_dict['n_inner']}.py"
-
-        # TODO 이거 살리기
-        # self.append_reward_generation_log(trial_num=0, result=message,
-        #                                   previous_reward_function=self._current_reward_function_filename,
-        #                                   current_reward_function=reward_name)
-
-        if is_success:
-            # copy the reward function as iteration_2.py
-            message = f"Reward function generated successfully: {reward_name}"
-        else:
-            message = f"Reward function bypassed: {reward_name}"
-            # src_path = os.path.join(self.reward_functions_dir, f"reward_{args_dict['postfix']}.py")
-            # tgt_path = os.path.join(self.reward_functions_dir, reward_name)
-            # shutil.copy(src_path, tgt_path)
+        reward_name = generate_reward(config=self.config, generate_args=args_dict)
 
         return reward_name
 
@@ -229,9 +208,17 @@ class Experiment:
 
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
-        config.reward_function_path = path.join(self.reward_functions_dir, self._current_reward_function_filename)
-        config.total_timesteps = int(1e6)
+        config.initialize = False
+
+
+        config.reward_function_path = self._current_reward_function_filename
+        # copy to the exp_dir
+
         os.makedirs(config.exp_dir, exist_ok=True)
+
+        self.logging(f'Copying reward function to the experiment directory: {config.reward_function_path} -> {path.join(config.exp_dir, basename(self._current_reward_function_filename))}')
+        shutil.copy(config.reward_function_path, path.join(config.exp_dir, basename(self._current_reward_function_filename)))
+        config.reward_function_path = path.join(config.exp_dir, basename(self._current_reward_function_filename))
 
         config.overwrite = False
 
@@ -328,23 +315,10 @@ class Experiment:
 
                 self._current_reward_function_filename = self.generate_reward_function()
 
-                # reward_function_path, message = self.generate_reward_function() # TODO (self._reward_generation_settings.get('first_iter_reward', None))
-                #
-                # if reward_function_path is None:
-                #     self.logging(f"Reward function generation failed.\n{message}\nExiting.")
-                #     self.exit("Reward function generation failed.")
-                # else:
-                #     self._current_reward_function_filename = reward_function_path
-
-                self._stage = Stage.TrainPCGRL
-
-            # elif self._stage == Stage.RewardValidation:
-                # # Validate the reward function
-                # if self.validate_reward_function():
-                #     self.exit("Good!") # TODO remove this before push
-                #     self._stage = Stage.TrainPCGRL
-                # else:
-                #     self._stage = Stage.RewardGeneration
+                if self._current_reward_function_filename is False:
+                    self.exit("Reward function generation failed. Exiting.")
+                else:
+                    self._stage = Stage.TrainPCGRL
 
 
             elif self._stage == Stage.TrainPCGRL:

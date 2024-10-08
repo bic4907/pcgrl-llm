@@ -217,7 +217,7 @@ class RewardGenerator:
 
 
                     if hasattr(self, '_execution_config'):
-                        self.logging(f"Vlidating the reward function: {generating_function_path}", logging.DEBUG)
+                        self.logging(f"Validating the reward function: {generating_function_path}", logging.DEBUG)
                         self.execute_reward_function(generating_function_path)
                     else:
                         self.logging(f'Execution config is not set. Skipping the validation.', logging.WARNING)
@@ -227,9 +227,9 @@ class RewardGenerator:
                 except Exception as e:
                     error_message = str(e)
                     self.logging(f"Failed to validate the reward function: {generating_function_path}", logging.INFO)
-                    self.logging(traceback.format_exc(), logging.ERROR)
+                    self.logging(error_message, logging.DEBUG)
                     is_success = False
-                    pass
+
 
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
@@ -238,6 +238,10 @@ class RewardGenerator:
                     break
                 else:
                     generating_function_error = error_message
+
+            if not is_success:
+                self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
+                return False
 
             self.current_inner += 1
 
@@ -248,6 +252,9 @@ class RewardGenerator:
         with open(reward_function_file_path, 'w') as f:
             self.logging(f"Saving the reward function to the file: {reward_function_file_path}", logging.INFO)
             f.write(reward_function_string)
+
+        return reward_function_file_path
+
 
     def set_execution_config(self, config: Config):
         self.logging(f"Setting the execution config: {config}", logging.INFO)
@@ -513,16 +520,13 @@ class RewardGenerator:
         try:
             code = parse_reward_function(file_to_string(reward_function_path))
         except Exception as e:
-
-            raise RewardParsingException("Failed to parse the reward function")
+            raise RewardParsingException(file_to_string(reward_function_path), "Failed to parse the reward function")
 
         return code
 
     def execute_reward_function(self, reward_function_path: str) -> bool:
         config = deepcopy(self._execution_config)
         config.reward_function_path = reward_function_path
-
-
 
         try:
             result = run_validate(config)
@@ -535,9 +539,7 @@ class RewardGenerator:
 def generate_reward(config: Config, generate_args: dict):
     reward_generator = RewardGenerator(generate_args)
     reward_generator.set_execution_config(config)
-    reward_generator.run()
-
-    return True, None
+    return reward_generator.run()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

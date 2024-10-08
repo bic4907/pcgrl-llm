@@ -27,6 +27,13 @@ from utils import (get_ckpt_dir, get_exp_dir, init_network, gymnax_pcgrl_make,
                    init_config)
 
 
+import logging
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+logger = logging.getLogger(basename(__file__))
+logger.setLevel(getattr(logging, log_level, logging.INFO))
+
+
+
 class RunnerState(struct.PyTreeNode):
     train_state: TrainState
     env_state: jnp.ndarray
@@ -711,7 +718,7 @@ def main(config: TrainConfig):
     rng = jax.random.PRNGKey(config.seed)
 
     exp_dir = config.exp_dir
-    print(f'running experiment at {exp_dir}\n')
+    logger.info(f'running experiment at {exp_dir}')
 
     # Need to do this before setting up checkpoint manager so that it doesn't refer to old checkpoints.
     if config.overwrite and os.path.exists(exp_dir):
