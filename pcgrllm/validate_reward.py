@@ -39,7 +39,7 @@ def run_validate(config: TrainLLMConfig):
     if config.reward_function_path is None:
         config.reward_function_path = path.abspath(path.join(path.dirname(__file__), 'example', 'dummy_reward.py'))
 
-    print_log(logger, f"Reward function path: {config.reward_function_path}", level=logging.INFO)
+    print_log(logger, f"Reward validation path: {config.reward_function_path}", level=logging.INFO)
     reward_fn_str = read_file(config.reward_function_path)
     print_log(logger, f"\n{reward_fn_str}")
 
@@ -89,7 +89,7 @@ def run_validate(config: TrainLLMConfig):
 
     # Final reward check
     rewards = np.array(rewards)
-    print_log(logger, f"Reward validation result: {rewards.shape}", level=logging.INFO)
+    print_log(logger, f"Reward output shape: {rewards.shape}", level=logging.INFO)
 
     # Check for invalid rewards (NaN or Inf)
     if np.isnan(rewards).any():
@@ -97,7 +97,7 @@ def run_validate(config: TrainLLMConfig):
     if np.isinf(rewards).any():
         raise ValueError("Found Inf in the reward values")
 
-    print("Passed")
+    return True
 
 @hydra.main(version_base=None, config_path='../conf', config_name='train_pcgrllm')
 def main(config: TrainLLMConfig) -> None:
