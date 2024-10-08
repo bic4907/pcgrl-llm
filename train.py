@@ -33,7 +33,6 @@ logger = logging.getLogger(basename(__file__))
 logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
-
 class RunnerState(struct.PyTreeNode):
     train_state: TrainState
     env_state: jnp.ndarray
@@ -91,7 +90,7 @@ def log_callback(metric, steps_prev_complete, config, writer, train_start_time):
         #     writer.add_scalar(k, v, t)
 
 
-def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
+def make_train(config, restored_ckpt, checkpoint_manager):
     config.NUM_UPDATES = (
         config.total_timesteps // config.num_steps // config.n_envs
     )
@@ -100,19 +99,21 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
     )
     env_r, env_params = gymnax_pcgrl_make(config.env_name, config=config)
     # env = FlattenObservationWrapper(env)
+    env = env_r
 
+    if hasattr(config, 'reward_function_path') and config.reward_function_path is not None:
+        logger.info(f"Train using reward function from {config.reward_function_path}")
 
-    env = LLMRewardWrapper(env_r)
+        env = LLMRewardWrapper(env)
+
+        reward_fn_str = read_file(config.reward_function_path)
+
+        exec_scope = {}
+        exec(reward_fn_str, exec_scope)
+        reward_fn = exec_scope['compute_reward']
+        env.set_reward_fn(reward_fn)
+
     env = LogWrapper(env)
-
-    reward_fn_str = read_file(config.reward_function_path)
-
-    exec_scope = {}
-    exec(reward_fn_str, exec_scope)
-    reward_fn = exec_scope['compute_reward']
-    env.set_reward_fn(reward_fn)
-
-
     env_r.init_graphics()
 
     def linear_schedule(count):
@@ -299,31 +300,27 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
         def init_checkpoint(runner_state):
             ckpt = {'runner_state': runner_state,
                     'step_i': 0}
-            save_args = orbax_utils.save_args_from_target(ckpt)
-            checkpoint_manager.save(0, ckpt, save_kwargs={
-                'save_args': save_args})
+            checkpoint_manager.save(0, args=ocp.args.StandardSave(ckpt))
 
         def save_checkpoint(runner_state, info, steps_prev_complete):
-            try:
-                timesteps = info["timestep"][info["returned_episode"]
-                                             ] * config.n_envs
-            except jax.errors.NonConcreteBooleanIndexError:
-                return
+            # Get the global env timestep numbers corresponding to the points at which different episodes were finished
+            timesteps = info["timestep"][info["returned_episode"]] * config.n_envs
 
-            for t in timesteps:
-                if t > 0:
-                    latest_ckpt_step = checkpoint_manager.latest_step()
-                    if (latest_ckpt_step is None or
-                            t - latest_ckpt_step >= config.ckpt_freq):
-                        print(f"Saving checkpoint at step {t}")
-                        ckpt = {'runner_state': runner_state,
-                                # 'config': config,
-                                'step_i': t}
-                        # ckpt = {'step_i': t}
-                        save_args = orbax_utils.save_args_from_target(ckpt)
-                        checkpoint_manager.save(t, ckpt, save_kwargs={
-                                                'save_args': save_args})
-                    break
+            if len(timesteps) > 0:
+                # Get the latest global timestep at which some episode was finished
+                t = timesteps[-1].item()
+                latest_ckpt_step = checkpoint_manager.latest_step()
+                if (latest_ckpt_step is None or
+                        t - latest_ckpt_step >= config.ckpt_freq):
+                    print(f"Saving checkpoint at step {t}")
+                    ckpt = {'runner_state': runner_state,
+                            # 'config': OmegaConf.to_container(config),
+                            'step_i': t}
+                    # ckpt = {'step_i': t}
+                    # save_args = orbax_utils.save_args_from_target(ckpt)
+                    # checkpoint_manager.save(t, ckpt, save_kwargs={
+                    #                         'save_args': save_args})
+                    checkpoint_manager.save(t, args=ocp.args.StandardSave(ckpt))
 
         # frames, states = render_episodes(train_state.params)
         # jax.debug.callback(render_frames, frames, runner_state.update_i)
@@ -492,8 +489,6 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
 
             # Save initial weight
 
-
-
             update_state = (train_state, traj_batch, advantages, targets, rng)
             update_state, loss_info = jax.lax.scan(
                 _update_epoch, update_state, None, config.update_epochs
@@ -505,6 +500,8 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
             # Save weight to checkpoint
             jax.debug.callback(save_checkpoint, runner_state,
                                metric, steps_prev_complete)
+
+
 
             # FIXME: shouldn't assume size of render map.
             # frames_shape = (config.n_render_eps * 1 * env.max_steps, 
@@ -605,31 +602,37 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
     target = {'runner_state': runner_state, 'step_i': 0}
     # Get absolute path
     ckpt_dir = os.path.abspath(ckpt_dir)
-    options = orbax.checkpoint.CheckpointManagerOptions(
+
+    options = ocp.CheckpointManagerOptions(
         max_to_keep=2, create=True)
-    checkpoint_manager = orbax.checkpoint.CheckpointManager(
-        ckpt_dir, orbax.checkpoint.PyTreeCheckpointer(), options)
+    # checkpoint_manager = orbax.checkpoint.CheckpointManager(
+    #     ckpt_dir, orbax.checkpoint.PyTreeCheckpointer(), options)
+    checkpoint_manager = ocp.CheckpointManager(
+        # ocp.test_utils.erase_and_create_empty(ckpt_dir),
+        ckpt_dir,
+        options=options,
+    )
 
     def try_load_ckpt(steps_prev_complete, target):
 
         runner_state = target['runner_state']
         try:
             restored_ckpt = checkpoint_manager.restore(
-                steps_prev_complete, items=target)
+                # steps_prev_complete, items=target)
+                steps_prev_complete, args=ocp.args.StandardRestore(target))
         except KeyError:
             # HACK
             runner_state = runner_state.replace(
                 env_state=runner_state.env_state.replace(
                     env_state=runner_state.env_state.env_state.replace(
-                                queued_state=gen_dummy_queued_state_old(env)
+                        queued_state=gen_dummy_queued_state_old(env)
                     )
                 )
-            )     
+            )
             target = {'runner_state': runner_state, 'step_i': 0}
             restored_ckpt = checkpoint_manager.restore(
                 steps_prev_complete, items=target)
-            
-            
+
         restored_ckpt['steps_prev_complete'] = steps_prev_complete
         if restored_ckpt is None:
             raise TypeError("Restored checkpoint is None")
@@ -639,9 +642,10 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
             dummy_queued_state = gen_dummy_queued_state(env)
 
             # Now add leading dimension with sizeto match the shape of the original queued_state
-            dummy_queued_state = jax.tree_map(lambda x: jnp.array(x, dtype=bool) if isinstance(x, bool) else x, dummy_queued_state)
+            dummy_queued_state = jax.tree_map(lambda x: jnp.array(x, dtype=bool) if isinstance(x, bool) else x,
+                                              dummy_queued_state)
             dummy_queued_state = jax.tree_map(lambda x: jnp.repeat(x[None], config.n_envs, axis=0), dummy_queued_state)
-            
+
             runner_state = restored_ckpt['runner_state']
             runner_state = runner_state.replace(
                 env_state=runner_state.env_state.replace(
@@ -681,11 +685,11 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
                 break
             except TypeError as e:
                 print(f"Failed to load checkpoint at step {steps_prev_complete}. Error: {e}")
-                continue 
-    
+                continue
+
     return checkpoint_manager, restored_ckpt
 
-    
+
 def main_chunk(config, rng, exp_dir):
     checkpoint_manager, restored_ckpt = init_checkpointer(config)
 
