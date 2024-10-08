@@ -135,6 +135,7 @@ class LLMRewardWrapper(GymnaxWrapper):
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
 
         reward_fn = self.get_reward_fn()
+        print(state.__dict__)
 
         llm_reward_prev = reward_fn(state.env_map)
         llm_reward_curr = reward_fn(state.env_map)
@@ -149,6 +150,43 @@ class LLMRewardWrapper(GymnaxWrapper):
     def get_reward_fn(self):
         return self.reward_fn
 
+
+
+class LLMRewardWrapperDebug(GymnaxWrapper):
+    def __init__(self, env: environment.Environment):
+        super().__init__(env)
+
+        self.reward_fn = None
+
+    @partial(jax.jit, static_argnums=(0, 4))
+    def step(
+        self,
+        key: chex.PRNGKey,
+        state: environment.EnvState,
+        action: Union[int, float],
+        params: Optional[environment.EnvParams] = None,
+    ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
+
+        assert self.reward_fn is not None, "Reward function not set."
+
+        obs, env_state, reward, done, info = self._env.step(key, state, action, params)
+
+        metrics_enum = self._env.prob.metrics_enum
+
+        # Stats 출력
+
+        for metric in metrics_enum:
+            jax.debug.print(f'Metric name: {metric.name}, value = {{}}', env_state.prob_state.stats[metric.value])
+
+        jax.debug.print("{}", env_state.env_map)
+
+        return obs, env_state, reward, done, info
+
+    def set_reward_fn(self, reward_fn):
+        self.reward_fn = reward_fn
+
+    def get_reward_fn(self):
+        return self.reward_fn
 
 
 
