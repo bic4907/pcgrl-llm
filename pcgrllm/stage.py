@@ -5,6 +5,7 @@ class Stage:
     StartIteration = "StartIteration"
 
     RewardGeneration = "RewardGeneration"
+    RewardValidation = "RewardValidation"
     TrainPCGRL = "TrainPCGRL"
     RolloutPCGRL = "RolloutPCGRL"
     Analysis = "Analysis"

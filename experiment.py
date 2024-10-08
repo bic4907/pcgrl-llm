@@ -25,8 +25,9 @@ import pprint
 from conf.config import TrainConfig
 from eval import main_eval
 from pcgrllm.paths import init_config
+from pcgrllm.utils.logger import print_log
 
-
+from pcgrllm.validate_reward import run_validate
 from pcgrllm.stage import Stage
 
 
@@ -40,7 +41,7 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
 
 logging.getLogger('hydra').setLevel(logging.INFO)
-logging.getLogger('absl').setLevel(logging.WARNING)
+logging.getLogger('absl').setLevel(logging.INFO)
 
 
 class Experiment:
@@ -160,7 +161,6 @@ class Experiment:
             def compute_reward(state):
             return jnp.count_nonzero(state)
         '''
-        print(generated_reward_str.strip())
 
         return generated_reward_str
 
@@ -302,6 +302,17 @@ class Experiment:
             return reward_name, message
         return None, message
 
+    def validate_reward_function(self):
+        config = copy.deepcopy(self.config)
+
+        try:
+            result = run_validate(config)
+        except:
+            result = False
+
+        print_log(self.logger, f"Reward validation passed?: {result}", level=logging.INFO)
+
+        return result
 
     def append_reward_generation_log(self, result: str, trial_num: int, previous_reward_function: str,
                                      current_reward_function: str) -> None:
@@ -403,8 +414,16 @@ class Experiment:
                 # else:
                 #     self._current_reward_function_filename = reward_function_path
 
+                self._stage = Stage.RewardValidation
 
-                self._stage = Stage.TrainPCGRL
+            elif self._stage == Stage.RewardValidation:
+                # Validate the reward function
+                if self.validate_reward_function():
+                    self._stage = Stage.TrainPCGRL
+                else:
+                    self._stage = Stage.RewardGeneration
+
+
             elif self._stage == Stage.TrainPCGRL:
                 # Run ML-Agents
                 self.train_pcgrl()

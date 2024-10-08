@@ -260,8 +260,6 @@ class TrainLLMConfig(Config):
     MINIBATCH_SIZE: Optional[int] = None
     ###########################################################################
 
-
-
     # LLM experiment setting
     total_iterations: int = int(2)
 
@@ -274,6 +272,13 @@ class TrainLLMConfig(Config):
     n_eval_envs: int = 1
     reevaluate: bool = True
     n_eps: int = 2
+
+    # validation setting
+    reward_function_path: Optional[str] = None
+
+
+    # debug options
+
 
 
 cs = ConfigStore.instance()
