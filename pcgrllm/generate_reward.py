@@ -72,8 +72,6 @@ class RewardGenerator:
         self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
 
         self.reward_template = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
-        # self.sampled_data_example = file_to_string(path.join(self.file_path, "sampled_data_example.txt"))
-        # self.reward_example = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
 
         # previous 나중에 변경하기
         self.previous_reward_function_path = config.get('previous_reward_function', None)
