@@ -66,22 +66,22 @@ class RewardGenerator:
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
+        self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
+
         self.task_description = file_to_string(path.join(self.file_path, "task_description.txt"))
         self.second_user = file_to_string(path.join(self.file_path, "second_user.txt"))
 
         self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
 
         self.reward_template = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
-        # self.sampled_data_example = file_to_string(path.join(self.file_path, "sampled_data_example.txt"))
-        # self.reward_example = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
 
         # previous 나중에 변경하기
+        default_reward = path.join(self.file_path, "compute_reward_example.py")
+
         self.previous_reward_function_path = config.get('previous_reward_function', None)
         if self.previous_reward_function_path is None:
-            self.previous_reward_function_path = path.join(self.file_path, 'compute_reward_example.py')
-            self.previous_reward_function = file_to_string(self.previous_reward_function_path)
-        else:
-            self.previous_reward_function = file_to_string(path.join(self.shared_storage_path, self.reward_functions_dir, self.previous_reward_function, self.previous_reward_function))
+            self.previous_reward_function_path = default_reward
+        self.previous_reward_function = file_to_string(self.previous_reward_function_path)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
         # self._ensure_utility_files(self.reward_function_path)
@@ -198,10 +198,11 @@ class RewardGenerator:
                     self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path = self.second_user_response(basename=basename,
+                    generating_function_path = self.first_user_response(basename=basename,
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
                                                                         trial=i_trial)
+                    # TODO implement second_user_function with the feedback prompts
                     self.logging(f'Called the second_user_response function')
 
 
@@ -267,6 +268,9 @@ class RewardGenerator:
             reward_signature=self.reward_template,
             # sampled_data_example=self.sampled_data_example
         )
+
+        # Add jax code tips prompt
+        self.initial_system += self.jax_code_tips_prompt
 
         initial_user = copy.deepcopy(self.initial_user)
 
@@ -557,7 +561,7 @@ if __name__ == "__main__":
     parser.add_argument('--arbitrary_dataset', type=str, default='./example/random_dataset.txt')
     parser.add_argument('--trial_count', type=int, default=10)
     parser.add_argument('--iteration_num', type=int, default=1)
-    parser.add_argument('--previous_reward_function', type=str, default='compute_reward_example.py')
+    parser.add_argument('--previous_reward_function', type=str, default=None)
 
     parser.add_argument('--initial_reward_function', type=str, default=None)
 
