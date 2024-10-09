@@ -280,6 +280,7 @@ class TrainLLMConfig(Config):
     # reward generation setting
     n_generation_trials: int = 10
     bypass_reward_path: Optional[str] = None
+    gpt_model: str = 'llama3-80b-instruct'
 
 
 cs = ConfigStore.instance()

@@ -121,7 +121,7 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         self.reward_fn = None
 
-    @partial(jax.jit, static_argnums=(0, 4))
+    # @partial(jax.jit, static_argnums=(0, 4))
     def step(
         self,
         key: chex.PRNGKey,

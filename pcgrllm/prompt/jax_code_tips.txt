@@ -1,0 +1,16 @@
+# Tips for Jax code implementation
+The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)
+
+### Attempted boolean conversion of traced array with shape bool[].
+This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use `jnp.where` to achieve the same result.
+
+[Before]
+if current_diameter > diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty
+
+[After]
+jnp.where(current_diameter > diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
