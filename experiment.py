@@ -147,7 +147,7 @@ class Experiment:
             'shared_storage_path': self._experiment_path,
             'postfix': f"reward_outer_{self._iteration}",
             'reward_functions_dir': 'reward_functions',
-            # 'gpt_model': gpt_model,
+            'gpt_model': self.config.gpt_model,
             'gpt_max_token': 4096,
             'verbose': None,
             'previous_reward_function': self._current_reward_function_filename,

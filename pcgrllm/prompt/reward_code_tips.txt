@@ -1,0 +1,3 @@
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp
