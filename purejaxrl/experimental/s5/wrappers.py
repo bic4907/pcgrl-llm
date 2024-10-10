@@ -155,7 +155,7 @@ class LLMRewardWrapper(GymnaxWrapper):
         llm_reward_prev = reward_fn(prev_array, prev_stats)
         llm_reward_curr = reward_fn(curr_array, curr_stats)
 
-        reward += llm_reward_curr - llm_reward_prev
+        reward = llm_reward_curr - llm_reward_prev
 
         return obs, env_state, reward, done, info
 
@@ -194,6 +194,7 @@ class LLMRewardWrapperDebug(GymnaxWrapper):
             jax.debug.print(f'Metric name: {metric.name}, value = {{}}', env_state.prob_state.stats[metric.value])
 
         jax.debug.print("{}", env_state.env_map)
+        jax.debug.print("{}", env_state.env_map.shape)
 
         return obs, env_state, reward, done, info
 

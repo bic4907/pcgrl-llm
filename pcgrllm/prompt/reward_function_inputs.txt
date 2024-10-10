@@ -2,6 +2,12 @@
 ### Reward Function Inputs
 def compute_reward(array: jnp.array, stats: dict) -> float:
 
-1. array (jnp.array): {array_shape}
+1. array (jnp.array, int32): {array_shape}
+The array is a 2D array with the shape of (height, width).
+The game level is represented with tile numbers (enum) in the 2D array.
+
+[Tile Number]
+{tile_enum}
+
 2. stats: (dict[int]): ({stats_keys})
 

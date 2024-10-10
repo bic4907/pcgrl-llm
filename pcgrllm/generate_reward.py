@@ -67,6 +67,7 @@ class RewardGenerator:
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
+        self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
         self.task_description = file_to_string(path.join(self.file_path, "task_description.txt"))
         self.second_user = file_to_string(path.join(self.file_path, "second_user.txt"))
@@ -226,9 +227,8 @@ class RewardGenerator:
                     is_success = True
 
                 except Exception as e:
-                    error_message = str(e)
-                    self.logging(f"Failed to validate the reward function: {generating_function_path}", logging.INFO)
-                    self.logging(error_message, logging.DEBUG)
+                    self.logging(f"Failed to generating the reward function: {generating_function_path}", logging.INFO)
+                    self.logging(str(e), logging.DEBUG)
                     is_success = False
 
 
@@ -271,12 +271,14 @@ class RewardGenerator:
 
         # Add jax code tips prompt
         self.initial_system += self.jax_code_tips_prompt
+        self.initial_system += self.reward_code_tips_prompt
 
         initial_user = copy.deepcopy(self.initial_user)
 
         reward_function_inputs = self.reward_function_inputs_template.format(
-            array_shape='(16, 16, 1)',
+            array_shape='(16, 16)',
             stats_keys='DIAMETER = 0, N_REGIONS = 1',
+            tile_enum='EMPTY = 1, WALL = 2'
         )
 
         if generating_function_path is not None and generating_function_error is not None:
@@ -524,7 +526,7 @@ class RewardGenerator:
         try:
             code = parse_reward_function(file_to_string(reward_function_path))
         except Exception as e:
-            raise RewardParsingException(file_to_string(reward_function_path), "Failed to parse the reward function")
+            raise RewardParsingException(file_to_string(reward_function_path), e)
 
         return code
 
