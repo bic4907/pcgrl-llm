@@ -94,26 +94,6 @@ def make_train(config, restored_ckpt, checkpoint_manager):
     def train(rng, config: TrainConfig):
         train_start_time = timer()
 
-        # TensorBoard writer
-
-
-        # checkwriter = SummaryWriter(config.exp_dir)
-
-
-
-        #
-        # if config.wandb_key and config.wandb_project:
-        #
-        #     # get the dir name of the experiment
-        #
-        #
-        #     wandb.login(key=config.wandb_key)
-        #     wandb.init(project=config.wandb_project, name=get_wandb_name(config), save_code=True)
-        #     wandb.config.update(dict(config))
-        #     logger.info(f"Initialized wandb with project {config.wandb_project}")
-        # else:
-        #     logger.info("wandb not initialized")
-
         # INIT NETWORK
         network = init_network(env, env_params, config)
         rng, _rng = jax.random.split(rng)
@@ -161,6 +141,11 @@ def make_train(config, restored_ckpt, checkpoint_manager):
         # Set the start time and previous steps
         multiple_handler.set_start_time(train_start_time)
         multiple_handler.set_steps_prev_complete(steps_prev_complete)
+
+        multiple_handler.add_text("config", f'```{str(config)}```')
+        # if reward_function is in this scope
+        if 'reward_fn_str' in locals():
+            multiple_handler.add_text("reward_function", f'```python\n{reward_fn_str}\n```')
 
         # During training, call the log method
 
@@ -394,6 +379,9 @@ def main(config: TrainConfig):
     else:
         out = main_chunk(config, rng, exp_dir)
 
+    wandb.finish()
+
 
 if __name__ == "__main__":
     main()
+

@@ -4,6 +4,7 @@ import pandas as pd
 from pcgrllm.utils.logger import get_wandb_name
 from tensorboardX import SummaryWriter
 
+
 # Base logging handler
 class BaseLoggingHandler:
     def __init__(self, **kwargs):
@@ -11,6 +12,9 @@ class BaseLoggingHandler:
         self.steps_prev_complete = 0
         self.config = kwargs.get("config", None)
         self.logger = kwargs.get("logger", None)
+
+    def initialize(self):
+        pass
 
     def set_start_time(self, start_time):
         """Sets the start time for training."""
@@ -25,19 +29,23 @@ class BaseLoggingHandler:
         raise NotImplementedError
 
 
-
 # TensorBoard logging handler
 class TensorBoardLoggingHandler(BaseLoggingHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-
         self.writer = SummaryWriter(self.config.exp_dir)
 
     def log(self, metric, t):
         for key, val in metric.items():
-            self.writer.add_scalar(key, val, t)
+            if isinstance(val, (int, float)):  # Log scalars
+                self.writer.add_scalar(key, val, t)
+            elif isinstance(val, str):  # Log text
+                self.writer.add_text(key, val, t)
+            elif isinstance(val, list) and isinstance(val[0], (list, str, int, float)):  # Handle images or lists of images
+                self.writer.add_image(key, val, t)
 
-
+    def add_text(self, category, text, t=0):
+        self.writer.add_text(category, text, t)
 
 # wandb logging handler
 class WandbLoggingHandler(BaseLoggingHandler):
@@ -53,14 +61,38 @@ class WandbLoggingHandler(BaseLoggingHandler):
                 self.logger.info(f"Initialized wandb with project {self.config.wandb_project}")
             else:
                 print(f"Initialized wandb with project {self.config.wandb_project}")
+
+            self.use_wandb = True
         else:
             if self.logger is not None:
                 self.logger.info("wandb not initialized")
             else:
                 print("wandb not initialized")
+            self.use_wandb = False
 
     def log(self, metric, t):
+        if not self.use_wandb:
+            return
+
         wandb.log(metric, step=t)
+
+    def add_text(self, category, text, t=0):
+        if not self.use_wandb:
+            return
+
+        def text_to_html(text):
+            # 줄바꿈을 <br> 태그로 변환
+            html_text = text.replace('\n', '<br>')
+
+            # 탭을 4개의 공백 (&nbsp;)으로 변환
+            html_text = html_text.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
+
+            return html_text
+
+        html_output = text_to_html(text)
+
+        wandb.log({category: wandb.Html(html_output)})
+
 
 
 # CSV logging handler
@@ -69,20 +101,20 @@ class CSVLoggingHandler(BaseLoggingHandler):
         super().__init__(**kwargs)
 
     def log(self, metric, t):
-
+        # Flatten all the data into strings (text or scalar) for CSV compatibility
+        scalar_metric = {k: str(v) if not isinstance(v, (int, float)) else v for k, v in metric.items()}
 
         # Load or create a CSV dataframe
         csv_path = os.path.join(self.config.exp_dir, "progress.csv")
-
         if os.path.exists(csv_path):
             df = pd.read_csv(csv_path)
         else:
             df = pd.DataFrame()
 
-        metric['timestep'] = t
+        scalar_metric['timestep'] = t
 
         # Append new data
-        new_data = pd.DataFrame.from_dict({k: [v] for k, v in metric.items()})
+        new_data = pd.DataFrame([scalar_metric])
         df = pd.concat([df, new_data], ignore_index=True)
 
         # Save the updated CSV
@@ -105,3 +137,8 @@ class MultipleLoggingHandler:
     def log(self, metric, t):
         for handler in self.handlers:
             handler.log(metric, t)
+
+    def add_text(self, text, t):
+        for handler in self.handlers:
+            if hasattr(handler, "add_text"):
+                handler.add_text(text, t)
