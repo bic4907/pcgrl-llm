@@ -14,3 +14,4 @@ submitit_logs
 
 user_defined_freezies/*.npy
 .idea
+wandb
