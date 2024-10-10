@@ -37,7 +37,7 @@ def run_validate(config: TrainLLMConfig):
 
     # Setup reward function
     if config.reward_function_path is None:
-        config.reward_function_path = path.abspath(path.join(path.dirname(__file__), 'example', 'dummy_reward.py'))
+        config.reward_function_path = path.abspath(path.join(path.dirname(__file__), 'example', 'bypass_reward.py'))
 
     print_log(logger, f"Reward validation path: {config.reward_function_path}", level=logging.INFO)
     reward_fn_str = read_file(config.reward_function_path)
