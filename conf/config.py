@@ -243,6 +243,7 @@ class SweepConfig(EnjoyConfig, EvalConfig):
 class TrainLLMConfig(Config):
     overwrite: bool = False
 
+    target_character: Optional[str] = ""
     # Save a checkpoint after (at least) this many timesteps
     ckpt_freq: int = int(1e7)
     # Render after this many update steps
