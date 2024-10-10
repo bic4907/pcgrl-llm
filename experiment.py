@@ -27,8 +27,9 @@ from scipy.stats import dweibull
 
 from conf.config import TrainConfig
 from eval import main_eval
-from pcgrllm.paths import init_config
+
 from pcgrllm.utils.logger import print_log
+from pcgrllm.utils.path_utils import init_config
 
 from pcgrllm.validate_reward import run_validate
 from pcgrllm.stage import Stage

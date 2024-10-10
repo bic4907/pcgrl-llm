@@ -23,7 +23,7 @@ from envs.pcgrl_env import (gen_dummy_queued_state, gen_dummy_queued_state_old,
                             OldQueuedState)
 from pcgrllm.validate_reward import read_file
 from purejaxrl.experimental.s5.wrappers import LogWrapper, LLMRewardWrapper
-from utils import (get_ckpt_dir, get_exp_dir, init_network, gymnax_pcgrl_make,
+from pcgrllm.utils.path_utils import (get_ckpt_dir, get_exp_dir, init_network, gymnax_pcgrl_make,
                    init_config)
 
 
@@ -73,8 +73,7 @@ def log_callback(metric, steps_prev_complete, config, writer, train_start_time):
                         [metric["returned_episode"]].mean())
 
         # Add a row to csv with ep_return
-        with open(os.path.join(get_exp_dir(config),
-                                "progress.csv"), "a") as f:
+        with open(os.path.join(config.exp_dir, "progress.csv"), "a") as f:
             f.write(f"{t},{ep_return_mean}\n")
 
         writer.add_scalar("ep_return", ep_return_mean, t)

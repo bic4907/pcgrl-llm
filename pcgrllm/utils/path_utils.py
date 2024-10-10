@@ -41,16 +41,16 @@ def get_exp_dir(config: Config):
             'saves',
             f'{config.problem}{ctrl_str}_{config.representation}_{config.model}-' +
             f'{config.activation}_w-{config.map_width}_' + \
-            ('random-shape_' if config.randomize_map_shape else '') + \
-            f'vrf-{config.vrf_size}_' + \
-            (f'cp-{config.change_pct}_' if config.change_pct > 0 else '') +
-            f'arf-{config.arf_size}_' + \
-            (f"hd-{'-'.join((str(hd) for hd in config.hidden_dims))}_" if not is_default_hiddims(config) else '') + \
-            f'sp-{config.static_tile_prob}_'
-            f'bs-{config.max_board_scans}_' + \
-            f'fz-{config.n_freezies}_' + \
-            f'act-{"x".join([str(e) for e in config.act_shape])}_' + \
-            f'nag-{config.n_agents}_' + \
+            # ('random-shape_' if config.randomize_map_shape else '') + \
+            # f'vrf-{config.vrf_size}_' + \
+            # (f'cp-{config.change_pct}_' if config.change_pct > 0 else '') +
+            # f'arf-{config.arf_size}_' + \
+            # (f"hd-{'-'.join((str(hd) for hd in config.hidden_dims))}_" if not is_default_hiddims(config) else '') + \
+            # f'sp-{config.static_tile_prob}_'
+            # f'bs-{config.max_board_scans}_' + \
+            # f'fz-{config.n_freezies}_' + \
+            # f'act-{"x".join([str(e) for e in config.act_shape])}_' + \
+            # f'nag-{config.n_agents}_' + \
             ('empty-start_' if config.empty_start else '') + \
             ('pinpoints_' if config.pinpoints else '') + \
             (f'{config.n_envs}-envs_' if config.profile_fps else '') + \
