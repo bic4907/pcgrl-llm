@@ -551,13 +551,6 @@ def make_train(config: TrainConfig, restored_ckpt, checkpoint_manager):
     return lambda rng: train(rng, config)
 
 
-# def plot_ep_returns(ep_returns, config):
-#     plt.plot(ep_returns)
-#     plt.xlabel("Timesteps")
-#     plt.ylabel("Episodic Return")
-#     plt.title(f"Episodic Return vs. Timesteps ({config.ENV_NAME})")
-#     plt.savefig(os.path.join(get_exp_dir(config), "ep_returns.png"))
-
 
 def init_checkpointer(config: Config) -> Tuple[Any, dict]:
     # This will not affect training, just for initializing dummy env etc. to load checkpoint.

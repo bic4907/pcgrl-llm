@@ -84,6 +84,10 @@ class Config:
     # NOTE: DO NOT MODIFY THESE. WILL BE SET AUTOMATICALLY AT RUNTIME. ########
     initialize: Optional[bool] = None
 
+    # Wandb
+    wandb_key: Optional[str] = None
+    wandb_project: Optional[str] = 'pcgrl-llm'
+
 @dataclass
 class EvoMapConfig(Config):
     n_generations: int = 100_000
