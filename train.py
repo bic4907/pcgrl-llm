@@ -558,7 +558,10 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
     # Create a dummy checkpoint so we can restore it to the correct dataclasses
     env, env_params = gymnax_pcgrl_make(config.env_name, config=config)
     # env = FlattenObservationWrapper(env)
-    env = LLMRewardWrapper(env)
+
+    if hasattr(config, 'reward_function_path') and config.reward_function_path is not None:
+        env = LLMRewardWrapper(env)
+
     env = LogWrapper(env)
 
     rng, _rng = jax.random.split(rng)
