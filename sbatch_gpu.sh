@@ -1,7 +1,22 @@
 #!/bin/bash
 
-# 사용자 인자 (key=value 형태로 전달된 여러 조건들을 인자로 받음)
-ARGS=("$@")
+#SBATCH --job-name=multi_pcgrl  # 작업 이름
+#SBATCH --output=output_logs/output_%A_%a.out    # 출력 파일 경로 (%A: Job ID, %a: array task ID)
+#SBATCH --error=error_logs/error_%A_%a.err       # 에러 파일 경로
+#SBATCH --ntasks=1                        # 실행할 작업 수
+#SBATCH --cpus-per-task=4                 # 각 작업당 사용할 CPU 코어 수
+#SBATCH --gres=gpu:1                      # GPU 자원 설정 (1개의 GPU 사용)
+#SBATCH --mem=16G                         # 각 작업당 메모리 할당
+#SBATCH --time=1-00:00:00                 # 최대 실행 시간 (1일)
+#SBATCH --account=pr_174_general          # SLURM 계정 설정
+
+
+# 첫 번째 인자로 파이썬 파일 이름을 받음
+python_file="$1"
+
+# 나머지 인자들 (key=value 형태로 전달된 여러 조건들)
+ARGS=("${@:2}")  # 첫 번째 인자 제외
+
 
 # 전달된 인자를 파싱하여 key=value 형식으로 처리
 keys=()            # key 배열 (예: seed, gpt_model 등)
@@ -79,8 +94,8 @@ if [ -z "$SLURM_ARRAY_TASK_ID" ]; then
     if command -v sbatch &> /dev/null; then
         # SLURM 작업 제출 (현재 스크립트를 재실행하며 --array 옵션을 동적으로 설정)
         echo "Submitting jobs with array range: $array_range"
-        echo sbatch --array=$array_range "$0" "${ARGS[@]}"
-        sbatch --array=$array_range "$0" "${ARGS[@]}"
+        echo sbatch --array=$array_range "$0" "$1" "${ARGS[@]}"
+        sbatch --array=$array_range "$0" "$1" "${ARGS[@]}"
     else
         echo "sbatch not found, displaying what would be executed."
         for i in "${!PARAMS_ARRAY[@]}"; do
@@ -99,15 +114,21 @@ exp_name=""
 for kv in "${param_kv[@]}"; do
   key=$(echo $kv | cut -d'=' -f1)
   value=$(echo $kv | cut -d'=' -f2)
-  exp_name+="${key}-${value}_"
+  if [[ "$key" != "n_envs" && "$key" != "overwrite" ]]; then  # n_envs와 overwrite는 exp_name에 포함되지 않음
+    exp_name+="${key}-${value}_"
+  fi
 done
 # 마지막 _ 제거
 exp_name=$(echo $exp_name | sed 's/_$//')
 
 echo "Running experiment with parameters: $PARAMS"
-echo "Generated exp_name: $exp_name"
+if [ -n "$exp_name" ]; then
+    exp_name_arg="exp_name=$exp_name"
+else
+    exp_name_arg=""
+fi
 
 # Python 스크립트 실행
-python_command="python experiment.py ${PARAMS//,/ } exp_name=$exp_name"
+python_command="python $python_file ${PARAMS//,/ } $exp_name_arg +wandb_key=ecd68e29f83835871f85d88e6f1b9e16bb93ff1c"
 echo "Python command to be executed: $python_command"
 $python_command

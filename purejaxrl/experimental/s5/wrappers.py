@@ -121,7 +121,8 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         self.reward_fn = None
 
-    # @partial(jax.jit, static_argnums=(0, 4))
+
+    @partial(jax.jit, static_argnums=(0, 4))
     def step(
         self,
         key: chex.PRNGKey,
@@ -133,9 +134,9 @@ class LLMRewardWrapper(GymnaxWrapper):
         assert self.reward_fn is not None, "Reward function not set."
 
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
+        reward_ctrl = reward
 
         reward_fn = self.get_reward_fn()
-
 
         metrics_enum = self._env.prob.metrics_enum
 
@@ -152,10 +153,7 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         curr_array = env_state.env_map
 
-        llm_reward_prev = reward_fn(prev_array, prev_stats)
-        llm_reward_curr = reward_fn(curr_array, curr_stats)
-
-        reward = llm_reward_curr - llm_reward_prev
+        reward = reward_fn(prev_array, prev_stats, curr_array, curr_stats)
 
         return obs, env_state, reward, done, info
 

@@ -348,6 +348,7 @@ def make_train(config, restored_ckpt, checkpoint_manager):
                 obsv, env_state, reward, done, info = vmap_step_fn(
                     rng_step, env_state, action, env_params
                 )
+
                 transition = Transition(
                     done, action, value, reward, log_prob, last_obs, info
                 )
@@ -561,6 +562,13 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
 
     if hasattr(config, 'reward_function_path') and config.reward_function_path is not None:
         env = LLMRewardWrapper(env)
+
+        reward_fn_str = read_file(config.reward_function_path)
+
+        exec_scope = {}
+        exec(reward_fn_str, exec_scope)
+        reward_fn = exec_scope['compute_reward']
+        env.set_reward_fn(reward_fn)
 
     env = LogWrapper(env)
 
