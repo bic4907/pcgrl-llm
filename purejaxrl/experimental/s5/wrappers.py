@@ -1,3 +1,4 @@
+import dataclasses
 import jax
 import jax.numpy as jnp
 import chex
@@ -110,6 +111,9 @@ class LogWrapper(GymnaxWrapper):
         info["returned_episode_lengths"] = state.returned_episode_lengths
         info["timestep"] = state.timestep
         info["returned_episode"] = done
+
+        # jax.debug.print("reward = {}", reward)
+
         return obs, state, reward, done, info
 
 
@@ -134,7 +138,6 @@ class LLMRewardWrapper(GymnaxWrapper):
         assert self.reward_fn is not None, "Reward function not set."
 
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
-        reward_ctrl = reward
 
         reward_fn = self.get_reward_fn()
 
@@ -153,7 +156,9 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         curr_array = env_state.env_map
 
-        reward = reward_fn(prev_array, prev_stats, curr_array, curr_stats)
+        llm_reward = reward_fn(prev_array, prev_stats, curr_array, curr_stats)
+
+        env_state = dataclasses.replace(env_state, reward=llm_reward)
 
         return obs, env_state, reward, done, info
 

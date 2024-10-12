@@ -34,47 +34,42 @@ def is_default_hiddims(config: Config):
     return tuple(config.hidden_dims) == (64, 256)[:len(config.hidden_dims)]
 
 
-def get_exp_dir(config: Config):
+def get_exp_group(config):
     if config.env_name == 'PCGRL':
         ctrl_str = '_ctrl_' + '_'.join(config.ctrl_metrics) if len(config.ctrl_metrics) > 0 else ''
-        exp_dir = os.path.join(
+        exp_group = os.path.join(
             'saves',
             f'{config.problem}{ctrl_str}_{config.representation}_{config.model}-' +
-            f'{config.activation}_w-{config.map_width}_' + \
-            # ('random-shape_' if config.randomize_map_shape else '') + \
-            # f'vrf-{config.vrf_size}_' + \
-            # (f'cp-{config.change_pct}_' if config.change_pct > 0 else '') +
-            # f'arf-{config.arf_size}_' + \
-            # (f"hd-{'-'.join((str(hd) for hd in config.hidden_dims))}_" if not is_default_hiddims(config) else '') + \
-            # f'sp-{config.static_tile_prob}_'
-            # f'bs-{config.max_board_scans}_' + \
-            # f'fz-{config.n_freezies}_' + \
-            # f'act-{"x".join([str(e) for e in config.act_shape])}_' + \
-            # f'nag-{config.n_agents}_' + \
+            f'_w-{config.map_width}_' + \
             ('empty-start_' if config.empty_start else '') + \
             ('pinpoints_' if config.pinpoints else '') + \
             (f'{config.n_envs}-envs_' if config.profile_fps else '') + \
-            f'{config.seed}_{config.exp_name}')
+            f'{config.exp_name}'
+        )
     elif config.env_name == 'PlayPCGRL':
-        exp_dir = os.path.join(
+        exp_group = os.path.join(
             'saves',
             f'play_w-{config.map_width}_' + \
             f'{config.model}-{config.activation}_' + \
             f'vrf-{config.vrf_size}_arf-{config.arf_size}_' + \
-            f'{config.seed}_{config.exp_name}',
+            f'{config.exp_name}'
         )
     elif config.env_name == 'Candy':
-        exp_dir = os.path.join(
+        exp_group = os.path.join(
             'saves',
             'candy_' + \
-            f'{config.seed}_{config.exp_name}',
+            f'{config.exp_name}'
         )
     else:
-        exp_dir = os.path.join(
+        exp_group = os.path.join(
             'saves',
-            config.env_name,
+            config.env_name
         )
-    return exp_dir
+    return exp_group
+
+def get_exp_dir(config):
+    exp_group = get_exp_group(config)
+    return f'{exp_group}_{config.seed}'
 
 
 def init_config(config: Config):
@@ -103,6 +98,7 @@ def init_config(config: Config):
     if config.model == 'conv2':
         config.arf_size = config.vrf_size = min([config.arf_size, config.vrf_size])
 
+    config.exp_group = get_exp_group(config)
     config.exp_dir = get_exp_dir(config)
 
     if config.model == 'seqnca':

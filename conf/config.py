@@ -87,6 +87,7 @@ class Config:
     # Wandb
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
+    exp_group: Optional[str] = None
 
 @dataclass
 class EvoMapConfig(Config):
