@@ -160,7 +160,7 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         env_state = dataclasses.replace(env_state, reward=llm_reward)
 
-        return obs, env_state, reward, done, info
+        return obs, env_state, llm_reward, done, info
 
     def set_reward_fn(self, reward_fn):
         self.reward_fn = reward_fn

@@ -55,7 +55,7 @@ class WandbLoggingHandler(BaseLoggingHandler):
         if self.config.wandb_key and self.config.wandb_project:
             wandb.login(key=self.config.wandb_key)
             wandb.init(project=self.config.wandb_project, name=get_wandb_name(self.config), save_code=True)
-            wandb.config.update(dict(self.config))
+            wandb.config.update(dict(self.config), allow_val_change=True)
 
             if self.logger is not None:
                 self.logger.info(f"Initialized wandb with project {self.config.wandb_project}")

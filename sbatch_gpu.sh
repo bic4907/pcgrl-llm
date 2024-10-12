@@ -114,7 +114,7 @@ exp_name=""
 for kv in "${param_kv[@]}"; do
   key=$(echo $kv | cut -d'=' -f1)
   value=$(echo $kv | cut -d'=' -f2)
-  if [[ "$key" != "n_envs" && "$key" != "overwrite" ]]; then  # n_envs와 overwrite는 exp_name에 포함되지 않음
+  if [[ "$key" != "n_envs" && "$key" != "overwrite" && "$key" != "seed" ]]; then  # n_envs와 overwrite는 exp_name에 포함되지 않음
     exp_name+="${key}-${value}_"
   fi
 done

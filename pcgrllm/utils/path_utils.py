@@ -38,9 +38,8 @@ def get_exp_group(config):
     if config.env_name == 'PCGRL':
         ctrl_str = '_ctrl_' + '_'.join(config.ctrl_metrics) if len(config.ctrl_metrics) > 0 else ''
         exp_group = os.path.join(
-            'saves',
-            f'{config.problem}{ctrl_str}_{config.representation}_{config.model}-' +
-            f'_w-{config.map_width}_' + \
+            f'{config.problem}{ctrl_str}_{config.representation}-' +
+            f'w-{config.map_width}_' + \
             ('empty-start_' if config.empty_start else '') + \
             ('pinpoints_' if config.pinpoints else '') + \
             (f'{config.n_envs}-envs_' if config.profile_fps else '') + \
@@ -56,20 +55,18 @@ def get_exp_group(config):
         )
     elif config.env_name == 'Candy':
         exp_group = os.path.join(
-            'saves',
             'candy_' + \
             f'{config.exp_name}'
         )
     else:
         exp_group = os.path.join(
-            'saves',
             config.env_name
         )
     return exp_group
 
 def get_exp_dir(config):
     exp_group = get_exp_group(config)
-    return f'{exp_group}_{config.seed}'
+    return os.path.join('saves', f'{exp_group}_{config.seed}')
 
 
 def init_config(config: Config):

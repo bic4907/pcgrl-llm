@@ -121,6 +121,8 @@ class TrainConfig(Config):
     MINIBATCH_SIZE: Optional[int] = None
     ###########################################################################
 
+    reward_function_path: Optional[str] = None
+
 
 @dataclass
 
