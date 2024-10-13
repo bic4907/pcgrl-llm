@@ -1,4 +1,3 @@
-import dataclasses
 import jax
 import jax.numpy as jnp
 import chex
@@ -10,6 +9,8 @@ from gymnax.environments import environment, spaces
 from envs.pcgrl_env import PCGRLObs
 
 from envs.probs.problem import get_loss
+
+
 # from brax import envs
 
 class GymnaxWrapper(object):
@@ -17,10 +18,11 @@ class GymnaxWrapper(object):
 
     def __init__(self, env):
         self._env = env
-    
+
     # provide proxy access to regular attributes of wrapped object
     def __getattr__(self, name):
         return getattr(self._env, name)
+
 
 class FlattenObservationWrapper(GymnaxWrapper):
     """Flatten the observations of the environment."""
@@ -39,7 +41,7 @@ class FlattenObservationWrapper(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0,))
     def reset(
-        self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None
     ) -> Tuple[chex.Array, environment.EnvState]:
         obs, state = self._env.reset(key, params)
         if isinstance(obs, PCGRLObs):
@@ -51,11 +53,11 @@ class FlattenObservationWrapper(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0,))
     def step(
-        self,
-        key: chex.PRNGKey,
-        state: environment.EnvState,
-        action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
         obs, state, reward, done, info = self._env.step(key, state, action, params)
         if isinstance(obs, PCGRLObs):
@@ -64,6 +66,7 @@ class FlattenObservationWrapper(GymnaxWrapper):
         else:
             obs = jnp.reshape(obs, (-1,))
         return obs, state, reward, done, info
+
 
 @struct.dataclass
 class LogEnvState:
@@ -74,6 +77,7 @@ class LogEnvState:
     returned_episode_lengths: int
     timestep: int
 
+
 class LogWrapper(GymnaxWrapper):
     """Log the episode returns and lengths."""
 
@@ -82,7 +86,7 @@ class LogWrapper(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0, 2))
     def reset(
-        self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None, queued_state = None,
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None, queued_state=None,
     ) -> Tuple[chex.Array, environment.EnvState]:
         obs, env_state = self._env.reset(key, params, queued_state)
         state = LogEnvState(env_state, 0.0, 0, 0.0, 0, 0)
@@ -90,22 +94,22 @@ class LogWrapper(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0, 4))
     def step(
-        self,
-        key: chex.PRNGKey,
-        state: environment.EnvState,
-        action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
         obs, env_state, reward, done, info = self._env.step(key, state.env_state, action, params)
         new_episode_return = state.episode_returns + reward
         new_episode_length = state.episode_lengths + 1
         state = LogEnvState(
-            env_state = env_state,
-            episode_returns = new_episode_return * (1 - done),
-            episode_lengths = new_episode_length * (1 - done),
-            returned_episode_returns = state.returned_episode_returns * (1 - done) + new_episode_return * done,
-            returned_episode_lengths = state.returned_episode_lengths * (1 - done) + new_episode_length * done,
-            timestep = state.timestep + 1,
+            env_state=env_state,
+            episode_returns=new_episode_return * (1 - done),
+            episode_lengths=new_episode_length * (1 - done),
+            returned_episode_returns=state.returned_episode_returns * (1 - done) + new_episode_return * done,
+            returned_episode_lengths=state.returned_episode_lengths * (1 - done) + new_episode_length * done,
+            timestep=state.timestep + 1,
         )
         info["returned_episode_returns"] = state.returned_episode_returns
         info["returned_episode_lengths"] = state.returned_episode_lengths
@@ -116,30 +120,24 @@ class LogWrapper(GymnaxWrapper):
 
         return obs, state, reward, done, info
 
-
-
-
 class LLMRewardWrapper(GymnaxWrapper):
     def __init__(self, env: environment.Environment):
         super().__init__(env)
 
         self.reward_fn = None
 
-
     @partial(jax.jit, static_argnums=(0, 4))
     def step(
-        self,
-        key: chex.PRNGKey,
-        state: environment.EnvState,
-        action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
 
         assert self.reward_fn is not None, "Reward function not set."
 
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
-
-        reward_fn = self.get_reward_fn()
 
         metrics_enum = self._env.prob.metrics_enum
 
@@ -156,11 +154,17 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         curr_array = env_state.env_map
 
-        llm_reward = reward_fn(prev_array, prev_stats, curr_array, curr_stats)
+        llm_reward = self.reward_fn(prev_array, prev_stats, curr_array, curr_stats)
 
-        env_state = dataclasses.replace(env_state, reward=llm_reward)
+        # reward = jax.tree.map(
+        #     lambda x, y: jax.lax.select(done, x, y), reward, llm_reward
+        # )
+        # use where
+        reward = jnp.where(done, reward, llm_reward)
 
-        return obs, env_state, llm_reward, done, info
+        env_state = env_state.replace(reward=reward)
+
+        return obs, env_state, reward, done, info
 
     def set_reward_fn(self, reward_fn):
         self.reward_fn = reward_fn
@@ -177,19 +181,17 @@ class LLMRewardWrapperDebug(GymnaxWrapper):
 
     @partial(jax.jit, static_argnums=(0, 4))
     def step(
-        self,
-        key: chex.PRNGKey,
-        state: environment.EnvState,
-        action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
-
         assert self.reward_fn is not None, "Reward function not set."
 
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
 
         metrics_enum = self._env.prob.metrics_enum
-
 
         # Stats 출력
 
@@ -208,12 +210,12 @@ class LLMRewardWrapperDebug(GymnaxWrapper):
         return self.reward_fn
 
 
-
 @struct.dataclass
 class LossLogEnvState:
     log_env_state: LogEnvState
     losses: float
     min_episode_losses: float
+
 
 class LossLogWrapper(LogWrapper):
     """Log the episode returns and lengths."""
@@ -223,7 +225,7 @@ class LossLogWrapper(LogWrapper):
 
     @partial(jax.jit, static_argnums=(0, 2))
     def reset(
-        self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None, queued_state = None,
+            self, key: chex.PRNGKey, params: Optional[environment.EnvParams] = None, queued_state=None,
     ) -> Tuple[chex.Array, environment.EnvState]:
         obs, log_env_state = super().reset(key, params, queued_state)
         state = LossLogEnvState(log_env_state, jnp.inf, jnp.inf)
@@ -231,33 +233,34 @@ class LossLogWrapper(LogWrapper):
 
     @partial(jax.jit, static_argnums=(0, 4))
     def step(
-        self,
-        key: chex.PRNGKey,
-        state: environment.EnvState,
-        action: Union[int, float],
-        params: Optional[environment.EnvParams] = None,
+            self,
+            key: chex.PRNGKey,
+            state: environment.EnvState,
+            action: Union[int, float],
+            params: Optional[environment.EnvParams] = None,
     ) -> Tuple[chex.Array, environment.EnvState, float, bool, dict]:
         obs, log_env_state, reward, done, info = super().step(
             key, state.log_env_state, action, params)
-        loss = get_loss(log_env_state.env_state.prob_state.stats, 
-                        self._env.prob.stat_weights, 
+        loss = get_loss(log_env_state.env_state.prob_state.stats,
+                        self._env.prob.stat_weights,
                         self._env.prob.stat_trgs,
-                        self._env.prob.ctrl_threshes, 
+                        self._env.prob.ctrl_threshes,
                         self._env.prob.metric_bounds)
         # Normalize the loss to be in [0, 1]
         loss = loss / self._env.prob.max_loss
 
         new_best_loss = jnp.minimum(loss, state.losses)
         state = LossLogEnvState(
-            log_env_state = log_env_state,
-            losses = jax.lax.select(
+            log_env_state=log_env_state,
+            losses=jax.lax.select(
                 done,
                 jnp.inf,
                 new_best_loss,
             ),
-            min_episode_losses = new_best_loss,
+            min_episode_losses=new_best_loss,
         )
         return obs, state, reward, done, info
+
 
 # class BraxGymnaxWrapper:
 #     def __init__(self, env_name, backend="positional"):
@@ -302,6 +305,7 @@ class ClipAction(GymnaxWrapper):
         action = jnp.clip(action, self.low, self.high)
         return self._env.step(key, state, action, params)
 
+
 class TransformObservation(GymnaxWrapper):
     def __init__(self, env, transform_obs):
         super().__init__(env)
@@ -314,6 +318,7 @@ class TransformObservation(GymnaxWrapper):
     def step(self, key, state, action, params=None):
         obs, state, reward, done, info = self._env.step(key, state, action, params)
         return self.transform_obs(obs), state, reward, done, info
+
 
 class TransformReward(GymnaxWrapper):
     def __init__(self, env, transform_reward):
@@ -331,12 +336,14 @@ class VecEnv(GymnaxWrapper):
         self.reset = jax.vmap(self._env.reset, in_axes=(0, None))
         self.step = jax.vmap(self._env.step, in_axes=(0, 0, 0, None))
 
+
 @struct.dataclass
 class NormalizeVecObsEnvState:
     mean: jnp.ndarray
     var: jnp.ndarray
     count: float
     env_state: environment.EnvState
+
 
 class NormalizeVecObservation(GymnaxWrapper):
     def __init__(self, env):
@@ -407,6 +414,7 @@ class NormalizeVecRewEnvState:
     return_val: float
     env_state: environment.EnvState
 
+
 class NormalizeVecReward(GymnaxWrapper):
 
     def __init__(self, env, gamma):
@@ -428,7 +436,7 @@ class NormalizeVecReward(GymnaxWrapper):
     def step(self, key, state, action, params=None):
         obs, env_state, reward, done, info = self._env.step(key, state.env_state, action, params)
         return_val = (state.return_val * self.gamma * (1 - done) + reward)
- 
+
         batch_mean = jnp.mean(return_val, axis=0)
         batch_var = jnp.var(return_val, axis=0)
         batch_count = obs.shape[0]
