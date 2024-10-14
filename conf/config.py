@@ -255,11 +255,13 @@ class SweepConfig(EnjoyConfig, EvalConfig):
 class TrainLLMConfig(Config):
     overwrite: bool = False
 
-    target_character: Optional[str] = ""
+    target_character: Optional[str] = "A"
     # Save a checkpoint after (at least) this many timesteps
-    ckpt_freq: int = int(1e7)
+    ckpt_freq: int = int(5e6)
     # Render after this many update steps
-    render_freq: int = 50
+    total_timesteps: int = int(2e7)
+
+    render_freq: int = 20
     n_render_eps: int = 3
 
     # eval the model on pre-made eval freezie maps to see how it's doing
@@ -274,7 +276,7 @@ class TrainLLMConfig(Config):
     ###########################################################################
 
     # LLM experiment setting
-    total_iterations: int = int(2)
+    total_iterations: int = int(1)
     llm_iteration: int = int(1)
 
     # Eval rollout setting
