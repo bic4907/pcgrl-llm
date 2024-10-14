@@ -36,6 +36,7 @@ from pcgrllm.stage import Stage
 
 
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="orbax")
 warnings.filterwarnings("ignore", category=FutureWarning, module="jax")
 
@@ -46,6 +47,7 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
 logging.getLogger('hydra').setLevel(logging.INFO)
 logging.getLogger('absl').setLevel(logging.INFO)
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 
 class Experiment:
@@ -66,7 +68,7 @@ class Experiment:
 
     def initialize(self):
         self._iteration = 1
-        self._stage = Stage.StartIteration
+        self._stage = Stage.Analysis
         self._current_reward_function_filename = None
 
         self._copy_prompt()
@@ -258,40 +260,27 @@ class Experiment:
 
 
     # 파일 분석
-    def analyze_output(self, output) -> None:
-        self.logging("Output analyzed")
+    def analyze_output(self, iteration_num: int) -> None:
 
-        raise NotImplementedError
+        from pcgrllm.generate_feedback import generate_feedback
 
-        # if feedback_type == "t-SNE":
-        #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "t-SNE.png")
-        # elif feedback_type == "statistics":
-        #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "statistics.json")
-
-        feedback_args_dict = {
-            'shared_storage_path': self._experiment_path,
-            'postfix': f"outer_{self._iteration}",
-            # 'feedback_type': feedback_type,
-            'skill_log_csv': self._reference_csv
+        args_dict = {
+            'exp_path': self.config.exp_dir,
+            # 'exp_path': self.config.exp_dir,
+            'condition_prompt': 'Make a level looks like "A"',
+            'exp_path': '/Users/inchang/Desktop/pcgrl-llm/pcgrllm/example/binary_narrow-w-16_gpt_model-gpt-4o-gil_3',
+            'input_type': 'array',
+            'gpt_model': self.config.gpt_model,
+            'reward_function': self._current_reward_function_filename,
+            'iteration': self._iteration,
         }
-        feedback_args_list = [item for key, value in feedback_args_dict.items() if value is not None for item in
-                              (f'--{key}', str(value))]
 
-        generate_feedback_py = os.path.join(path.dirname(__file__), 'generate_feedback.py')
-        command_line = ['python', generate_feedback_py, *feedback_args_list]
+        feedback = generate_feedback(self.config, args_dict)
 
-        process = subprocess.Popen(command_line,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        while True:
-            error = process.stderr.readline()
-            if error == '' and process.poll() is not None:
-                break
-            if error:
-                message = f'Fail:{error.strip()}'
-                return None, message
+        self.logging
+        self.feedback = feedback
 
-        return None
-
+        return True
 
     def save_state(self):
         # target variables: iteration, current_reward_function_filename
@@ -353,7 +342,7 @@ class Experiment:
                 self._stage = Stage.Analysis
             elif self._stage == Stage.Analysis:
                 # Analyze results
-                # self.analyze_output(self._iteration) # TODO
+                self.analyze_output(self._iteration) # TODO
                 self._stage = Stage.FinishIteration
 
             elif self._stage == Stage.FinishIteration:

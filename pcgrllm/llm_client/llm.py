@@ -58,7 +58,12 @@ class UnifiedLLMClient:
         with open(self._config_path, 'r') as f:
             self.config = json.load(f)
 
-    def call_model(self, ctx: ChatContext, messages, model=None, n_response=1, seed=42, top_p=0.99):
+    def call_model(self, ctx: ChatContext,
+                   messages: list,
+                   model=None,
+                   n_response=1,
+                   seed=42,
+                   top_p=0.99):
         model_config = self.config[model]
         api_host = model_config["api_host"]
         api_key = model_config["api_key"]
@@ -88,6 +93,7 @@ class UnifiedLLMClient:
             input_tokens = response.usage.prompt_tokens
             output_tokens = response.usage.completion_tokens
             assistant_message = choice.message.content
+
 
             _ctx = copy.deepcopy(ctx)
             _ctx.add_interaction(
