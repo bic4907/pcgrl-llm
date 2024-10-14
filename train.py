@@ -1,6 +1,7 @@
 import functools
 from functools import partial
 import os
+import wandb
 import shutil
 from os.path import basename
 from timeit import default_timer as timer
@@ -407,8 +408,6 @@ def make_train(config, restored_ckpt, checkpoint_manager):
                 train_state, env_state, last_obs, rng,
                 update_i=runner_state.update_i + 1)
 
-            jax.debug.print("update_i {}", update_steps)
-
             update_steps = update_steps + 1
 
             do_render = (config.render_freq != -1) and (update_steps % config.render_freq == 0)
@@ -600,6 +599,7 @@ def main_chunk(config, rng, exp_dir):
     out = train_jit(rng)
 
     jax.block_until_ready(out)
+    wandb.finish()
 
     return out
 
