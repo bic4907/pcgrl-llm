@@ -270,6 +270,7 @@ class TrainLLMConfig(Config):
 
     # LLM experiment setting
     total_iterations: int = int(2)
+    llm_iteration: int = int(1)
 
     # Eval rollout setting
     random_agent: bool = False

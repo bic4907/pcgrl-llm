@@ -164,7 +164,7 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         env_state = env_state.replace(reward=reward)
 
-        return obs, jax.lax.stop_gradient(env_state), env_state, reward, done, info
+        return obs, jax.lax.stop_gradient(env_state), reward, done, info
 
     def set_reward_fn(self, reward_fn):
         self.reward_fn = reward_fn

@@ -224,6 +224,7 @@ class Experiment:
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
         config.initialize = False
+        config.llm_iteration = self._iteration
 
 
         config.reward_function_path = self._current_reward_function_filename
@@ -251,6 +252,7 @@ class Experiment:
         config.initialize = False
         config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id))
         config.random_agent = False
+        config.llm_iteration = self._iteration
 
         run_eval(config)
 
