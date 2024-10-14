@@ -1,17 +1,17 @@
-import json
 import os
-
+import warnings
 import gymnax
 import jax
 import numpy as np
+import jax.numpy as jnp
 import yaml
-
+import imageio
+import wandb
 from conf.config import Config, EvoMapConfig, SweepConfig, TrainConfig
 from envs.candy import Candy, CandyParams
-from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, RepEnum, get_prob_cls
+from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, RepEnum, get_prob_cls, \
+    gen_dummy_queued_state
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
-from envs.probs.binary import BinaryProblem
-from envs.probs.problem import Problem
 from marl.model import ActorRNN, ActorCategorical
 from marl.wrappers.baselines import MultiAgentWrapper
 from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, NCA, SeqNCA
@@ -299,3 +299,104 @@ def load_sweep_hypers(cfg: SweepConfig):
         raise FileNotFoundError(f"Could not find sweep config file {sweep_conf_path}")
     return hypers, eval_hypers
 
+
+def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_params: PCGRLEnvParams, runner_state):
+    max_episode_len = env.max_steps  # Maximum steps per episode
+
+    def sim_render_episode(actor_params):
+
+        def step_env(carry, _):
+            rng, obs, state, done = carry
+
+            # SELECT ACTION
+            # # Squash the gpu dimension (network only takes one batch dimension)
+            #
+            rng, _rng = jax.random.split(rng)
+
+            pi, value = network.apply(actor_params, obs)
+            action = pi.sample(seed=rng)
+
+            # # STEP ENV
+            rng, _rng = jax.random.split(rng)
+            rng_step = jax.random.split(_rng, config.n_envs)
+
+            # rng_step = rng_step.reshape((config.n_gpus, -1) + rng_step.shape[1:])
+            vmap_step_fn = jax.vmap(env.step, in_axes=(0, 0, 0, None))
+            # pmap_step_fn = jax.pmap(vmap_step_fn, in_axes=(0, 0, 0, None))
+            obsv, next_state, reward, done, info = vmap_step_fn(
+                rng_step, state, action, env_params
+            )
+            # next_state = state
+
+            return (rng, obsv, next_state, done), next_state
+
+        # Initialize the `done` flag
+        done = jnp.zeros((config.n_envs,), dtype=bool)
+
+        rng = jax.random.PRNGKey(0)
+
+        rng, _rng = jax.random.split(rng)
+        reset_rng = jax.random.split(_rng, config.n_envs)
+
+        vmap_reset_fn = jax.vmap(env.reset, in_axes=(0, None, None))
+        init_obs, init_state = vmap_reset_fn(
+            reset_rng,
+            env_params,
+            gen_dummy_queued_state(env)
+        )
+        _, states = jax.lax.scan(step_env, (rng, init_obs, init_state, done), None, length=max_episode_len)
+        # Concatenate the init_state to the states
+        states = jax.tree.map(lambda x, y: jnp.concatenate([x[None], y], axis=0), init_state, states)
+        # 첫 번째 환경의 상태만 선택 (2번째 차원의 첫 번째 인덱스 선택)
+        first_env_state = jax.tree_map(lambda x: x[:, 0], states.env_state)
+
+        # 첫 번째 환경 상태를 렌더링
+
+        frames = jax.vmap(env.render)(first_env_state)
+
+        return frames
+
+    # JIT compile the simulation function for better performance
+    return jax.jit(sim_render_episode)
+
+def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str = None, t: int = 0,
+                    max_steps: int = 0, logger=None, metric=None):
+    fps = 60  # 초당 프레임 수
+
+    # 비디오 저장
+    if video_dir is None:
+        warnings.warn("video_dir is not set. Skipping video save.")
+    else:
+        if not os.path.exists(video_dir):
+            os.makedirs(video_dir, exist_ok=True)
+
+        video_path = os.path.join(video_dir, f"video_{t}.gif")
+        imageio.mimsave(video_path, np.array(frames[:-1]), duration=1 / fps, loop=1)
+
+        if logger is not None:
+            logger.info(f"Saved gif to {video_path}")
+        else:
+            print(f"Saved gif to {video_path}")
+
+        # wandb에 비디오 로그
+        if wandb.run is not None:
+            wandb.log({"video": wandb.Video(video_path, fps=fps, format="gif")}, step=t)
+
+    # 마지막 프레임을 PNG로 저장
+    if image_dir is None:
+        warnings.warn("image_dir is not set. Skipping image save.")
+    else:
+        if not os.path.exists(image_dir):
+            os.makedirs(image_dir, exist_ok=True)
+
+        image_path = os.path.join(image_dir, f"image_{t}.png")
+        imageio.imwrite(image_path, frames[-2])
+
+        if logger is not None:
+            logger.info(f"Saved png to {image_path}")
+        else:
+            print(f"Saved png png {image_path}")
+
+        # wandb에 이미지 로그
+        if wandb.run is not None:
+            wandb.log({"image": wandb.Image(image_path)}, step=t)

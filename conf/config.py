@@ -89,6 +89,9 @@ class Config:
     wandb_project: Optional[str] = 'pcgrl-llm'
     exp_group: Optional[str] = None
 
+    _vid_dir: Optional[str] = None
+    _img_dir: Optional[str] = None
+
 @dataclass
 class EvoMapConfig(Config):
     n_generations: int = 100_000
@@ -106,8 +109,9 @@ class TrainConfig(Config):
 
     # Save a checkpoint after (at least) this many timesteps
     ckpt_freq: int = int(1e7)
+
     # Render after this many update steps
-    render_freq: int = 1000
+    render_freq: int = 5
     n_render_eps: int = 3
 
     # eval the model on pre-made eval freezie maps to see how it's doing
@@ -123,6 +127,7 @@ class TrainConfig(Config):
 
     reward_function_path: Optional[str] = None
 
+    agents: int = 1
 
 @dataclass
 
@@ -254,7 +259,7 @@ class TrainLLMConfig(Config):
     # Save a checkpoint after (at least) this many timesteps
     ckpt_freq: int = int(1e7)
     # Render after this many update steps
-    render_freq: int = 1000
+    render_freq: int = 50
     n_render_eps: int = 3
 
     # eval the model on pre-made eval freezie maps to see how it's doing
