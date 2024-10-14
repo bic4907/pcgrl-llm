@@ -98,6 +98,9 @@ def init_config(config: Config):
     config.exp_group = get_exp_group(config)
     config.exp_dir = get_exp_dir(config)
 
+    config._vid_dir = os.path.join(config.exp_dir, 'videos')
+    config._img_dir = os.path.join(config.exp_dir, 'images')
+
     if config.model == 'seqnca':
         config.hidden_dims = config.hidden_dims[:1]
 
