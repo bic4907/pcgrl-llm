@@ -156,10 +156,6 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         llm_reward = self.reward_fn(prev_array, prev_stats, curr_array, curr_stats)
 
-        # reward = jax.tree.map(
-        #     lambda x, y: jax.lax.select(done, x, y), reward, llm_reward
-        # )
-        # use where
         reward = jnp.where(done, reward, llm_reward)
 
         env_state = env_state.replace(reward=reward)

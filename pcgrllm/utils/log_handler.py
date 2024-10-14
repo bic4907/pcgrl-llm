@@ -53,6 +53,7 @@ class WandbLoggingHandler(BaseLoggingHandler):
         super().__init__(**kwargs)
 
         if self.config.wandb_key and self.config.wandb_project:
+
             wandb.login(key=self.config.wandb_key)
             wandb.init(project=self.config.wandb_project, name=get_wandb_name(self.config), save_code=True)
             wandb.config.update(dict(self.config), allow_val_change=True)
@@ -73,6 +74,7 @@ class WandbLoggingHandler(BaseLoggingHandler):
     def log(self, metric, t):
         if not self.use_wandb:
             return
+
 
         wandb.log(metric, step=t)
 
