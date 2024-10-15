@@ -3,7 +3,7 @@ Task is to generate a level with two-dimensional array looks like alphabet-lette
 The reward function gives higher reward when the generated level looks like the "target letter".
 The reward function get inputs level array and target letter, and return the reward value.
 
-Target letter: 'A'
+Target letter: {Target_character}
 
 
 

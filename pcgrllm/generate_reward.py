@@ -297,6 +297,7 @@ class RewardGenerator:
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
+                Target_character=self._execution_config.target_character,
                 few_shot_code_string=sample_code,
                 reward_function_inputs=reward_function_inputs
             )
@@ -311,6 +312,7 @@ class RewardGenerator:
             """.format(task_obs_code_string="")
 
             initial_user = initial_user.format(
+                Target_character=self._execution_config.target_character,
                 few_shot_code_string=sample_code,
                 reward_function_inputs=reward_function_inputs
             )
