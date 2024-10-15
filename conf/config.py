@@ -261,7 +261,7 @@ class TrainLLMConfig(Config):
     # Save a checkpoint after (at least) this many timesteps
     ckpt_freq: int = int(5e6)
     # Render after this many update steps
-    total_timesteps: int = int(2e7)
+    total_timesteps: int = int(5e7)
 
     render_freq: int = 20
     n_render_eps: int = 3
