@@ -130,7 +130,6 @@ class TrainConfig(Config):
 
     agents: int = 1
 
-    random_agent: bool = False # TODO remove it
 
 @dataclass
 
