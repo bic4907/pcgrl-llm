@@ -264,8 +264,7 @@ class RewardGenerator:
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
-            i='{i}',
-            reward_signature=self.reward_template,
+            i='{i}'
             # sampled_data_example=self.sampled_data_example
         )
 
@@ -297,22 +296,20 @@ class RewardGenerator:
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs
+                few_shot_code_string=sample_code
             )
         else:
             sample_code = """
             ## Example Reward Code
-            Here is the example of the reward function which minimizes the error between target (State.Target.WinRate) and current win rate (Playtesting.WinRate).
-            The function measure the decrease/increase of the error by comparing the previous and current winrate error.
+            Here is the example of the reward function which minimizes the error.
+            The function measure the decrease/increase of the error.
             ```python
             {task_obs_code_string}
             ```
-            """.format(task_obs_code_string="")
+            """.format(task_obs_code_string=self.reward_template)
 
             initial_user = initial_user.format(
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs
+                few_shot_code_string=sample_code
             )
 
         messages = [
