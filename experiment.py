@@ -36,6 +36,7 @@ from pcgrllm.stage import Stage
 
 
 import warnings
+
 warnings.filterwarnings("ignore", category=UserWarning, module="orbax")
 warnings.filterwarnings("ignore", category=FutureWarning, module="jax")
 
@@ -46,6 +47,7 @@ logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
 logging.getLogger('hydra').setLevel(logging.INFO)
 logging.getLogger('absl').setLevel(logging.INFO)
+logging.getLogger('httpx').setLevel(logging.WARNING)
 
 
 class Experiment:
@@ -68,6 +70,7 @@ class Experiment:
         self._iteration = 1
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
+        self._current_feedback_path = None
 
         self._copy_prompt()
 
@@ -118,7 +121,7 @@ class Experiment:
 
     @property
     def feedback_dir(self):
-        return path.join(self._experiment_path, 'feedbacks')
+        return path.join(self._experiment_path, f'iteration_{self._iteration}', 'feedbacks')
 
 
     def _create_reward_functions_dir(self):
@@ -135,10 +138,6 @@ class Experiment:
             self.logging(f"Feedback directory already exists: {self.feedback_dir}")
             raise
 
-    def _bypass_reward_function(self) -> str:
-        raise NotImplementedError
-
-
     def generate_reward_function(self):
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
@@ -153,12 +152,14 @@ class Experiment:
             'verbose': None,
             'previous_reward_function': self._current_reward_function_filename,
             'trial_count': self.config.n_generation_trials,
-            'n_outer': self._iteration,
+            'total_iterations': self.config.total_iterations,
             'n_inner': 1,
-            # 'reference_csv': self._reference_csv,
             'iteration_num': self._iteration,
-            'feedback_path': None,
-            'map_width': self.config.map_width
+            'target_character': self.config.target_character,
+            'pe': self.config.pe,
+            'feedback_path': path.abspath(self._current_feedback_path) if self._current_feedback_path else None,
+            'map_width': self.config.map_width,
+            'map_height': self.config.map_width,
         }
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
@@ -176,13 +177,28 @@ class Experiment:
         os.makedirs(self.reward_functions_dir, exist_ok=True)
 
         reward_filename = f'{basename(self.config.bypass_reward_path)}.py'
-        origin_path = path.join(dirname(__file__), 'pcgrllm', 'example', reward_filename)
+        origin_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', reward_filename)
         target_path = path.join(self.reward_functions_dir, reward_filename)
 
         self.logging(f"Copying reward function to the experiment directory: {origin_path} -> {target_path}", logging.WARNING)
         shutil.copy(origin_path, target_path)
 
         return target_path
+
+    def bypass_feedback(self, iteration_num: int):
+        # copy the reward function
+
+        os.makedirs(self.feedback_dir, exist_ok=True)
+
+        reward_filename = f'{basename(self.config.bypass_feedback_path)}.txt'
+        origin_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_feedback', reward_filename)
+        target_path = path.join(self.feedback_dir, reward_filename)
+
+        self.logging(f"Copying feedback to the experiment directory: {origin_path} -> {target_path}", logging.WARNING)
+        shutil.copy(origin_path, target_path)
+
+        return target_path
+
 
     def validate_reward_function(self):
         config = copy.deepcopy(self.config)
@@ -225,8 +241,11 @@ class Experiment:
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
         config.initialize = False
-        config.llm_iteration = self._iteration
 
+        media_dir = path.join(config.exp_dir, 'train')
+        os.makedirs(media_dir, exist_ok=True)
+        config._vid_dir = os.path.join(media_dir, 'videos')
+        config._img_dir = os.path.join(media_dir, 'images')
 
         config.reward_function_path = self._current_reward_function_filename
         # copy to the exp_dir
@@ -247,52 +266,50 @@ class Experiment:
 
 
     def rollout_pcgrl(self, iteration_run_id):
-        from eval import main_eval as run_eval
+        from rollout import main_rollout as run_rollout
 
         config = copy.deepcopy(self.config)
         config.initialize = False
         config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id))
         config.random_agent = False
-        config.llm_iteration = self._iteration
 
-        run_eval(config)
+        media_dir = path.join(config.exp_dir, 'inference')
+        os.makedirs(media_dir, exist_ok=True)
+
+        config._vid_dir = os.path.join(media_dir, 'videos')
+        config._img_dir = os.path.join(media_dir, 'images')
+        config._numpy_dir = os.path.join(media_dir, 'numpy')
+        config.n_envs = 5
+        config.n_eps = 1
+
+        run_rollout(config)
 
 
     # 파일 분석
-    def analyze_output(self, output) -> None:
-        self.logging("Output analyzed")
+    def analyze_output(self, iteration_num: int) -> None:
 
-        raise NotImplementedError
+        from pcgrllm.generate_feedback import generate_feedback
 
-        # if feedback_type == "t-SNE":
-        #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "t-SNE.png")
-        # elif feedback_type == "statistics":
-        #     self._feedback_path = os.path.join(self.feedback_dir, f"outer_{self._iteration}", feedback_type, "statistics.json")
-
-        feedback_args_dict = {
-            'shared_storage_path': self._experiment_path,
-            'postfix': f"outer_{self._iteration}",
-            # 'feedback_type': feedback_type,
-            'skill_log_csv': self._reference_csv
+        args_dict = {
+            'exp_path': self.config.exp_dir,
+            'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
+            'input_type': self.config.feedback_input_type,
+            'gpt_model': self.config.gpt_model,
+            'reward_function': self._current_reward_function_filename,
+            'iteration': self._iteration,
         }
-        feedback_args_list = [item for key, value in feedback_args_dict.items() if value is not None for item in
-                              (f'--{key}', str(value))]
 
-        generate_feedback_py = os.path.join(path.dirname(__file__), 'generate_feedback.py')
-        command_line = ['python', generate_feedback_py, *feedback_args_list]
+        feedback = generate_feedback(self.config, args_dict)
+        # red
 
-        process = subprocess.Popen(command_line,
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        while True:
-            error = process.stderr.readline()
-            if error == '' and process.poll() is not None:
-                break
-            if error:
-                message = f'Fail:{error.strip()}'
-                return None, message
+        tgt_dir = path.join(self.config.exp_dir, 'iteration_' + str(iteration_num))
+        # save feedback text to iteratio, dir
+        feedback_path = path.join(tgt_dir, f'feedback.txt')
 
-        return None
+        # copy feedback using shutil
+        shutil.copy(feedback, feedback_path)
 
+        return feedback_path
 
     def save_state(self):
         # target variables: iteration, current_reward_function_filename
@@ -351,10 +368,22 @@ class Experiment:
                 # Collect results
                 self.rollout_pcgrl(self._iteration)
 
-                self._stage = Stage.Analysis
+                # if the last iteration, do not analyze the output
+                if self._iteration >= self.config.total_iterations:
+                    self._stage = Stage.FinishIteration
+                else:
+                    self._stage = Stage.Analysis
+
             elif self._stage == Stage.Analysis:
                 # Analyze results
-                # self.analyze_output(self._iteration) # TODO
+
+                if self.config.bypass_feedback_path is not None:
+                    feedback_generation_fn = self.bypass_feedback
+                else:
+                    feedback_generation_fn = self.analyze_output
+
+                self._current_feedback_path = feedback_generation_fn(self._iteration)
+
                 self._stage = Stage.FinishIteration
 
             elif self._stage == Stage.FinishIteration:

@@ -1,0 +1,7 @@
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp
+
+[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).

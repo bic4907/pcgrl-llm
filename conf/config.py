@@ -91,6 +91,7 @@ class Config:
 
     _vid_dir: Optional[str] = None
     _img_dir: Optional[str] = None
+    _numpy_dir: Optional[str] = None
 
 @dataclass
 class EvoMapConfig(Config):
@@ -128,6 +129,7 @@ class TrainConfig(Config):
     reward_function_path: Optional[str] = None
 
     agents: int = 1
+
 
 @dataclass
 
@@ -259,7 +261,7 @@ class TrainLLMConfig(Config):
     # Save a checkpoint after (at least) this many timesteps
     ckpt_freq: int = int(5e6)
     # Render after this many update steps
-    total_timesteps: int = int(2e7)
+    total_timesteps: int = int(5e7)
 
     render_freq: int = 20
     n_render_eps: int = 3
@@ -277,7 +279,6 @@ class TrainLLMConfig(Config):
 
     # LLM experiment setting
     total_iterations: int = int(1)
-    llm_iteration: int = int(1)
 
     # Eval rollout setting
     random_agent: bool = False
@@ -295,8 +296,13 @@ class TrainLLMConfig(Config):
 
     # reward generation setting
     n_generation_trials: int = 10
+
     bypass_reward_path: Optional[str] = None
+    bypass_feedback_path: Optional[str] = None
+
     gpt_model: str = 'llama3-80b-instruct'
+    feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
+    pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
 
 
 cs = ConfigStore.instance()

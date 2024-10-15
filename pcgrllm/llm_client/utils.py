@@ -35,9 +35,6 @@ def parse_reward_function(message):
     patterns = [
         r'```python(.*?)```',
         r'```(.*?)```',
-        r'"""(.*?)"""',
-        r'""(.*?)""',
-        r'"(.*?)"',
     ]
 
     for pattern in patterns:
