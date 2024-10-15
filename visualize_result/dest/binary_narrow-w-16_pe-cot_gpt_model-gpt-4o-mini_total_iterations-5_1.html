@@ -1,0 +1,926 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Experiment Results - binary_narrow-w-16_pe-cot_gpt_model-gpt-4o-mini_total_iterations-5_1</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f7f8fa;
+            margin: 0;
+            padding: 20px;
+            color: #2c3e50;
+        }
+        .container {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #34495e;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .message-box {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .message-container {
+            margin-bottom: 20px;
+        }
+        .message.user .message-box {
+            background-color: #dce8f6;  /* Soft Blue */
+            color: #1c2833;
+            align-self: flex-start;
+        }
+        .message.assistant .message-box {
+            background-color: #f4e1d2;  /* Soft Peach */
+            color: #1c2833;
+            align-self: flex-end;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    </head><body>
+<h1>src/binary_narrow-w-16_pe-cot_gpt_model-gpt-4o-mini_total_iterations-5_1</h1>
+<div class="container"><h2>Iteration 1</h2>
+<div class="message-container"><h3>Trial 1</h3>
+
+                <div class="message user">
+                    <div class="message-box"><h1>PCG Agent Reward Function Generation Task</h1>
+<p>You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.</p>
+<h2>PCGRL Environment</h2>
+<h2>Variable Reference</h2>
+<p>In this section, the variables that the reward function can access are described.
+The reward function only can access the key listed below. If the key is not listed below, the reward function cannot access the value.
+The common variables are the variables that are measured for the overall game state, not for each player.
+The individual variables are the variables that are measured for each player in the game state.</p>
+<h2>Reward Function</h2>
+<p>The reward function is a function that calculates the reward value for the agent based on the playtested results.
+The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.</p>
+<p>import jax.numpy as jnp</p>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code>return reward
+</code></pre>
+<p>This is the template of the reward function.</p>
+<h1>Tips for Jax code implementation</h1>
+<p>The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
+<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
+<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
+<p>[Before]
+if current_diameter &gt; diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty</p>
+<p>[After]
+jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp</p>
+<p>[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To create diverse shape of target character, avoid creating hard-coded levels.</p></div>
+                </div>
+                
+
+                <div class="message user">
+                    <div class="message-box"><h1>Task</h1>
+<p>The task is to generate a level with two-dimensional array looks like alphabet-letter
+The reward function gives higher reward when the generated level looks like the "target letter".
+The reward function get inputs level array and target letter, and return the reward value.
+Consider the shape of the level array and create an alphabet shape to fill it.</p>
+<p>Target letter: A</p>
+<pre><code>        ## Example Reward Code
+        ```python
+        import jax.numpy as jnp
+</code></pre>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code>return reward
+        ```
+</code></pre>
+<h3>Reward Function Inputs</h3>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<p>prev_array: jnp.array : previous game level represented with tile numbers
+prev_stats: dict : statistics of the previous game level
+curr_array: jnp.array : current game level represented with tile numbers
+curr_stats: dict : statistics of the current game level</p>
+<ol>
+<li>array (jnp.array, int32): (16, 16)
+The array is a 2D array with the shape of (height, width).
+The game level is represented with tile numbers (enum) in the 2D array.</li>
+</ol>
+<p>[Tile Number]
+EMPTY = 1, WALL = 2</p>
+<ul>
+<li>Generate reward function which fills "1" to show alphabet shape in the level.</li>
+<li>
+<p>Make sure "0" is not present in the generating level array. "0" is reserved for the border padding.</p>
+</li>
+<li>
+<p>stats: (dict[int]): (DIAMETER = 0, N_REGIONS = 1)</p>
+</li>
+</ul>
+<h2>Thought Tips</h2>
+<p>You have to generate the reward function step-by-step in several iterations.
+The reward function is revised trial-and-error by training the agent and evaluating the generated content.
+You can get feedback from the reward function every iteration to improve the reward function.
+Note the progress of thought and starts from the simplest reward function to the complex one.</p>
+<p>Current Iteration: 1 / Max Iteration: 5 (20.0%)</p>
+<h2>Output</h2>
+<p>Reward function:</p>
+<pre><code class="language-python"></code></pre></div>
+                </div>
+                
+
+            <div class="message assistant">
+                <div class="message-box"><pre><code class="language-python">import jax.numpy as jnp
+
+def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0
+
+    # Define the target letter 'A' shape in a 16x16 grid
+    target_shape = jnp.array([
+        [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ])
+
+    # Calculate the number of matching tiles with the target shape
+    matching_tiles = jnp.sum(curr_array == target_shape)
+
+    # Reward is proportional to the number of matching tiles
+    reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+    return reward
+</code></pre></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
+<div class="message-container"><h3>Result numpy/image files</h3>
+<img src="data:image/png;base64,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" alt="level_2.png" />
+<img src="data:image/png;base64,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" alt="level_3.png" />
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAEgCAYAAAAUg66AAAAJN0lEQVR4nO3dsW4c1xUG4FFAqVIhqzPYqBAcGLAa6wEEVapSqQiQt3BKPQAfxUCA8AFcGXmAVCLgJoDdEOoSFaykwilsOha5ZLi8w/nnzPm+znt9sTNzZ693Ds/+vvfjN1/8/M9/PJyu8vzF2WTcuHHjdzH+hytHAO6YDQiIuffjN1/8nD4IoKeDi89n6WdC48aN9xn3CAbE2ICAGDUgIOZgmqZVPRMaN268z7hHMCDGBgTEqAEBMfqAjBs3Hhv3CAbE2ICAGDUgIGa4D+j46ZPZDwqWcnR44v4fMHr9PIIBMTYgIGa4BvTm9Ku5jgUWd3R4MjS/+/0/ev3G+4Ce7v73Pjz6OJ19fjZN0zQ9fPdwevD+/l4HZr75S8y/q/u/i9Hrd3AXB/XvL/8zfffs+/+98GyaXr19OT3+4TPzzV/9fJYzew3ow6OPny7+r7579v304dFH881f9XyWdfD8xdmlF3e9dtX48emnY+dfe3c5+/xsevz++v8KmW/+kvPnvv+7Gb1+w31A3Z+Bqc/9P2ZVfUAP3139ZteNmW/+GuazrNk3oAfv70+v3r689Pqrty9v9JcM881PzmdZd9YHVOXPsOb3nq8PaMzo9bv396+//mQD2vfv+N1/C0Ntr//10yf/7P7fz+j181MMIMYGBMT4LRitqQGNGf4t2DTpg6Cv7hvIHFbVBwRwUzYgIEYNCLi11eYBQVKVRsjq81eZBwRJ6Tyh7vP3oQbEpqTzhLrP39fseUCQVC2PqPp8eUBAlD4g+FU6T6j7/H3ZgNiUdJ5Q9/n70gfEJlX5M3b1+fKAgBh5QEBZNiAgRg0IuDV5QFDY0eHJ0OdvDTVYfUBASTYgIEYNCIKqZ1LLA4LC1vr5kwcERMgDAiKWzgNSA4KgtdWALn37+Z1d34L0AUFx1T9/+oCAWcgDAmLkAUEja6sBnVsqD0gfEASt9fP34P39/xtgP03jx+8RDIixAQExakAQtNYa0E3pA4Liqn/+9AEBJdmAgBg1IAhqXwNaax8CdLDWz588ICBCHhAQIQ8IGllbDUgeEDRT/fOnDwiYhTwgIEYeEDSythrQOXlA0MBaP3/ygIDNswEBMWpAELTWGtBN6QNiyNHhydD6Hz99cgdHtZz0+ac3kDnoAwJKsgEBMQfT9MvXpOtcN358Ou8Bsbzu69/9/EeNXD99QM11X//u538VeUBAhDwgIEIeEIuq3ocyqvv5XyQPiMV1X//u5z9KHxAwC3lAQIw8IBbVvQbS/fyvIg+IRXRf/+7nfxV5QMDm2YCAGDWg5rrXQLqf/yh9QIPSeTBp1T9Ao+v3ZsoHelW///QBASXZgIAYeUCT86+u+vp1Pv72fUDdz7+66uu31uOXBwREyAMCIuQBLUwfSG3V129txy8PKKD7+VdXff06H79HMOA38oCAGHlAC1vbMzj7qb5+az1+eUAL6X7+1VVfv7UevzwgYPNsQECMGtBKn8G5merr1/34431A6TyU9AJ2Vz3PZ9QW7j99QEBJNiAgZhV5QOn3J8v611Y6Dyj9/mRZ/3WSBwREyAMCItrlAVXvg2CM9V+XlnlA6fcny/rXpg8ImIU8ICCmXR6QGkBv1n+d2uQBpd+fLOu/TvKAgM2zAQExakBEWf/ayvcBdb+BRvNwRsdH85S65/mgDwgoygYExMRrQN2NPkOPUsNjRPk+oO6Gr//ouD4udpAHBETIAwIi2uUBdacG5P5Zk5Z5QN0l+4DkOTFKHxAwC3lAQEy7PKDu1IDcP2vUJg+oO31AY+/P3ZAHBGyeDQiIUQMKUwNy/1SmD6i4LXwAk/dP9TylLdAHBJRkAwJi1IAYkq4BVa+hVacPiKj0/VO9j2qt5AEBEfKAgAh5QJSiBrSt+18eEOWk75/qeUrV6QMCZiEPCIiRB0QpakDbvP/lAVFC+v7RB3Q35AEBm2cDAmLUgBiiBtT7/tcHFDaaR1M9Tyb9AZxjA3P/j9EHBJRkAwJiDqbpl69J17lu/Ph03gOqyPWrzfqNGbl++oAGuX61Wb/d5AEBEfKAgAh5QMWk+2AYY/0+JQ+oINevNus3Rh8QMAt5QECMPKBi1BBqs367yQMqwvWrzfrtJg8I2DwbEBCjBjRIDaE26zdGH1CYG7B2HlL39ZuDPiCgJBsQEKMGxBA1lN70ARHl/tkmeUBAhDwgIEIeEKWoAW2LPCDKcf/0pg8ImIU8ICBGHhClqAFtkzwgSnD/bJM8IGDzbEBAjBoQQ9SAemvfB1Q9j6Y6Gwj6gICSbEBATPkakBoE5LTvA6p+/LBG8oCACHlAQIQ8oD2pAcF85AHdQvXjh8r0AQGzkAcExMgD2pMaEMxPHtANVT9+WCN5QMDm2YCAGDUgNSC4tfZ9QOkNRB4R3ekDAkqyAQEx5WtAaWpQdNa+DyjN9WOL5AEBEfKAgAh5QMWoAbEl8oAKcv3oTB8QMAt5QECMPKBi1IDYInlARbh+bJE8IGDzbEBAjBrQIDUgOtMHFGYDoTt9QEBJNiAgRg0IuDV9QMDs5AEBEfKAgIil84AOnr84u/TirteuGj8+nf2YgJDzx66rxi7+PGN0/9AHBAzRBwTMQh4QECMPCIiTBwTEyAMCNs8GBMSoAQG31j4P6OjwZOj4j58+uYOjgj70AQEl2YCAmPI1IJnMkNO+D6j68cMayQMCIuQBARFL5wGpAakBwW8uffv5nV3fgtr3AU1T/eOHyvQBAbOQBwTEyAPakxoQzE8e0A1VP35YI3lAwObZgIAYNSA1ILi18n1Ao3k+byYbSJI8pqxv/3Y8NP8vf349fAz6gICS/BgVNmDfbzKj35zmcjBN+/2/nC+a4/8Nn35/xli/3kbWP94HlH5/xli/bZIHBETIAwIils4DOtj1fLbPM93oM3z6/Rlj/bbl/LHrqrGLP88YXf94H9Aa3p8x1q83fUDALOQBATFL5wHpA2KY9duWxz98Nr1+96cb/Rl+mvQBEWT9tkkeELB5GhFhA9by26596QNiiPXrLd4HdPRiLA9mOsy+v/GxceuXHf/pr38cvP7Z9VcDAmJsQEDMcCY0wG2N9wEZN27c+C3HPYIBMTYgIEYNCIgZ7gMybty48duOewQDYmxAQIwaEBCjD8i4ceOxcY9gQIwNCIhRAwJi/gvMBoNokw8s2AAAAABJRU5ErkJggg==" alt="level_1.png" />
+<img src="data:image/png;base64,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" alt="level_0.png" />
+<img src="data:image/png;base64,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" alt="level_4.png" />
+
+            <div class="message user">
+                <div class="message-box"><p>Evaluation condition to revise the reward function:
+Make a level looks like "A"</p>
+<p>Please provide feedback on the reward function:</p>
+<p>import jax.numpy as jnp</p>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code># Define the target letter 'A' shape in a 16x16 grid
+target_shape = jnp.array([
+    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+])
+
+# Calculate the number of matching tiles with the target shape
+matching_tiles = jnp.sum(curr_array == target_shape)
+
+# Reward is proportional to the number of matching tiles
+reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+return reward
+</code></pre>
+<p>Evaluating the following content which is generated by the model:
+Level Id 1:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 2 1 1 1 2 2 1 2]
+ [1 1 1 1 1 1 1 1 2 2 2 1 2 1 2 2]
+ [1 1 2 1 1 1 1 2 2 1 1 1 2 1 1 2]
+ [1 1 1 1 2 1 1 2 1 2 1 1 2 2 2 1]
+ [1 1 2 1 2 1 1 1 2 1 1 1 1 1 1 1]
+ [1 1 2 1 1 1 1 1 2 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 2 1 1 1 1 2 2 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 2 1 2 1 1 1 1 1 2 1 1 1 1 1]
+ [1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 2:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 2 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 2 1]
+ [1 1 1 1 1 1 1 1 1 1 2 1 1 1 1 2]
+ [1 1 1 1 2 1 1 1 1 1 2 2 2 2 1 1]
+ [1 1 1 1 1 1 1 1 2 1 2 2 1 1 1 1]
+ [1 2 1 2 1 1 1 1 1 2 1 2 2 2 1 1]
+ [1 1 1 1 2 2 1 2 2 1 2 1 2 1 1 1]
+ [2 1 1 1 1 1 1 1 1 2 1 1 1 1 2 1]
+ [1 1 1 1 1 1 1 2 2 1 1 2 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 2 1 1 1 2 1 1 1 1 1 1 1 1 1]
+ [1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 3:
+[[1 1 1 1 1 1 1 1 1 2 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 2]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 2]
+ [1 1 1 1 1 1 1 1 1 2 1 2 2 1 1 1]
+ [1 1 1 2 1 1 1 2 2 1 1 2 1 2 2 1]
+ [1 1 1 1 2 1 2 2 2 2 2 2 1 1 1 1]
+ [1 1 2 1 1 1 1 1 1 1 1 1 2 1 2 1]
+ [1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 2 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 2 1 1 1 1 1 1 1 2 1 1 1 1 1]]</p>
+<p>Level Id 4:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 2]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 2 1 1 1 2 2 1]
+ [1 1 1 1 1 1 1 1 2 1 2 2 1 1 1 1]
+ [1 1 1 1 1 1 1 2 1 2 1 1 1 2 1 2]
+ [1 1 2 1 1 2 1 1 2 2 1 1 1 2 1 1]
+ [1 2 2 1 2 1 1 1 1 1 1 1 2 1 2 1]
+ [1 1 1 1 1 2 1 1 1 1 1 2 2 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 2 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 5:
+[[1 1 1 1 1 1 1 1 1 1 1 2 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 2 1 1]
+ [1 1 1 1 1 1 1 2 1 1 1 2 1 1 1 1]
+ [1 1 1 2 1 1 1 1 1 1 2 1 1 2 1 1]
+ [1 2 1 1 1 1 1 1 1 2 1 1 1 1 1 1]
+ [1 1 1 1 1 2 2 1 2 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 2 1 2 2 1 1 1 1]
+ [1 1 1 1 2 1 1 1 1 1 1 2 1 1 1 1]
+ [1 1 1 1 1 1 1 1 2 1 1 1 1 1 1 1]
+ [1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 2 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 2 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 2 1 1 1 1 1 1 2 1 1 1 1 1 1 1]]</p></div>
+            </div>
+            <div class="message assistant">
+                <div class="message-box"><p>The evaluation of the generated levels indicates that none of the levels closely resemble the target shape of the letter "A" as defined in the reward function. The generated content primarily consists of the value <code>1</code>, which does not correspond to the expected structure of the letter "A" (represented by <code>1</code> in the target shape) and instead includes a significant number of <code>2</code>s, which are not part of the target shape.</p>
+<h3>Feedback on the Reward Function:</h3>
+<ol>
+<li>
+<p><strong>Matching Criteria</strong>: The current reward function calculates the reward based on the number of matching tiles with the target shape. However, it does not account for the size of the letters. If the letters are too small or not prominent enough, the reward may not reflect the intended design.</p>
+</li>
+<li>
+<p><strong>Letter Size</strong>: The generated levels do not seem to prioritize the size of the letters. The reward function should be revised to provide a higher reward for larger representations of the letter "A". This can be achieved by incorporating a scaling factor that rewards larger contiguous blocks of <code>1</code>s that match the target shape.</p>
+</li>
+<li>
+<p><strong>Penalty for Non-Matching Values</strong>: The presence of <code>2</code>s in the generated levels suggests that the model may be generating unwanted elements. The reward function could be improved by introducing a penalty for non-matching values, which would discourage the generation of values that do not contribute to forming the letter "A".</p>
+</li>
+</ol>
+<h3>Recommendation to Revise the Reward Function:</h3>
+<ul>
+<li>Introduce a scaling factor that increases the reward based on the size of the contiguous blocks of <code>1</code>s that match the target shape.</li>
+<li>Implement a penalty for any <code>2</code>s or other values that do not match the target shape, reducing the overall reward when such values are present.</li>
+<li>Consider adding a threshold for the minimum number of matching tiles required to receive any reward, ensuring that only significant representations of the letter "A" are rewarded.</li>
+</ul>
+<p>By making these adjustments, the reward function will better align with the goal of generating a level that resembles the letter "A" in a prominent and recognizable manner.</p></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
+</div>  <!-- Close container -->
+<div class="container"><h2>Iteration 2</h2>
+<div class="message-container"><h3>Trial 2</h3>
+
+                <div class="message user">
+                    <div class="message-box"><h1>PCG Agent Reward Function Generation Task</h1>
+<p>You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.</p>
+<h2>PCGRL Environment</h2>
+<h2>Variable Reference</h2>
+<p>In this section, the variables that the reward function can access are described.
+The reward function only can access the key listed below. If the key is not listed below, the reward function cannot access the value.
+The common variables are the variables that are measured for the overall game state, not for each player.
+The individual variables are the variables that are measured for each player in the game state.</p>
+<h2>Reward Function</h2>
+<p>The reward function is a function that calculates the reward value for the agent based on the playtested results.
+The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.</p>
+<p>import jax.numpy as jnp</p>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code>return reward
+</code></pre>
+<p>This is the template of the reward function.</p>
+<h1>Tips for Jax code implementation</h1>
+<p>The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
+<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
+<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
+<p>[Before]
+if current_diameter &gt; diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty</p>
+<p>[After]
+jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp</p>
+<p>[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To create diverse shape of target character, avoid creating hard-coded levels.# Tips for Jax code implementation
+The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
+<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
+<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
+<p>[Before]
+if current_diameter &gt; diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty</p>
+<p>[After]
+jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp</p>
+<p>[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To create diverse shape of target character, avoid creating hard-coded levels.</p></div>
+                </div>
+                
+
+                <div class="message user">
+                    <div class="message-box"><h1>Task</h1>
+<p>The task is to generate a level with two-dimensional array looks like alphabet-letter
+The reward function gives higher reward when the generated level looks like the "target letter".
+The reward function get inputs level array and target letter, and return the reward value.
+Consider the shape of the level array and create an alphabet shape to fill it.</p>
+<p>Target letter: A</p>
+<pre><code>           ## Previous Reward Code
+           Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+           ```python
+           import jax.numpy as jnp
+</code></pre>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code># Define the target letter 'A' shape in a 16x16 grid
+target_shape = jnp.array([
+    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+])
+
+# Calculate the number of matching tiles with the target shape
+matching_tiles = jnp.sum(curr_array == target_shape)
+
+# Calculate the total number of tiles in the target shape
+total_target_tiles = jnp.sum(target_shape == 1)
+
+# Reward is proportional to the number of matching tiles
+reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+# Introduce a penalty for non-matching values (e.g., tile number 2)
+non_matching_tiles = jnp.sum(curr_array == 2)
+reward -= non_matching_tiles * 0.05  # Adjust the penalty factor as needed
+
+# Reward for larger representations of the letter "A"
+if matching_tiles &gt; total_target_tiles * 0.5:  # If more than 50% of the target shape is matched
+    reward += 1.0  # Bonus for significant representation
+
+return reward
+           ```
+
+           Feedback:
+</code></pre>
+<h2>Feedback</h2>
+<p>The evaluation of the generated levels indicates that none of the levels closely resemble the target shape of the letter "A" as defined in the reward function. The generated content primarily consists of the value <code>1</code>, which does not correspond to the expected structure of the letter "A" (represented by <code>1</code> in the target shape) and instead includes a significant number of <code>2</code>s, which are not part of the target shape.</p>
+<h3>Feedback on the Reward Function:</h3>
+<ol>
+<li>
+<p><strong>Matching Criteria</strong>: The current reward function calculates the reward based on the number of matching tiles with the target shape. However, it does not account for the size of the letters. If the letters are too small or not prominent enough, the reward may not reflect the intended design.</p>
+</li>
+<li>
+<p><strong>Letter Size</strong>: The generated levels do not seem to prioritize the size of the letters. The reward function should be revised to provide a higher reward for larger representations of the letter "A". This can be achieved by incorporating a scaling factor that rewards larger contiguous blocks of <code>1</code>s that match the target shape.</p>
+</li>
+<li>
+<p><strong>Penalty for Non-Matching Values</strong>: The presence of <code>2</code>s in the generated levels suggests that the model may be generating unwanted elements. The reward function could be improved by introducing a penalty for non-matching values, which would discourage the generation of values that do not contribute to forming the letter "A".</p>
+</li>
+</ol>
+<h3>Recommendation to Revise the Reward Function:</h3>
+<ul>
+<li>Introduce a scaling factor that increases the reward based on the size of the contiguous blocks of <code>1</code>s that match the target shape.</li>
+<li>Implement a penalty for any <code>2</code>s or other values that do not match the target shape, reducing the overall reward when such values are present.</li>
+<li>Consider adding a threshold for the minimum number of matching tiles required to receive any reward, ensuring that only significant representations of the letter "A" are rewarded.</li>
+</ul>
+<p>By making these adjustments, the reward function will better align with the goal of generating a level that resembles the letter "A" in a prominent and recognizable manner.</p>
+<h3>Reward Function Inputs</h3>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<p>prev_array: jnp.array : previous game level represented with tile numbers
+prev_stats: dict : statistics of the previous game level
+curr_array: jnp.array : current game level represented with tile numbers
+curr_stats: dict : statistics of the current game level</p>
+<ol>
+<li>array (jnp.array, int32): (16, 16)
+The array is a 2D array with the shape of (height, width).
+The game level is represented with tile numbers (enum) in the 2D array.</li>
+</ol>
+<p>[Tile Number]
+EMPTY = 1, WALL = 2</p>
+<ul>
+<li>Generate reward function which fills "1" to show alphabet shape in the level.</li>
+<li>
+<p>Make sure "0" is not present in the generating level array. "0" is reserved for the border padding.</p>
+</li>
+<li>
+<p>stats: (dict[int]): (DIAMETER = 0, N_REGIONS = 1)</p>
+</li>
+</ul>
+<h2>Thought Tips</h2>
+<p>You have to generate the reward function step-by-step in several iterations.
+The reward function is revised trial-and-error by training the agent and evaluating the generated content.
+You can get feedback from the reward function every iteration to improve the reward function.
+Note the progress of thought and starts from the simplest reward function to the complex one.</p>
+<p>Current Iteration: 2 / Max Iteration: 5 (40.0%)</p>
+<h2>Output</h2>
+<p>Reward function:</p>
+<pre><code class="language-python"></code></pre></div>
+                </div>
+                
+
+            <div class="message assistant">
+                <div class="message-box"><pre><code class="language-python">import jax.numpy as jnp
+
+def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0
+
+    # Define the target letter 'A' shape in a 16x16 grid
+    target_shape = jnp.array([
+        [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ])
+
+    # Calculate the number of matching tiles with the target shape
+    matching_tiles = jnp.sum(curr_array == target_shape)
+
+    # Calculate the total number of tiles in the target shape
+    total_target_tiles = jnp.sum(target_shape == 1)
+
+    # Reward is proportional to the number of matching tiles
+    reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+    # Introduce a penalty for non-matching values (e.g., tile number 2)
+    non_matching_tiles = jnp.sum(curr_array == 2)
+    reward -= non_matching_tiles * 0.05  # Adjust the penalty factor as needed
+
+    # Reward for larger representations of the letter &quot;A&quot;
+    reward += jnp.where(matching_tiles &gt; total_target_tiles * 0.5, 1.0, 0.0)  # Bonus for significant representation
+
+    return reward
+</code></pre></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
+<div class="message-container"><h3>Trial 1</h3>
+
+                <div class="message user">
+                    <div class="message-box"><h1>PCG Agent Reward Function Generation Task</h1>
+<p>You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.</p>
+<h2>PCGRL Environment</h2>
+<h2>Variable Reference</h2>
+<p>In this section, the variables that the reward function can access are described.
+The reward function only can access the key listed below. If the key is not listed below, the reward function cannot access the value.
+The common variables are the variables that are measured for the overall game state, not for each player.
+The individual variables are the variables that are measured for each player in the game state.</p>
+<h2>Reward Function</h2>
+<p>The reward function is a function that calculates the reward value for the agent based on the playtested results.
+The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.</p>
+<p>import jax.numpy as jnp</p>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code>return reward
+</code></pre>
+<p>This is the template of the reward function.</p>
+<h1>Tips for Jax code implementation</h1>
+<p>The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
+<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
+<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
+<p>[Before]
+if current_diameter &gt; diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty</p>
+<p>[After]
+jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp</p>
+<p>[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To create diverse shape of target character, avoid creating hard-coded levels.</p></div>
+                </div>
+                
+
+                <div class="message user">
+                    <div class="message-box"><h1>Task</h1>
+<p>The task is to generate a level with two-dimensional array looks like alphabet-letter
+The reward function gives higher reward when the generated level looks like the "target letter".
+The reward function get inputs level array and target letter, and return the reward value.
+Consider the shape of the level array and create an alphabet shape to fill it.</p>
+<p>Target letter: A</p>
+<pre><code>           ## Previous Reward Code
+           Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+           ```python
+           import jax.numpy as jnp
+</code></pre>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code># Define the target letter 'A' shape in a 16x16 grid
+target_shape = jnp.array([
+    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+])
+
+# Calculate the number of matching tiles with the target shape
+matching_tiles = jnp.sum(curr_array == target_shape)
+
+# Reward is proportional to the number of matching tiles
+reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+return reward
+           ```
+
+           Feedback:
+</code></pre>
+<h2>Feedback</h2>
+<p>The evaluation of the generated levels indicates that none of the levels closely resemble the target shape of the letter "A" as defined in the reward function. The generated content primarily consists of the value <code>1</code>, which does not correspond to the expected structure of the letter "A" (represented by <code>1</code> in the target shape) and instead includes a significant number of <code>2</code>s, which are not part of the target shape.</p>
+<h3>Feedback on the Reward Function:</h3>
+<ol>
+<li>
+<p><strong>Matching Criteria</strong>: The current reward function calculates the reward based on the number of matching tiles with the target shape. However, it does not account for the size of the letters. If the letters are too small or not prominent enough, the reward may not reflect the intended design.</p>
+</li>
+<li>
+<p><strong>Letter Size</strong>: The generated levels do not seem to prioritize the size of the letters. The reward function should be revised to provide a higher reward for larger representations of the letter "A". This can be achieved by incorporating a scaling factor that rewards larger contiguous blocks of <code>1</code>s that match the target shape.</p>
+</li>
+<li>
+<p><strong>Penalty for Non-Matching Values</strong>: The presence of <code>2</code>s in the generated levels suggests that the model may be generating unwanted elements. The reward function could be improved by introducing a penalty for non-matching values, which would discourage the generation of values that do not contribute to forming the letter "A".</p>
+</li>
+</ol>
+<h3>Recommendation to Revise the Reward Function:</h3>
+<ul>
+<li>Introduce a scaling factor that increases the reward based on the size of the contiguous blocks of <code>1</code>s that match the target shape.</li>
+<li>Implement a penalty for any <code>2</code>s or other values that do not match the target shape, reducing the overall reward when such values are present.</li>
+<li>Consider adding a threshold for the minimum number of matching tiles required to receive any reward, ensuring that only significant representations of the letter "A" are rewarded.</li>
+</ul>
+<p>By making these adjustments, the reward function will better align with the goal of generating a level that resembles the letter "A" in a prominent and recognizable manner.</p>
+<h3>Reward Function Inputs</h3>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<p>prev_array: jnp.array : previous game level represented with tile numbers
+prev_stats: dict : statistics of the previous game level
+curr_array: jnp.array : current game level represented with tile numbers
+curr_stats: dict : statistics of the current game level</p>
+<ol>
+<li>array (jnp.array, int32): (16, 16)
+The array is a 2D array with the shape of (height, width).
+The game level is represented with tile numbers (enum) in the 2D array.</li>
+</ol>
+<p>[Tile Number]
+EMPTY = 1, WALL = 2</p>
+<ul>
+<li>Generate reward function which fills "1" to show alphabet shape in the level.</li>
+<li>
+<p>Make sure "0" is not present in the generating level array. "0" is reserved for the border padding.</p>
+</li>
+<li>
+<p>stats: (dict[int]): (DIAMETER = 0, N_REGIONS = 1)</p>
+</li>
+</ul>
+<h2>Thought Tips</h2>
+<p>You have to generate the reward function step-by-step in several iterations.
+The reward function is revised trial-and-error by training the agent and evaluating the generated content.
+You can get feedback from the reward function every iteration to improve the reward function.
+Note the progress of thought and starts from the simplest reward function to the complex one.</p>
+<p>Current Iteration: 2 / Max Iteration: 5 (40.0%)</p>
+<h2>Output</h2>
+<p>Reward function:</p>
+<pre><code class="language-python"></code></pre></div>
+                </div>
+                
+
+            <div class="message assistant">
+                <div class="message-box"><pre><code class="language-python">import jax.numpy as jnp
+
+def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0
+
+    # Define the target letter 'A' shape in a 16x16 grid
+    target_shape = jnp.array([
+        [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ])
+
+    # Calculate the number of matching tiles with the target shape
+    matching_tiles = jnp.sum(curr_array == target_shape)
+
+    # Calculate the total number of tiles in the target shape
+    total_target_tiles = jnp.sum(target_shape == 1)
+
+    # Reward is proportional to the number of matching tiles
+    reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+    # Introduce a penalty for non-matching values (e.g., tile number 2)
+    non_matching_tiles = jnp.sum(curr_array == 2)
+    reward -= non_matching_tiles * 0.05  # Adjust the penalty factor as needed
+
+    # Reward for larger representations of the letter &quot;A&quot;
+    if matching_tiles &gt; total_target_tiles * 0.5:  # If more than 50% of the target shape is matched
+        reward += 1.0  # Bonus for significant representation
+
+    return reward
+</code></pre></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
+<div class="message-container"><h3>Result numpy/image files</h3>
+<img src="data:image/png;base64,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" alt="level_2.png" />
+<img src="data:image/png;base64,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" alt="level_3.png" />
+<img src="data:image/png;base64,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" alt="level_1.png" />
+<img src="data:image/png;base64,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" alt="level_0.png" />
+<img src="data:image/png;base64,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" alt="level_4.png" />
+
+            <div class="message user">
+                <div class="message-box"><p>Evaluation condition to revise the reward function:
+Make a level looks like "A"</p>
+<p>Please provide feedback on the reward function:</p>
+<p>import jax.numpy as jnp</p>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code># Define the target letter 'A' shape in a 16x16 grid
+target_shape = jnp.array([
+    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+])
+
+# Calculate the number of matching tiles with the target shape
+matching_tiles = jnp.sum(curr_array == target_shape)
+
+# Calculate the total number of tiles in the target shape
+total_target_tiles = jnp.sum(target_shape == 1)
+
+# Reward is proportional to the number of matching tiles
+reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+# Introduce a penalty for non-matching values (e.g., tile number 2)
+non_matching_tiles = jnp.sum(curr_array == 2)
+reward -= non_matching_tiles * 0.05  # Adjust the penalty factor as needed
+
+# Reward for larger representations of the letter "A"
+reward += jnp.where(matching_tiles &gt; total_target_tiles * 0.5, 1.0, 0.0)  # Bonus for significant representation
+
+return reward
+</code></pre>
+<p>Evaluating the following content which is generated by the model:
+Level Id 1:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 2:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 3:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 4:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p>
+<p>Level Id 5:
+[[1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]
+ [1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1]]</p></div>
+            </div>
+            <div class="message assistant">
+                <div class="message-box"><p>The generated levels (Levels 1 to 5) consist entirely of the value <code>1</code>, which represents the letter "A" in the defined target shape. However, the evaluation condition specifies that the level should look like the letter "A", and while the generated content does match the shape of "A", it does not take into account the size of the letters.</p>
+<h3>Feedback on the Reward Function:</h3>
+<ol>
+<li>
+<p><strong>Size of Letters</strong>: The current reward function does not explicitly reward larger representations of the letter "A". All generated levels are filled with <code>1</code>s, which means they are maximally sized, but the reward function should encourage larger letters in a more nuanced way. </p>
+</li>
+<li>
+<p><strong>Lack of Variation</strong>: The generated levels are uniform and do not provide any variation in the representation of the letter "A". This could lead to a lack of creativity in the generated levels. The reward function could be adjusted to encourage more diverse representations of the letter "A".</p>
+</li>
+</ol>
+<h3>Recommendation to Revise the Reward Function:</h3>
+<ul>
+<li>Introduce a higher reward for larger letters by adding a condition that checks the size of the letter representation. For example, if the letter "A" occupies more than a certain percentage of the grid, provide a significant bonus.</li>
+<li>Consider adding a penalty for levels that are too uniform or lack variation in the representation of the letter "A". This could encourage the agent to explore different configurations while still maintaining the overall shape of "A".</li>
+<li>Adjust the scaling factor for matching tiles to ensure that the reward reflects not just the quantity of matching tiles but also their arrangement and size.</li>
+</ul>
+<p>By implementing these changes, the reward function can better guide the agent to generate levels that not only resemble the letter "A" but also do so in a more visually appealing and varied manner.</p></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
+</div>  <!-- Close container -->
+</body></html>
