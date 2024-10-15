@@ -276,7 +276,7 @@ class RewardGenerator:
         initial_user = copy.deepcopy(self.initial_user)
 
         reward_function_inputs = self.reward_function_inputs_template.format(
-            array_shape='(16, 16)',
+            array_shape=f'({self._execution_config.map_width}, {self._execution_config.map_width})',
             stats_keys='DIAMETER = 0, N_REGIONS = 1',
             tile_enum='EMPTY = 1, WALL = 2'
         )
@@ -320,7 +320,6 @@ class RewardGenerator:
             {"role": "user", "content": initial_user}
         ]
 
-        # print(messages)
         response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)

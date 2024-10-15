@@ -157,7 +157,8 @@ class Experiment:
             'n_inner': 1,
             # 'reference_csv': self._reference_csv,
             'iteration_num': self._iteration,
-            'feedback_path': None
+            'feedback_path': None,
+            'map_width': self.config.map_width
         }
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
