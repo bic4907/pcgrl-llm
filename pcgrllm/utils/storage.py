@@ -50,6 +50,9 @@ class Iteration:
             f"\tNumpy Files: {len(self.get_numpy_files())} files"
         )
 
+    def get_path(self) -> str:
+        return self.root_path
+
     def get_inference_dir(self) -> str:
         return join(self.root_path, INFERENCE_DIR)
 

@@ -91,6 +91,7 @@ class Config:
 
     _vid_dir: Optional[str] = None
     _img_dir: Optional[str] = None
+    _numpy_dir: Optional[str] = None
 
 @dataclass
 class EvoMapConfig(Config):
@@ -128,6 +129,8 @@ class TrainConfig(Config):
     reward_function_path: Optional[str] = None
 
     agents: int = 1
+
+    random_agent: bool = False # TODO remove it
 
 @dataclass
 
@@ -295,8 +298,12 @@ class TrainLLMConfig(Config):
 
     # reward generation setting
     n_generation_trials: int = 10
+
     bypass_reward_path: Optional[str] = None
+    bypass_feedback_path: Optional[str] = None
+
     gpt_model: str = 'llama3-80b-instruct'
+    feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
 
 
 cs = ConfigStore.instance()

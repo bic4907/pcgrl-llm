@@ -68,7 +68,7 @@ class Experiment:
 
     def initialize(self):
         self._iteration = 1
-        self._stage = Stage.Analysis
+        self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
 
         self._copy_prompt()
@@ -229,6 +229,11 @@ class Experiment:
         config.llm_iteration = self._iteration
 
 
+        media_dir = path.join(config.exp_dir, 'train')
+        os.makedirs(media_dir, exist_ok=True)
+        config._vid_dir = os.path.join(media_dir, 'videos')
+        config._img_dir = os.path.join(media_dir, 'images')
+
         config.reward_function_path = self._current_reward_function_filename
         # copy to the exp_dir
 
@@ -248,7 +253,7 @@ class Experiment:
 
 
     def rollout_pcgrl(self, iteration_run_id):
-        from eval import main_eval as run_eval
+        from rollout import main_rollout as run_rollout
 
         config = copy.deepcopy(self.config)
         config.initialize = False
@@ -256,7 +261,17 @@ class Experiment:
         config.random_agent = False
         config.llm_iteration = self._iteration
 
-        run_eval(config)
+
+        media_dir = path.join(config.exp_dir, 'inference')
+        os.makedirs(media_dir, exist_ok=True)
+
+        config._vid_dir = os.path.join(media_dir, 'videos')
+        config._img_dir = os.path.join(media_dir, 'images')
+        config._numpy_dir = os.path.join(media_dir, 'numpy')
+        config.n_envs = 5
+        config.n_eps = 1
+
+        run_rollout(config)
 
 
     # 파일 분석
@@ -266,10 +281,8 @@ class Experiment:
 
         args_dict = {
             'exp_path': self.config.exp_dir,
-            # 'exp_path': self.config.exp_dir,
-            'condition_prompt': 'Make a level looks like "A"',
-            'exp_path': '/Users/inchang/Desktop/pcgrl-llm/pcgrllm/example/binary_narrow-w-16_gpt_model-gpt-4o-gil_3',
-            'input_type': 'array',
+            'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
+            'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
             'reward_function': self._current_reward_function_filename,
             'iteration': self._iteration,
@@ -277,8 +290,12 @@ class Experiment:
 
         feedback = generate_feedback(self.config, args_dict)
 
-        self.logging
-        self.feedback = feedback
+        tgt_dir = path.join(self.config.exp_dir, 'iteration_' + str(iteration_num))
+
+        # save feedback text to iteratio, dir
+        feedback_path = path.join(tgt_dir, f'feedback.txt')
+        with open(feedback_path, 'w') as file:
+            file.write(feedback)
 
         return True
 

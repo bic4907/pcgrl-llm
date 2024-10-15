@@ -1,11 +1,10 @@
 import os
 import sys
 import json
-import time
 import argparse
 import logging
+import warnings
 from copy import deepcopy
-from wsgiref.types import InputStream
 
 import numpy as np
 from PIL import Image
@@ -14,8 +13,6 @@ from io import BytesIO
 import base64
 from os.path import abspath, basename, join, dirname
 
-from tensorflow_probability.python.internal.backend.jax.numpy_logging import warning
-from wandb.sdk.internal.system.assets import asset_registry
 
 from conf.config import Config
 from pcgrllm.llm_client.llm import UnifiedLLMClient, ChatContext
@@ -40,13 +37,14 @@ class FeedbackGenerator:
         self.logging(f'FeedbackGenerator initializing with config: {config}', level=logging.INFO)
 
         self.iteration = self.storage.get_iteration(config['iteration'])
-        assert self.iteration is not None, f"Iteration {config['iteration']} not found."
+        assert self.iteration is not None, f"Iteration {config['iteration']} not found in {self.config['exp_path']}."
 
         self._system_template = open(join(dirname(__file__), 'prompt', 'feedback_system.txt'), 'r').read()
         self._user_template = open(join(dirname(__file__), 'prompt', 'feedback_user.txt'), 'r').read()
 
         # Create feedback folder inside exp_path
-        self.feedback_dir = join(config['exp_path'], 'feedback')
+
+        self.feedback_dir = join(self.iteration.get_path(), 'feedback')
         os.makedirs(self.feedback_dir, exist_ok=True)
 
         # Paths for logs and images
@@ -79,7 +77,7 @@ class FeedbackGenerator:
             reward_function_prompt = f'Please provide feedback on the reward function:\n\n{reward_function}\n\n'
 
         if self.config['condition_prompt'] is None:
-            warning('Condition prompt is not provided. Please provide a condition prompt.')
+            warnings.warn('Condition prompt is not provided. Please provide a condition prompt.')
             self.config['condition_prompt'] = 'N/A'
 
         user_prompt = user_prompt.format(
@@ -109,7 +107,7 @@ class FeedbackGenerator:
 
         self.logging(f'Model input:\n{messages}')
 
-        response, ctx = self.client.call_model(ctx, messages, model='gpt-4o-mini')[0]
+        response, ctx = self.client.call_model(ctx, messages, model=self.config['gpt_model'])[0]
 
         self.save_log(ctx)
 
@@ -140,7 +138,7 @@ class FeedbackGenerator:
 
         self.logging(f'Model input:\n{messages}')
 
-        response, ctx = self.client.call_model(ctx, messages, model='gpt-4o-gil')[0]
+        response, ctx = self.client.call_model(ctx, messages, model=self.config['gpt_model'])[0]
         self.save_log(ctx)
 
         return response
