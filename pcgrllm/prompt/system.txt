@@ -13,6 +13,5 @@ The individual variables are the variables that are measured for each player in 
 The reward function is a function that calculates the reward value for the agent based on the playtested results.
 The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.
 
-{reward_signature}
-
-This is the template of the reward function.
+The reward shaping code should be written between '# start of code' and '# end of code' comments.
+The code output should be formatted as a Python code string: "```python ... ```".
