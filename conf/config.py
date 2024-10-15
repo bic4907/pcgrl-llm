@@ -279,7 +279,6 @@ class TrainLLMConfig(Config):
 
     # LLM experiment setting
     total_iterations: int = int(1)
-    llm_iteration: int = int(1)
 
     # Eval rollout setting
     random_agent: bool = False
@@ -303,6 +302,7 @@ class TrainLLMConfig(Config):
 
     gpt_model: str = 'llama3-80b-instruct'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
+    pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
 
 
 cs = ConfigStore.instance()

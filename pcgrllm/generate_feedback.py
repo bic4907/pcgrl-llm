@@ -54,11 +54,21 @@ class FeedbackGenerator:
     def run(self):
         self.logging(f'FeedbackGenerator config: {self.config}', level=logging.INFO)
 
+        response = None
         if self.config['input_type'] == FeedbackInputType.Array:
-            return self.run_text_model()
+            response = self.run_text_model()
         elif self.config['input_type'] == FeedbackInputType.Image:
-            return self.run_vision_model()
-        self.logging('Invalid input type', level=logging.ERROR)
+            response = self.run_vision_model()
+        else:
+            self.logging('Invalid input type', level=logging.ERROR)
+            raise ValueError('Invalid input type')
+
+        # save to the iteration_dir and return the path
+        feedback_path = join(self.feedback_dir, 'feedback.txt')
+        with open(feedback_path, 'w') as f:
+            f.write(response)
+
+        return feedback_path
 
     def _get_system_message(self) -> str:
         prompt = deepcopy(self._system_template)

@@ -1,0 +1,7 @@
+You have to generate the reward function step-by-step in several iterations.
+The reward function is revised trial-and-error by training the agent and evaluating the generated content.
+You can get feedback from the reward function every iteration to improve the reward function.
+Note the progress of thought and starts from the simplest reward function to the complex one.
+
+
+Current Iteration: {curr_iteration_num} / Max Iteration: {max_iteration_num} ({perc_iteration})

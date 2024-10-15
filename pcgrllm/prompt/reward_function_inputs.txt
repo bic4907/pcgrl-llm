@@ -15,6 +15,7 @@ The game level is represented with tile numbers (enum) in the 2D array.
 [Tile Number]
 {tile_enum}
 
-- "0" is reserved for the border padding. Do not use "0" for the game level.
+- Generate reward function which fills "1" to show alphabet shape in the level.
+- Make sure "0" is not present in the generating level array. "0" is reserved for the border padding.
 
 2. stats: (dict[int]): ({stats_keys})

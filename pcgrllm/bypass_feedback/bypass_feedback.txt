@@ -1,0 +1,1 @@
+Make the reward function more detail and regulate weights for each reward term.

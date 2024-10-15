@@ -1,31 +1,19 @@
-# The Task
-Task is to generate a level with two-dimensional array looks like alphabet-letter
+# Task
+The task is to generate a level with two-dimensional array looks like alphabet-letter
 The reward function gives higher reward when the generated level looks like the "target letter".
 The reward function get inputs level array and target letter, and return the reward value.
+Consider the shape of the level array and create an alphabet shape to fill it.
 
-Target letter: 'A'
-
-
+Target letter: {target_character}
 
 {few_shot_code_string}
 
-
-
 {reward_function_inputs}
 
-
-Find four insight(s) to design the reward function and write it in the Python code.
-
-Some helpful tips for writing the reward function code:
-(1) You may find it helpful to normalize the reward to a fixed range by applying transformations like torch.exp to the overall reward or its components
-(2) If you choose to transform a reward component, then you must also introduce a temperature parameter inside the transformation function; this parameter must be a named variable in the reward function and it must not be an input variable. Each transformed reward component should have its own temperature variable
-(3) Write the role of each agent (insight) and comment for each sub-function what the agents characteristics' is determined and how to calculated it.
-(4) Most importantly, the reward code's input variables must contain only attributes of the provided environment class definition (namely, variables that have prefix self.). Under no circumstance can you introduce new input variables.
-(5) Don't write any code outside the `compute_reward` function, only the `compute_reward` is compiled to the environment.
+{thought_tips}
 
 
+## Output
 Reward function:
 ```python
-<CODE>
-</CODE>
 ```
