@@ -343,6 +343,200 @@ Level Id 1:
             
 </div>  <!-- Close container -->
 <div class="container"><h2>Iteration 2</h2>
+<div class="message-container"><h3>Trial 1</h3>
+
+                <div class="message user">
+                    <div class="message-box"><h1>PCG Agent Reward Function Generation Task</h1>
+<p>You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.</p>
+<h2>PCGRL Environment</h2>
+<h2>Variable Reference</h2>
+<p>In this section, the variables that the reward function can access are described.
+The reward function only can access the key listed below. If the key is not listed below, the reward function cannot access the value.
+The common variables are the variables that are measured for the overall game state, not for each player.
+The individual variables are the variables that are measured for each player in the game state.</p>
+<h2>Reward Function</h2>
+<p>The reward function is a function that calculates the reward value for the agent based on the playtested results.
+The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.</p>
+<p>import jax.numpy as jnp</p>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code>return reward
+</code></pre>
+<p>This is the template of the reward function.</p>
+<h1>Tips for Jax code implementation</h1>
+<p>The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
+<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
+<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
+<p>[Before]
+if current_diameter &gt; diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty</p>
+<p>[After]
+jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp</p>
+<p>[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To create diverse shape of target character, avoid creating hard-coded levels.</p></div>
+                </div>
+                
+
+                <div class="message user">
+                    <div class="message-box"><h1>Task</h1>
+<p>The task is to generate a level with two-dimensional array looks like alphabet-letter
+The reward function gives higher reward when the generated level looks like the "target letter".
+The reward function get inputs level array and target letter, and return the reward value.
+Consider the shape of the level array and create an alphabet shape to fill it.</p>
+<p>Target letter: A</p>
+<pre><code>           ## Previous Reward Code
+           Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+           ```python
+           import jax.numpy as jnp
+</code></pre>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code># Define the target letter 'A' shape in a 16x16 grid
+target_shape = jnp.array([
+    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+])
+
+# Calculate the number of matching tiles with the target shape
+matching_tiles = jnp.sum(curr_array == target_shape)
+
+# Reward is proportional to the number of matching tiles
+reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+return reward
+           ```
+
+           Feedback:
+</code></pre>
+<h2>Feedback</h2>
+<p>The evaluation of the generated levels indicates that none of the levels closely resemble the target shape of the letter "A" as defined in the reward function. The generated content primarily consists of the value <code>1</code>, which does not correspond to the expected structure of the letter "A" (represented by <code>1</code> in the target shape) and instead includes a significant number of <code>2</code>s, which are not part of the target shape.</p>
+<h3>Feedback on the Reward Function:</h3>
+<ol>
+<li>
+<p><strong>Matching Criteria</strong>: The current reward function calculates the reward based on the number of matching tiles with the target shape. However, it does not account for the size of the letters. If the letters are too small or not prominent enough, the reward may not reflect the intended design.</p>
+</li>
+<li>
+<p><strong>Letter Size</strong>: The generated levels do not seem to prioritize the size of the letters. The reward function should be revised to provide a higher reward for larger representations of the letter "A". This can be achieved by incorporating a scaling factor that rewards larger contiguous blocks of <code>1</code>s that match the target shape.</p>
+</li>
+<li>
+<p><strong>Penalty for Non-Matching Values</strong>: The presence of <code>2</code>s in the generated levels suggests that the model may be generating unwanted elements. The reward function could be improved by introducing a penalty for non-matching values, which would discourage the generation of values that do not contribute to forming the letter "A".</p>
+</li>
+</ol>
+<h3>Recommendation to Revise the Reward Function:</h3>
+<ul>
+<li>Introduce a scaling factor that increases the reward based on the size of the contiguous blocks of <code>1</code>s that match the target shape.</li>
+<li>Implement a penalty for any <code>2</code>s or other values that do not match the target shape, reducing the overall reward when such values are present.</li>
+<li>Consider adding a threshold for the minimum number of matching tiles required to receive any reward, ensuring that only significant representations of the letter "A" are rewarded.</li>
+</ul>
+<p>By making these adjustments, the reward function will better align with the goal of generating a level that resembles the letter "A" in a prominent and recognizable manner.</p>
+<h3>Reward Function Inputs</h3>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<p>prev_array: jnp.array : previous game level represented with tile numbers
+prev_stats: dict : statistics of the previous game level
+curr_array: jnp.array : current game level represented with tile numbers
+curr_stats: dict : statistics of the current game level</p>
+<ol>
+<li>array (jnp.array, int32): (16, 16)
+The array is a 2D array with the shape of (height, width).
+The game level is represented with tile numbers (enum) in the 2D array.</li>
+</ol>
+<p>[Tile Number]
+EMPTY = 1, WALL = 2</p>
+<ul>
+<li>Generate reward function which fills "1" to show alphabet shape in the level.</li>
+<li>
+<p>Make sure "0" is not present in the generating level array. "0" is reserved for the border padding.</p>
+</li>
+<li>
+<p>stats: (dict[int]): (DIAMETER = 0, N_REGIONS = 1)</p>
+</li>
+</ul>
+<h2>Thought Tips</h2>
+<p>You have to generate the reward function step-by-step in several iterations.
+The reward function is revised trial-and-error by training the agent and evaluating the generated content.
+You can get feedback from the reward function every iteration to improve the reward function.
+Note the progress of thought and starts from the simplest reward function to the complex one.</p>
+<p>Current Iteration: 2 / Max Iteration: 5 (40.0%)</p>
+<h2>Output</h2>
+<p>Reward function:</p>
+<pre><code class="language-python"></code></pre></div>
+                </div>
+                
+
+            <div class="message assistant">
+                <div class="message-box"><pre><code class="language-python">import jax.numpy as jnp
+
+def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0
+
+    # Define the target letter 'A' shape in a 16x16 grid
+    target_shape = jnp.array([
+        [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    ])
+
+    # Calculate the number of matching tiles with the target shape
+    matching_tiles = jnp.sum(curr_array == target_shape)
+
+    # Calculate the total number of tiles in the target shape
+    total_target_tiles = jnp.sum(target_shape == 1)
+
+    # Reward is proportional to the number of matching tiles
+    reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
+
+    # Introduce a penalty for non-matching values (e.g., tile number 2)
+    non_matching_tiles = jnp.sum(curr_array == 2)
+    reward -= non_matching_tiles * 0.05  # Adjust the penalty factor as needed
+
+    # Reward for larger representations of the letter &quot;A&quot;
+    if matching_tiles &gt; total_target_tiles * 0.5:  # If more than 50% of the target shape is matched
+        reward += 1.0  # Bonus for significant representation
+
+    return reward
+</code></pre></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
 <div class="message-container"><h3>Trial 2</h3>
 
                 <div class="message user">
@@ -562,200 +756,6 @@ def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
 
     # Reward for larger representations of the letter &quot;A&quot;
     reward += jnp.where(matching_tiles &gt; total_target_tiles * 0.5, 1.0, 0.0)  # Bonus for significant representation
-
-    return reward
-</code></pre></div>
-            </div>
-            </div>  <!-- Close message-container -->
-            
-<div class="message-container"><h3>Trial 1</h3>
-
-                <div class="message user">
-                    <div class="message-box"><h1>PCG Agent Reward Function Generation Task</h1>
-<p>You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.</p>
-<h2>PCGRL Environment</h2>
-<h2>Variable Reference</h2>
-<p>In this section, the variables that the reward function can access are described.
-The reward function only can access the key listed below. If the key is not listed below, the reward function cannot access the value.
-The common variables are the variables that are measured for the overall game state, not for each player.
-The individual variables are the variables that are measured for each player in the game state.</p>
-<h2>Reward Function</h2>
-<p>The reward function is a function that calculates the reward value for the agent based on the playtested results.
-The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.</p>
-<p>import jax.numpy as jnp</p>
-<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
-    reward = 0.0</p>
-<pre><code>return reward
-</code></pre>
-<p>This is the template of the reward function.</p>
-<h1>Tips for Jax code implementation</h1>
-<p>The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
-Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
-The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
-Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
-<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
-<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
-<p>[Before]
-if current_diameter &gt; diameter_penalty_threshold:
-    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
-    reward -= diameter_penalty</p>
-<p>[After]
-jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
-[Reward Code Rules]
-Import the necessary library for the reward function code.
-- import jax.numpy as jnp</p>
-<p>[Reward Code Tips]
-- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
-- Write general reward function code that would work in diverse level sizes (width and height).
-- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
-- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
-- To create diverse shape of target character, avoid creating hard-coded levels.</p></div>
-                </div>
-                
-
-                <div class="message user">
-                    <div class="message-box"><h1>Task</h1>
-<p>The task is to generate a level with two-dimensional array looks like alphabet-letter
-The reward function gives higher reward when the generated level looks like the "target letter".
-The reward function get inputs level array and target letter, and return the reward value.
-Consider the shape of the level array and create an alphabet shape to fill it.</p>
-<p>Target letter: A</p>
-<pre><code>           ## Previous Reward Code
-           Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-           ```python
-           import jax.numpy as jnp
-</code></pre>
-<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
-    reward = 0.0</p>
-<pre><code># Define the target letter 'A' shape in a 16x16 grid
-target_shape = jnp.array([
-    [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-])
-
-# Calculate the number of matching tiles with the target shape
-matching_tiles = jnp.sum(curr_array == target_shape)
-
-# Reward is proportional to the number of matching tiles
-reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
-
-return reward
-           ```
-
-           Feedback:
-</code></pre>
-<h2>Feedback</h2>
-<p>The evaluation of the generated levels indicates that none of the levels closely resemble the target shape of the letter "A" as defined in the reward function. The generated content primarily consists of the value <code>1</code>, which does not correspond to the expected structure of the letter "A" (represented by <code>1</code> in the target shape) and instead includes a significant number of <code>2</code>s, which are not part of the target shape.</p>
-<h3>Feedback on the Reward Function:</h3>
-<ol>
-<li>
-<p><strong>Matching Criteria</strong>: The current reward function calculates the reward based on the number of matching tiles with the target shape. However, it does not account for the size of the letters. If the letters are too small or not prominent enough, the reward may not reflect the intended design.</p>
-</li>
-<li>
-<p><strong>Letter Size</strong>: The generated levels do not seem to prioritize the size of the letters. The reward function should be revised to provide a higher reward for larger representations of the letter "A". This can be achieved by incorporating a scaling factor that rewards larger contiguous blocks of <code>1</code>s that match the target shape.</p>
-</li>
-<li>
-<p><strong>Penalty for Non-Matching Values</strong>: The presence of <code>2</code>s in the generated levels suggests that the model may be generating unwanted elements. The reward function could be improved by introducing a penalty for non-matching values, which would discourage the generation of values that do not contribute to forming the letter "A".</p>
-</li>
-</ol>
-<h3>Recommendation to Revise the Reward Function:</h3>
-<ul>
-<li>Introduce a scaling factor that increases the reward based on the size of the contiguous blocks of <code>1</code>s that match the target shape.</li>
-<li>Implement a penalty for any <code>2</code>s or other values that do not match the target shape, reducing the overall reward when such values are present.</li>
-<li>Consider adding a threshold for the minimum number of matching tiles required to receive any reward, ensuring that only significant representations of the letter "A" are rewarded.</li>
-</ul>
-<p>By making these adjustments, the reward function will better align with the goal of generating a level that resembles the letter "A" in a prominent and recognizable manner.</p>
-<h3>Reward Function Inputs</h3>
-<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
-    reward = 0.0</p>
-<p>prev_array: jnp.array : previous game level represented with tile numbers
-prev_stats: dict : statistics of the previous game level
-curr_array: jnp.array : current game level represented with tile numbers
-curr_stats: dict : statistics of the current game level</p>
-<ol>
-<li>array (jnp.array, int32): (16, 16)
-The array is a 2D array with the shape of (height, width).
-The game level is represented with tile numbers (enum) in the 2D array.</li>
-</ol>
-<p>[Tile Number]
-EMPTY = 1, WALL = 2</p>
-<ul>
-<li>Generate reward function which fills "1" to show alphabet shape in the level.</li>
-<li>
-<p>Make sure "0" is not present in the generating level array. "0" is reserved for the border padding.</p>
-</li>
-<li>
-<p>stats: (dict[int]): (DIAMETER = 0, N_REGIONS = 1)</p>
-</li>
-</ul>
-<h2>Thought Tips</h2>
-<p>You have to generate the reward function step-by-step in several iterations.
-The reward function is revised trial-and-error by training the agent and evaluating the generated content.
-You can get feedback from the reward function every iteration to improve the reward function.
-Note the progress of thought and starts from the simplest reward function to the complex one.</p>
-<p>Current Iteration: 2 / Max Iteration: 5 (40.0%)</p>
-<h2>Output</h2>
-<p>Reward function:</p>
-<pre><code class="language-python"></code></pre></div>
-                </div>
-                
-
-            <div class="message assistant">
-                <div class="message-box"><pre><code class="language-python">import jax.numpy as jnp
-
-def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
-    reward = 0.0
-
-    # Define the target letter 'A' shape in a 16x16 grid
-    target_shape = jnp.array([
-        [0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    ])
-
-    # Calculate the number of matching tiles with the target shape
-    matching_tiles = jnp.sum(curr_array == target_shape)
-
-    # Calculate the total number of tiles in the target shape
-    total_target_tiles = jnp.sum(target_shape == 1)
-
-    # Reward is proportional to the number of matching tiles
-    reward += matching_tiles * 0.1  # Adjust the scaling factor as needed
-
-    # Introduce a penalty for non-matching values (e.g., tile number 2)
-    non_matching_tiles = jnp.sum(curr_array == 2)
-    reward -= non_matching_tiles * 0.05  # Adjust the penalty factor as needed
-
-    # Reward for larger representations of the letter &quot;A&quot;
-    if matching_tiles &gt; total_target_tiles * 0.5:  # If more than 50% of the target shape is matched
-        reward += 1.0  # Bonus for significant representation
 
     return reward
 </code></pre></div>
