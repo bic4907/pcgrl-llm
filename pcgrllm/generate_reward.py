@@ -355,7 +355,6 @@ class RewardGenerator:
                 target_character=self.config['target_character'],
                 few_shot_code_string=sample_code,
                 reward_function_inputs=reward_function_inputs,
-                target_character=self.config['target_character'],
                 thought_tips=self.get_pe_prompt(self.pe),
             )
 
