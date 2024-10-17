@@ -5,6 +5,8 @@ from pcgrllm.utils.logger import get_wandb_name
 from tensorboardX import SummaryWriter
 
 
+
+
 # Base logging handler
 class BaseLoggingHandler:
     def __init__(self, **kwargs):
@@ -52,24 +54,31 @@ class WandbLoggingHandler(BaseLoggingHandler):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-        if self.config.wandb_key and self.config.wandb_project:
+        if wandb.run is None:
+            if self.config.wandb_key and self.config.wandb_project:
 
-            wandb.login(key=self.config.wandb_key)
-            wandb.init(project=self.config.wandb_project, name=get_wandb_name(self.config), save_code=True)
-            wandb.config.update(dict(self.config), allow_val_change=True)
+                wandb.login(key=self.config.wandb_key)
+                wandb.init(project=self.config.wandb_project, name=get_wandb_name(self.config), save_code=True)
+                wandb.config.update(dict(self.config), allow_val_change=True)
 
-            if self.logger is not None:
-                self.logger.info(f"Initialized wandb with project {self.config.wandb_project}")
+                if self.logger is not None:
+                    self.logger.info(f"Initialized wandb with project {self.config.wandb_project}")
+                else:
+                    print(f"Initialized wandb with project {self.config.wandb_project}")
+
+                self.use_wandb = True
             else:
-                print(f"Initialized wandb with project {self.config.wandb_project}")
-
-            self.use_wandb = True
+                if self.logger is not None:
+                    self.logger.info("wandb not initialized")
+                else:
+                    print("wandb not initialized")
+                self.use_wandb = False
         else:
+            self.use_wandb = True
+            # logger is defined, wandb is already initialized
             if self.logger is not None:
-                self.logger.info("wandb not initialized")
-            else:
-                print("wandb not initialized")
-            self.use_wandb = False
+                self.logger.info("Using existing wandb run: {}".format(wandb.run.id))
+
 
     def log(self, metric, t):
         if not self.use_wandb:
