@@ -50,6 +50,12 @@ class Iteration:
             f"\tNumpy Files: {len(self.get_numpy_files())} files"
         )
 
+    @staticmethod
+    def from_path(path: str) -> Optional['Iteration']:
+        """Creates an Iteration object from the given path."""
+        iteration_num = int(basename(path).split('_')[-1])
+        return Iteration(iteration_num, path)
+
     def get_path(self) -> str:
         return self.root_path
 
