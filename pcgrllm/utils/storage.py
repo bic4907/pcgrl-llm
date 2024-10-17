@@ -1,8 +1,11 @@
+import json
 from os.path import abspath, join, basename, isdir
 from glob import glob
 from typing import List, Optional
 import numpy as np
 from PIL import Image
+
+from pcgrllm.evaluation import EvaluationResult
 
 # Constants
 ITERATION_PREFIX: str = 'iteration_'
@@ -50,6 +53,12 @@ class Iteration:
             f"\tNumpy Files: {len(self.get_numpy_files())} files"
         )
 
+    @staticmethod
+    def from_path(path: str) -> Optional['Iteration']:
+        """Creates an Iteration object from the given path."""
+        iteration_num = int(basename(path).split('_')[-1])
+        return Iteration(iteration_num, path)
+
     def get_path(self) -> str:
         return self.root_path
 
@@ -69,6 +78,15 @@ class Iteration:
     def get_numpy_files(self) -> List[NumpyResource]:
         numpy_paths = glob(join(self.get_numpy_dir(), '*.npy'))
         return [NumpyResource(path) for path in numpy_paths]
+
+    def get_evaluation_dir(self) -> str:
+        eval_path = join(self.root_path, 'evaluation.json')
+
+        try:
+            eval_json = json.load(open(eval_path, 'r'))
+        except:
+            return None
+        return EvaluationResult.from_dict(eval_json)
 
 
 class Storage:
