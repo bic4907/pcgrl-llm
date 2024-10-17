@@ -27,6 +27,30 @@ def get_wandb_name(config: Config):
     else:
         return exp_dirs[-1]
 
+def text_to_html(text):
+    # 줄바꿈을 <br> 태그로 변환
+    html_text = text.replace('\n', '<br>')
+
+    # 탭을 4개의 공백 (&nbsp;)으로 변환
+    html_text = html_text.replace('\t', '&nbsp;&nbsp;&nbsp;&nbsp;')
+
+    return html_text
+
+def log_reward_generation_data(logger, target_path: str, t: int):
+    if wandb.run is None: return None
+
+    # get the image files
+    json_files = glob(path.join(target_path, '*.json'))
+    python_files = glob(path.join(target_path, '*.py'))
+
+    for idx, items in enumerate(zip(json_files, python_files)):
+        # log the json file
+        wandb.log({f'RewardGeneration/json': wandb.Html(open(items[0], 'r').read())})
+        wandb.log({f'RewardGeneration/code': wandb.Html(text_to_html(open(items[1], 'r').read()))})
+
+
+    # Log the count of json files using logger
+
 def log_rollout_data(logger, target_path: str, t: int):
     if wandb.run is None: return None
 
@@ -53,7 +77,7 @@ def log_rollout_data(logger, target_path: str, t: int):
         wandb.log({f'Rollout/numpy': wandb.Html(numpy_data)})
 
     # Log the count of images and numpy files using logger
-    logger.info(f"Logged {len(image_files)} image files and {len(numpy_files)} numpy files to wandb.")
+    logger.info(f"Logged {len(image_files)} image files and {len(numpy_files)} numpy files to wandb for rollout.")
 
 
 def log_feedback_data(logger, target_path: str, t: int):
@@ -65,14 +89,14 @@ def log_feedback_data(logger, target_path: str, t: int):
     if len(json_files) > 0:
         json_file = json_files[0]
         if path.basename(json_file).startswith('feedback_log'):
-            wandb.log({f'Feedback/context': wandb.Html(open(json_file, 'r').read())}, step=t)
+            wandb.log({f'Feedback/context': wandb.Html(open(json_file, 'r').read())})
 
     text_files = glob(path.join(target_path, '*.txt'))
 
     if len(text_files) > 0:
         text_file = text_files[0]
         if path.basename(text_file) == 'feedback.txt':
-            wandb.log({f'Feedback/response': wandb.Html(open(text_file, 'r').read())}, step=t)
+            wandb.log({f'Feedback/response': wandb.Html(open(text_file, 'r').read())})
 
     # Log the count of json and text files using logger
-    logger.info(f"Logged {len(json_files)} json files and {len(text_files)} text files to WandB.")
+    logger.info(f"Logged {len(json_files)} json files and {len(text_files)} text files to wandb for feedback.")

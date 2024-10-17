@@ -28,7 +28,7 @@ from scipy.stats import dweibull
 from conf.config import TrainConfig
 from eval import main_eval
 
-from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data
+from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data
 from pcgrllm.utils.path_utils import init_config
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
 
@@ -362,7 +362,11 @@ class Experiment:
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.")
                 else:
+
+                    reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
+                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, t=self.config.total_timesteps)
                     self._stage = Stage.TrainPCGRL
+
 
 
             elif self._stage == Stage.TrainPCGRL:

@@ -177,10 +177,10 @@ def make_train(config, restored_ckpt, checkpoint_manager):
         multiple_handler.set_start_time(train_start_time)
         multiple_handler.set_steps_prev_complete(steps_prev_complete)
 
-        multiple_handler.add_text("config", f'```{str(config)}```')
+        multiple_handler.add_text("Train/Config", f'```{str(config)}```')
         # if reward_function is in this scope
         if 'reward_fn_str' in locals():
-            multiple_handler.add_text("reward_function", f'```python\n{reward_fn_str}\n```')
+            multiple_handler.add_text("Train/code", f'```python\n{reward_fn_str}\n```')
 
         # During training, call the log method
 
