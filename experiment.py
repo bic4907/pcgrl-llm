@@ -27,9 +27,12 @@ from scipy.stats import dweibull
 
 from conf.config import TrainConfig
 from eval import main_eval
+from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 
-from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data
+from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
+    log_evaluation_result
 from pcgrllm.utils.path_utils import init_config
+from pcgrllm.utils.storage import Iteration
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
 
 from pcgrllm.validate_reward import run_validate
@@ -309,11 +312,28 @@ class Experiment:
         tgt_dir = path.join(self.config.exp_dir, 'iteration_' + str(iteration_num))
         # save feedback text to iteratio, dir
         feedback_path = path.join(tgt_dir, f'feedback.txt')
-
         # copy feedback using shutil
         shutil.copy(feedback, feedback_path)
 
         return feedback_path
+
+    def run_evaluation(self):
+
+        exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+
+        evaluator = HeuristicEvaluator(logger=self.logger)
+        iteration = Iteration.from_path(exp_dir)
+        result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
+
+        # save to the iteration file
+        result_path = path.join(exp_dir, 'evaluation.json')
+        with open(result_path, 'w') as f:
+            json.dump(result.to_dict(), f)
+
+        log_evaluation_result(logger=self.logger, result=result, t=self.config.total_timesteps)
+
+        self.logging(result, level=logging.INFO)
+        return result
 
     def save_state(self):
         # target variables: iteration, current_reward_function_filename
@@ -395,7 +415,11 @@ class Experiment:
 
                 self._current_feedback_path = feedback_generation_fn(self._iteration)
 
+                self.run_evaluation()
+
                 log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), t=self.config.total_timesteps)
+
+
 
                 self._stage = Stage.FinishIteration
 

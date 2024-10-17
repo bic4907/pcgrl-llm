@@ -4,6 +4,7 @@ import numpy as np
 import wandb
 from glob import glob
 from conf.config import Config
+from pcgrllm.evaluation.base import EvaluationResult
 
 
 def get_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
@@ -100,3 +101,15 @@ def log_feedback_data(logger, target_path: str, t: int):
 
     # Log the count of json and text files using logger
     logger.info(f"Logged {len(json_files)} json files and {len(text_files)} text files to wandb for feedback.")
+
+def log_evaluation_result(logger, result: EvaluationResult, t: int):
+    if wandb.run is None: return None
+
+    result_dict = result.to_dict()
+
+    for key, value in result_dict.items():
+        wandb.log({f'Evaluation/{key}': value})
+
+
+    # Log the evaluation result using logger
+    logger.info(f"Logged evaluation result to wandb for iteration {t}.")

@@ -11,6 +11,8 @@ class EvaluationResult:
     similarity: float = -1
     diversity: float = -1
 
+    sample_size: int = 0
+
     similarity_weight: float = 0.5
     diversity_weight: float = 0.5
 
@@ -25,8 +27,15 @@ class EvaluationResult:
 
 
     def __str__(self):
-        return f"EvaluationResult(similarity={self.similarity}, diversity={self.diversity})"
+        return f"EvaluationResult(similarity={self.similarity}, diversity={self.diversity}, sample_size={self.sample_size})"
 
+    def to_dict(self):
+        return {
+            'similarity': self.similarity,
+            'diversity': self.diversity,
+            'sample_size': self.sample_size,
+            'total': self.total
+        }
 
 
 class LevelEvaluator:
