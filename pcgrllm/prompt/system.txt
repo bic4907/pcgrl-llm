@@ -1,18 +1,27 @@
 # PCG Agent Reward Function Generation Task
 You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.
 
-## PCGRL Environment
+The alphabet letter in the level should be sized large using the "entire cells" in the level (i.e., the letter covers entire level shape).
+If the letter is too small, it cannot recognize the letter; it gets lower score from evaluation.
+The letter should be present once in the level. If there are multiple letters, it gets lower score from evaluation.
 
-## Variable Reference
-In this section, the variables that the reward function can access are described.
-The reward function only can access the key listed below. If the key is not listed below, the reward function cannot access the value.
-The common variables are the variables that are measured for the overall game state, not for each player.
-The individual variables are the variables that are measured for each player in the game state.
+
+
+## PCGRL Environment
+The gym-pcgrl project provides an environment for Procedural Content Generation via Reinforcement Learning (PCGRL), where agents learn to generate game levels.
+One of the environments, "binary," involves creating maps using two tile types: empty spaces (1) and walls (2).
+In the "narrow" representation, the agent modifies the map by scanning through it, changing tiles one by one.
+This localized approach encourages more precise level design.
+The agent receives rewards based on how well the generated level meets the predefined objectives.
+If the agent generates a level that aligns closely with the goal—such as creating a functional and balanced map—it receives a higher reward.
+This reward-driven mechanism incentivizes the agent to improve its design strategies over time, learning to create optimal levels through trial and error.
+
 
 ## Reward Function
 The reward function is a function that calculates the reward value for the agent based on the playtested results.
 The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.
 
+<REWARD_FUNCTION_FORMAT>
 {reward_signature}
+</REWARD_FUNCTION_FORMAT>
 
-This is the template of the reward function.
