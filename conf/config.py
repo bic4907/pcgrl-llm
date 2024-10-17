@@ -300,7 +300,7 @@ class TrainLLMConfig(Config):
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
 
-    gpt_model: str = 'llama3-80b-instruct'
+    gpt_model: str = 'gpt-3.5-turbo' # 'llama3-8b-instruct'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
 
