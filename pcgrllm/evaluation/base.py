@@ -37,6 +37,10 @@ class EvaluationResult:
             'total': self.total
         }
 
+    @staticmethod
+    def from_dict(data: dict):
+        return EvaluationResult(**data)
+
 
 class LevelEvaluator:
     def __init__(self, logger: Logger = None):

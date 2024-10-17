@@ -1,5 +1,6 @@
 from distutils.command.config import config
 from os.path import basename, dirname
+from typing import Optional
 
 import hydra
 import json
@@ -27,6 +28,7 @@ from scipy.stats import dweibull
 
 from conf.config import TrainConfig
 from eval import main_eval
+from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
@@ -354,6 +356,11 @@ class Experiment:
                     setattr(self, key, value)
         except FileNotFoundError:
             self.logging("State file not found. Exiting.")
+
+    def get_evaluation_result(self, iteration_num: int) -> Optional[EvaluationResult]:
+        """Returns the evaluation result for the given iteration number."""
+        iteration = Iteration(iteration_num, path.join(self._experiment_path, f'iteration_{iteration_num}'))
+        return iteration.get_evaluation_result()
 
     def run(self):
 
