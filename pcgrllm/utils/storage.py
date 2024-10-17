@@ -5,7 +5,7 @@ from typing import List, Optional
 import numpy as np
 from PIL import Image
 
-from pcgrllm.evaluation.base import EvaluationResult
+from pcgrllm.evaluation import EvaluationResult
 
 # Constants
 ITERATION_PREFIX: str = 'iteration_'
