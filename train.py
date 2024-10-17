@@ -599,7 +599,6 @@ def main_chunk(config, rng, exp_dir):
     out = train_jit(rng)
 
     jax.block_until_ready(out)
-    wandb.finish()
 
     return out
 
@@ -630,3 +629,4 @@ def main(config: TrainConfig):
 
 if __name__ == "__main__":
     main()
+    wandb.finish()

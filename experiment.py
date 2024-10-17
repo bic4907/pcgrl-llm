@@ -28,8 +28,9 @@ from scipy.stats import dweibull
 from conf.config import TrainConfig
 from eval import main_eval
 
-from pcgrllm.utils.logger import print_log
+from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data
 from pcgrllm.utils.path_utils import init_config
+from pcgrllm.utils.wandb import start_wandb, finish_wandb
 
 from pcgrllm.validate_reward import run_validate
 from pcgrllm.stage import Stage
@@ -241,6 +242,7 @@ class Experiment:
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
         config.initialize = False
+        # config.initialize_wandb = False # Disable wandb in train.py
 
         media_dir = path.join(config.exp_dir, 'train')
         os.makedirs(media_dir, exist_ok=True)
@@ -265,7 +267,7 @@ class Experiment:
         return True
 
 
-    def rollout_pcgrl(self, iteration_run_id):
+    def rollout_pcgrl(self, iteration_run_id) -> str:
         from rollout import main_rollout as run_rollout
 
         config = copy.deepcopy(self.config)
@@ -283,6 +285,8 @@ class Experiment:
         config.n_eps = 1
 
         run_rollout(config)
+
+        return media_dir
 
 
     # 파일 분석
@@ -342,6 +346,8 @@ class Experiment:
             if self._stage == Stage.StartIteration:
                 self._stage = Stage.RewardGeneration
 
+                # start wandb
+                start_wandb(config=self.config, iteration=self._iteration)
 
 
             elif self._stage == Stage.RewardGeneration:
@@ -366,7 +372,8 @@ class Experiment:
                 self._stage = Stage.RolloutPCGRL
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
-                self.rollout_pcgrl(self._iteration)
+                output_dir = self.rollout_pcgrl(self._iteration)
+                log_rollout_data(logger=self.logger, target_path=output_dir, t=self.config.total_timesteps)
 
                 # if the last iteration, do not analyze the output
                 if self._iteration >= self.config.total_iterations:
@@ -384,9 +391,13 @@ class Experiment:
 
                 self._current_feedback_path = feedback_generation_fn(self._iteration)
 
+                log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), t=self.config.total_timesteps)
+
                 self._stage = Stage.FinishIteration
 
             elif self._stage == Stage.FinishIteration:
+
+                finish_wandb()
 
                 if self._iteration >= self.config.total_iterations:
                     self._stage = Stage.Done
@@ -422,6 +433,8 @@ class Experiment:
         for line in message.splitlines():
             formatted_message = f'{prefix} {line}'
             self.logger.log(level, formatted_message)
+
+
 
 
 
