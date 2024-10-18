@@ -233,4 +233,4 @@ if __name__ == '__main__':
     base_path = join(dirname(__file__), 'example')
 
     # Run the cross-validation and show sorted results with visualization enabled
-    run_cross_validation(evaluator, letters, base_path, visualize=True)
+    run_cross_validation(evaluator, letters, base_path, visualize=False)
