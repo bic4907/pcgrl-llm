@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from envs.pathfinding import FloodPath, FloodPathState, FloodRegions, FloodRegionsState, calc_diameter, get_max_n_regions, get_max_path_length, get_max_path_length_static, get_path_coords_diam
 from envs.probs.problem import Problem, ProblemState, get_reward
-from envs.utils import Tiles
+from envs.feature import *
 
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -29,9 +29,18 @@ class BinaryState(ProblemState):
 
 class BinaryMetrics(IntEnum):
     DIAMETER = 0
+
     N_REGIONS = 1
 
-    
+    H_SYMMETRY = 2  # Horizontal Symmetry
+    V_SYMMETRY = 3  # Vertical Symmetry
+    LR_DIAGONAL_SYMMETRY = 4  # Left-to-Right Diagonal Symmetry
+    RL_DIAGONAL_SYMMETRY = 5  # Right-to-Left Diagonal Symmetry
+
+    LARGEST_COMPONENT = 6  # Largest Component Normalized
+
+
+
 
 class BinaryProblem(Problem):
     tile_enum = BinaryTiles
@@ -69,6 +78,12 @@ class BinaryProblem(Problem):
         bounds = [None] * len(BinaryMetrics)
         bounds[BinaryMetrics.DIAMETER] = [0, get_max_path_length(map_shape)]
         bounds[BinaryMetrics.N_REGIONS] = [0, get_max_n_regions(map_shape)]
+        bounds[BinaryMetrics.H_SYMMETRY] = [0, 1]
+        bounds[BinaryMetrics.V_SYMMETRY] = [0, 1]
+        bounds[BinaryMetrics.LR_DIAGONAL_SYMMETRY] = [0, 1]
+        bounds[BinaryMetrics.RL_DIAGONAL_SYMMETRY] = [0, 1]
+        # width * height
+        bounds[BinaryMetrics.LARGEST_COMPONENT] = [0, map_shape[0] * map_shape[1]]
         return jnp.array(bounds)
 
     def get_path_coords(self, env_map: chex.Array, prob_state: BinaryState) -> Tuple[chex.Array]:
@@ -95,9 +110,30 @@ class BinaryProblem(Problem):
         diameter, flood_path_state, n_regions, flood_regions_state = calc_diameter(
             self.flood_regions_net, self.flood_path_net, env_map, self.passable_tiles
         )
+
+        # Initialize stats array with zeros
         stats = jnp.zeros(len(BinaryMetrics))
+
+        # Set diameter and number of regions
         stats = stats.at[BinaryMetrics.DIAMETER].set(diameter)
         stats = stats.at[BinaryMetrics.N_REGIONS].set(n_regions)
+
+        # Calculate the largest component of WALL tiles
+        stats = stats.at[BinaryMetrics.LARGEST_COMPONENT].set(get_largest_component_size(flood_regions_state.flood_count))
+
+        # Calculate symmetry metrics (consider only 1 and 2 blocks)
+        h_symmetry = calculate_horizontal_symmetry(env_map)
+        v_symmetry = calculate_vertical_symmetry(env_map)
+        lr_diagonal_symmetry = calculate_lr_diagonal_symmetry(env_map)
+        rl_diagonal_symmetry = calculate_rl_diagonal_symmetry(env_map)
+
+        stats = stats.at[BinaryMetrics.H_SYMMETRY].set(h_symmetry)
+        stats = stats.at[BinaryMetrics.V_SYMMETRY].set(v_symmetry)
+        stats = stats.at[BinaryMetrics.LR_DIAGONAL_SYMMETRY].set(lr_diagonal_symmetry)
+        stats = stats.at[BinaryMetrics.RL_DIAGONAL_SYMMETRY].set(rl_diagonal_symmetry)
+
+        # Return state with the new stats
         state = BinaryState(
-            stats=stats, flood_count=flood_path_state.flood_count, ctrl_trgs=None)
+            stats=stats, flood_count=flood_path_state.flood_count, ctrl_trgs=None
+        )
         return state
