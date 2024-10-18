@@ -92,6 +92,8 @@ class Config:
     _vid_dir: Optional[str] = None
     _img_dir: Optional[str] = None
     _numpy_dir: Optional[str] = None
+    current_iteration: int = 0
+
 
 @dataclass
 class EvoMapConfig(Config):
@@ -127,7 +129,6 @@ class TrainConfig(Config):
     ###########################################################################
 
     reward_function_path: Optional[str] = None
-    current_iteration: int = 0
 
     agents: int = 1
 
@@ -304,6 +305,8 @@ class TrainLLMConfig(Config):
     gpt_model: str = 'llama3-80b-instruct'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
+    evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
+    n_samples: int = 5
 
 
 cs = ConfigStore.instance()

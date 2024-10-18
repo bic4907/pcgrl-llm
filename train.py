@@ -10,12 +10,8 @@ from typing import Any, NamedTuple, Tuple
 import hydra
 import jax
 import jax.numpy as jnp
-from flax import struct
-import imageio
-import orbax
 import optax
 from flax.training.train_state import TrainState
-from flax.training import orbax_utils
 import orbax.checkpoint as ocp
 from jax.experimental.array_serialization.serialization import logger
 from tensorboardX import SummaryWriter

@@ -24,10 +24,7 @@ import site
 import platform
 import pprint
 
-from scipy.stats import dweibull
-
 from conf.config import TrainConfig
-from eval import main_eval
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
@@ -287,7 +284,7 @@ class Experiment:
         config._vid_dir = os.path.join(media_dir, 'videos')
         config._img_dir = os.path.join(media_dir, 'images')
         config._numpy_dir = os.path.join(media_dir, 'numpy')
-        config.n_envs = 5
+        config.n_envs = self.config.n_samples
         config.n_eps = 1
 
         run_rollout(config)
@@ -324,7 +321,11 @@ class Experiment:
 
         exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
 
-        evaluator = ViTEvaluator(logger=self.logger)
+        if self.config.evaluator == 'vit':
+            evaluator = ViTEvaluator(logger=self.logger)
+        elif self.config.evaluator == 'hr':
+            evaluator = HeuristicEvaluator(logger=self.logger)
+
         iteration = Iteration.from_path(exp_dir)
         result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
 

@@ -16,7 +16,7 @@ def start_wandb(config: Config, iteration: int):
         project=config.wandb_project,
         name=get_wandb_name(config),
         save_code=True)
-    wandb.config.update(config, allow_val_change=True)
+    wandb.config.update(dict(config), allow_val_change=True)
 
 
 def finish_wandb():

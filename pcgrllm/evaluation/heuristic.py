@@ -1,11 +1,9 @@
 import json
-import os
 import cv2
 import numpy as np
 from os.path import dirname, join, basename
 from typing import Tuple
 from scipy.spatial.distance import hamming
-from tensorflow_probability.python.internal.backend.jax import reverse
 
 from pcgrllm.evaluation.base import *
 from pcgrllm.utils.storage import Iteration

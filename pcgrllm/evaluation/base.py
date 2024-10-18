@@ -6,8 +6,8 @@ class EvaluationResult:
 
     total: float
 
-    similarity: float = -1
-    diversity: float = -1
+    similarity: float = 0
+    diversity: float = 0
 
     sample_size: int = 0
 
