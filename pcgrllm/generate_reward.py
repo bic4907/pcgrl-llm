@@ -284,123 +284,122 @@ class RewardGenerator:
         self.initial_system += '\n'
         self.initial_system += self.reward_code_tips_prompt
 
-        initial_user = copy.deepcopy(self.initial_user)
-
-        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
-
-        reward_function_inputs = self.reward_function_inputs_template.format(
-            array_shape=level_shape_str,
-            stats_keys='DIAMETER = 0, N_REGIONS = 1',
-            tile_enum='EMPTY = 1, WALL = 2'
-        )
-
-        if generating_function_error:
-
-            reward_code = file_to_string(generating_function_path)
-
-            sample_code = """
-            ## Reward Code
-            Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-            ```python
-            {reward_code_string}
-            ```
-            Error Message:
-            {error_message}
-            
-            """.format(reward_code_string=reward_code, error_message=generating_function_error)
-
-            initial_user = initial_user.format(
-                
-              
-              _character=self._execution_config.target_character,
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs,
-                target_character=self.config['target_character'],
-                thought_tips=self.get_pe_prompt(self.pe),
-            )
-
-
-        elif self.config['feedback_path'] is not None: # Feedback available
-
-            reward_code = file_to_string(generating_function_path)
-
-            sample_code = """
-               ## Previous Reward Code
-               Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-               ```python
-               {reward_code_string}
-               ```
-               
-               Feedback:
-               {feedback}
-
-               """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
-
-            initial_user = initial_user.format(
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs,
-                target_character=self.config['target_character'],
-                thought_tips=self.get_pe_prompt(self.pe),
-            )
-
-        else:
-            sample_code = """
-            ## Example Reward Code
-            ```python
-            {sample_reward_code}
-            ```
-            """.format(sample_reward_code=self.previous_reward_function)
-
-            initial_user = initial_user.format(
-                target_character=self.config['target_character'],
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs,
-                thought_tips=self.get_pe_prompt(self.pe),
-            )
-
-
+        # Task 나누기(ToT)
+        if self.pe == 'tot':
+            # saperated_tasks = self.ToT_separate_task_prompt()
+            # self.ToT_performed_task_prompt(saperated_tasks)
         # 피드백 받는 부분 작성 필요함
+        else:
+            initial_user = copy.deepcopy(self.initial_user)
+
+            level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
+
+            reward_function_inputs = self.reward_function_inputs_template.format(
+                array_shape=level_shape_str,
+                stats_keys='DIAMETER = 0, N_REGIONS = 1',
+                tile_enum='EMPTY = 1, WALL = 2'
+            )
+            if generating_function_error:
+
+                reward_code = file_to_string(generating_function_path)
+
+                sample_code = """
+                ## Reward Code
+                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+                ```python
+                {reward_code_string}
+                ```
+                Error Message:
+                {error_message}
+
+                """.format(reward_code_string=reward_code, error_message=generating_function_error)
+
+                initial_user = initial_user.format(
+                    _character=self._execution_config.target_character,
+                    few_shot_code_string=sample_code,
+                    reward_function_inputs=reward_function_inputs,
+                    target_character=self.config['target_character'],
+                    thought_tips=self.get_pe_prompt(self.pe),
+                )
 
 
-        messages = [
-            {"role": "system", "content": self.initial_system},
-            {"role": "user", "content": initial_user}
-        ]
+            elif self.config['feedback_path'] is not None:  # Feedback available
 
-        self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+                reward_code = file_to_string(generating_function_path)
 
-        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
-        self.logging(context, logging.INFO)
-        self.logging(response, logging.DEBUG)
+                sample_code = """
+                   ## Previous Reward Code
+                   Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+                   ```python
+                   {reward_code_string}
+                   ```
 
-        response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
-        with open(response_file_path, 'wb') as f:
-            pickle.dump(response, f)
+                   Feedback:
+                   {feedback}
 
-        context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
-        with open(context_file_path, 'wb') as f:
-            pickle.dump(context, f)
+                   """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
-        parsed_reward_function = parse_reward_function(response)
+                initial_user = initial_user.format(
+                    few_shot_code_string=sample_code,
+                    reward_function_inputs=reward_function_inputs,
+                    target_character=self.config['target_character'],
+                    thought_tips=self.get_pe_prompt(self.pe),
+                )
+
+            else:
+                sample_code = """
+                ## Example Reward Code
+                ```python
+                {sample_reward_code}
+                ```
+                """.format(sample_reward_code=self.previous_reward_function)
+
+                initial_user = initial_user.format(
+                    target_character=self.config['target_character'],
+                    few_shot_code_string=sample_code,
+                    reward_function_inputs=reward_function_inputs,
+                    thought_tips=self.get_pe_prompt(self.pe),
+                )
+
+            messages = [
+                {"role": "system", "content": self.initial_system},
+                {"role": "user", "content": initial_user}
+            ]
+
+            self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+
+            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+            self.logging(context, logging.INFO)
+            self.logging(response, logging.DEBUG)
+
+            response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
+            with open(response_file_path, 'wb') as f:
+                pickle.dump(response, f)
+
+            context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
+            with open(context_file_path, 'wb') as f:
+                pickle.dump(context, f)
+
+            parsed_reward_function = parse_reward_function(response)
 
 
-        log_dict = {
-            'request': messages,
-            'response': response,
-        }
+            log_dict = {
+                'request': messages,
+                'response': response,
+            }
 
-        # Save reward function to .py
-        reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
-        with open(reward_file_path, 'w') as f:
-            f.write(parsed_reward_function)
+            # Save reward function to .py
+            reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
+            with open(reward_file_path, 'w') as f:
+                f.write(parsed_reward_function)
 
-        # Save the log to .json file
-        log_file_path = path.join(self.reward_function_path, f"{basename}.json")
-        with open(log_file_path, 'w') as f:
-            json.dump(log_dict, f, indent=4)
+            # Save the log to .json file
+            log_file_path = path.join(self.reward_function_path, f"{basename}.json")
+            with open(log_file_path, 'w') as f:
+                json.dump(log_dict, f, indent=4)
 
 
-        return reward_file_path
+            return reward_file_path
 
     def get_pe_prompt(self, pe: str):
         # files in the PE directory

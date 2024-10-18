@@ -347,7 +347,7 @@ class Experiment:
                 self._stage = Stage.RewardGeneration
 
                 # start wandb
-                start_wandb(config=self.config, iteration=self._iteration)
+                # start_wandb(config=self.config, iteration=self._iteration)
 
 
             elif self._stage == Stage.RewardGeneration:
@@ -401,7 +401,7 @@ class Experiment:
 
             elif self._stage == Stage.FinishIteration:
 
-                finish_wandb()
+                # finish_wandb()
 
                 if self._iteration >= self.config.total_iterations:
                     self._stage = Stage.Done
