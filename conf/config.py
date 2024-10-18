@@ -295,7 +295,7 @@ class TrainLLMConfig(Config):
 
 
     # reward generation setting
-    n_generation_trials: int = 10
+    n_generation_trials: int = 3
 
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None

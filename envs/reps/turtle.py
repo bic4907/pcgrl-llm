@@ -44,7 +44,7 @@ class TurtleRepresentation(Representation):
         return self.n_editable_tiles + 4
 
     def step(self, env_map: chex.Array, action: chex.Array,
-             rep_state: TurtleRepresentationState, step_idx: int):
+             rep_state: TurtleRepresentationState, step_idx: int, agent_id: int = None):
         new_env_map, map_changed, new_pos = self.step_turtle(env_map, action, rep_state.pos)
         rep_state = rep_state.replace(pos=new_pos)
         return new_env_map, map_changed, rep_state
