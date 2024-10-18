@@ -408,7 +408,13 @@ class Experiment:
                 output_dir = self.rollout_pcgrl(self._iteration)
                 log_rollout_data(logger=self.logger, target_path=output_dir, t=self.config.total_timesteps)
 
-                # if the last iteration, do not analyze the output
+
+                self._stage = Stage.Evaluation
+
+            elif self._stage == Stage.Evaluation:
+
+                self.run_evaluation()
+
                 if self._iteration >= self.config.total_iterations:
                     self._stage = Stage.FinishIteration
                 else:
@@ -424,11 +430,7 @@ class Experiment:
 
                 self._current_feedback_path = feedback_generation_fn(self._iteration)
 
-                self.run_evaluation()
-
                 log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), t=self.config.total_timesteps)
-
-
 
                 self._stage = Stage.FinishIteration
 

@@ -12,3 +12,5 @@ class Tiles(IntEnum):
 def idx_dict_to_arr(d):
     """Convert dictionary to array, where dictionary has form (index: value)."""
     return np.array([d[i] for i in range(len(d))])
+
+
