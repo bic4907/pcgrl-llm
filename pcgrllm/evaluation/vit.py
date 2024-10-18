@@ -14,8 +14,6 @@ class ViTEvaluator(LevelEvaluator):
         super().__init__(**kwargs)
 
         self.device = torch.device("cpu")
-        if torch.cuda.is_available():
-            self.device = torch.device("cuda")
 
         model_name = 'pittawat/vit-base-uppercase-english-characters'
         self.processor = AutoImageProcessor.from_pretrained(model_name)
