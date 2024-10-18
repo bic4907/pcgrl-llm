@@ -9,6 +9,7 @@ class Stage:
     TrainPCGRL = "TrainPCGRL"
     RolloutPCGRL = "RolloutPCGRL"
     Analysis = "Analysis"
+    Evaluation = "Evaluation"
 
     FinishIteration = "FinishIteration"
 
