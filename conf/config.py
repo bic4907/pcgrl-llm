@@ -127,6 +127,7 @@ class TrainConfig(Config):
     ###########################################################################
 
     reward_function_path: Optional[str] = None
+    current_iteration: int = 0
 
     agents: int = 1
 

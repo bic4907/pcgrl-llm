@@ -10,6 +10,7 @@ def start_wandb(config: Config, iteration: int):
     config = deepcopy(config)
 
     config.exp_dir = path.join(config.exp_dir, f'iteration_{iteration}')
+    config.current_iteration = iteration
 
     wandb.init(
         project=config.wandb_project,
