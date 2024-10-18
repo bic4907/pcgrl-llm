@@ -1,5 +1,10 @@
 from os.path import dirname, join, basename
 
+from PIL import Image
+import torch
+from scipy.spatial.distance import cosine
+from transformers import AutoImageProcessor, AutoModelForImageClassification
+
 from pcgrllm.evaluation.base import *
 from pcgrllm.utils.storage import Iteration
 
@@ -8,16 +13,87 @@ class ViTEvaluator(LevelEvaluator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+        self.device = torch.device("cpu")
+        if torch.cuda.is_available():
+            self.device = torch.device("cuda")
 
-    def run(self, iteration: Iteration, target_character: str, visualize: bool = False) -> EvaluationResult:
+        model_name = 'pittawat/vit-base-uppercase-english-characters'
+        self.processor = AutoImageProcessor.from_pretrained(model_name)
+        self.model = AutoModelForImageClassification.from_pretrained(model_name).to(self.device)
+
+    def run(self, iteration: Iteration, target_character: str) -> EvaluationResult:
+        target_character = target_character.upper()
         image_files = iteration.get_images()
-        numpy_files = iteration.get_numpy_files()
+        trials = [image_file.path for image_file in image_files]
+        similarity_rate = 0
+        diversity_rate = 0
+        vectorized_trials = []
+        if trials:
+            total_trials = len(trials)
+            # similarity
+            for file_path in trials:
+                raw_result = self.predict(file_path)
+                target_prob = self.search('label', target_character, raw_result)
+                vectorized_logits = self.vectorize(raw_result)
+                vectorized_trials.append({
+                    'trial': file_path,
+                    'vector': vectorized_logits
+                })
+                similarity_rate += target_prob[0]['softmax_prob']
+            similarity = similarity_rate / total_trials
+
+            # diversity
+            all_pairs = self.generate_cartesian_product(vectorized_trials, vectorized_trials)
+            for pair in all_pairs:
+                distance = cosine(pair[0]['vector'], pair[1]['vector'])
+                diversity_rate += distance
+
+            diversity = diversity_rate / (total_trials * (total_trials - 1) / 2)
+
+            # return similarity, diversity
+            return EvaluationResult(similarity=similarity, diversity=diversity, sample_size=total_trials)
+        else:
+            print("No valid images found in the source folder.")
+            return EvaluationResult(similarity=float('-inf'), diversity=float('-inf'), sample_size=0)
+
+    def predict(self, file_path: str):
+        image = Image.open(file_path)
+        image = image.convert("RGB")
+        inputs = self.processor(images=image, return_tensors="pt").to(self.device)
+        outputs = self.model(**inputs)
+        logits = outputs.logits
+        softmax_outputs = torch.nn.Softmax(dim=-1)(logits)
+
+        output_list = []
+        for i in range(26):
+            char = chr(65 + i)
+            target_prob = softmax_outputs[0][i]
+            output_list.append({
+                'label': char,
+                'softmax_prob': target_prob.item()
+            })
+        return output_list
+
+    def vectorize(self, similarity_logits: list):
+        similarity_logits.sort(key=lambda x: x['label'])
+        vectorized_logits = []
+        for i in range(len(similarity_logits)):
+            vectorized_logits.append(similarity_logits[i]['softmax_prob'])
+
+        return vectorized_logits
+
+    def generate_cartesian_product(self, arr1: list, arr2: list):
+        lst = []
+        for i in range(len(arr1)):
+            for j in range(i + 1, len(arr2)):
+                lst.append((arr1[i], arr2[j]))
+        return lst
+
+    def search(self, key, val, arr):
+        return [el for el in arr if el[key] == val]
 
 
-        return EvaluationResult(similarity=0, sample_size=len(image_files))
-
-
-def run_cross_validation(evaluator, letters, base_path, visualize=False):
+def run_cross_validation(evaluator, letters, base_path):
     """
     Run cross-validation for a set of letters, where each letter is evaluated against others.
     The results are sorted by similarity score for each target letter.
@@ -34,7 +110,7 @@ def run_cross_validation(evaluator, letters, base_path, visualize=False):
             iteration = Iteration.from_path(path=example_path)
 
             # Run the evaluator with visualization enabled/disabled
-            result = evaluator.run(iteration=iteration, target_character=target_letter, visualize=visualize)
+            result = evaluator.run(iteration=iteration, target_character=target_letter)
 
             # Store the result for sorting later
             results_dict[target_letter].append((evaluate_letter, result.similarity))
@@ -54,11 +130,11 @@ if __name__ == '__main__':
     logger = logging.getLogger(basename(__file__))
     logger.setLevel(logging.DEBUG)
 
-    evaluator = HeuristicEvaluator(logger=logger)
+    evaluator = ViTEvaluator(logger=logger)
 
     # Define the letters and the base path for the evaluations
     letters = ['A', 'B', 'H']
     base_path = join(dirname(__file__), 'example')
 
     # Run the cross-validation and show sorted results with visualization enabled
-    run_cross_validation(evaluator, letters, base_path, visualize=True)
+    run_cross_validation(evaluator, letters, base_path)

@@ -30,6 +30,7 @@ from conf.config import TrainConfig
 from eval import main_eval
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
+from pcgrllm.evaluation.vit import ViTEvaluator
 
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
     log_evaluation_result
@@ -323,7 +324,7 @@ class Experiment:
 
         exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
 
-        evaluator = HeuristicEvaluator(logger=self.logger)
+        evaluator = ViTEvaluator(logger=self.logger)
         iteration = Iteration.from_path(exp_dir)
         result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
 
