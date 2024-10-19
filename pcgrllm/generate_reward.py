@@ -277,8 +277,8 @@ class RewardGenerator:
         feedback_prompt = file_to_string(self.config['feedback_path'])
         return feedback_prompt
 
-    def generate_thought(self, depth: int, parent_thought: str, branch: int, basename: str = 'reward'):
-        prompt = self.ToT_initial_user(generating_function=parent_thought, completed_tasks=basename, depth=depth)
+    def generate_thought(self, depth: int, parent_thought: str, branch: int, basename: str = 'reward', completed_task: str=None):
+        prompt = self.ToT_initial_user(generating_function=parent_thought, completed_tasks=completed_task, depth=depth)
 
         messages = [
             {"role": "system", "content": self.initial_system},
@@ -297,7 +297,12 @@ class RewardGenerator:
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
 
-        parsed_reward_function = parse_reward_function(response)
+        if "Reward function:" in response:
+            completed_task, generated_reward_function = response.split("Reward function")
+        else:
+            completed_task, generated_reward_function = response.split("Reward Function")
+
+        parsed_reward_function = parse_reward_function(generated_reward_function)
 
         log_dict = {
             'request': messages,
@@ -314,7 +319,7 @@ class RewardGenerator:
         with open(log_file_path, 'w') as f:
             json.dump(log_dict, f, indent=4)
 
-        return response
+        return response, completed_task, generated_reward_function
 
     def evaluate_thought(self, thought):
         prompt = f"On a scale of 0 to 1, how promising is this thought for solving the problem '{self.tot_prompt}'? Thought: '{thought}'\nJust respond with a number between 0 and 1."
@@ -331,7 +336,7 @@ class RewardGenerator:
         except ValueError:
             return 0.5  # Default score if parsing fails
 
-    def expand_tree(self, basename: str = 'reward', node="root", depth=0):
+    def expand_tree(self, basename: str = 'reward', node: str="root", completed_task: str=None, depth: int=0):
         if depth >= self.max_depth:
             return
 
@@ -339,12 +344,12 @@ class RewardGenerator:
             self.tree[node] = []
 
         for i in range(self.branch_factor):
-            new_thought = self.generate_thought(basename=basename, depth=depth, parent_thought=node, branch=i)
+            new_thought, new_completed_task, generated_reward_function = self.generate_thought(basename=basename, depth=depth, parent_thought=node, branch=i, completed_task=completed_task)
             score = self.evaluate_thought(new_thought)
             self.tree[node].append((new_thought, score))
 
-            if score >= 0.5:  # Only expand promising thoughts DFS
-                self.expand_tree(node=new_thought, depth=depth + 1)
+            if score > 0.7:  # Only expand promising thoughts DFS
+                self.expand_tree(node=generated_reward_function, completed_task=new_completed_task if not completed_task else completed_task+'\n'+new_completed_task, depth=depth + 1)
 
             time.sleep(1)  # To avoid hitting API rate limits
 
@@ -376,7 +381,7 @@ class RewardGenerator:
                 sample_reward_code=generating_function)
         else:
             sample_prompt = """# [Completed Tasks] \n{completed_task}\n\nThe current progress is {now_depth} out of {max_depth} steps completed.\nSelect one of the remaining tasks, excluding the ones already completed and generate a reward function using the selcted task.\nSummarize in one line what task was performed before generating the function.""".format(
-                completed_task="completed_tasks", now_depth=str(depth), max_depth=str(self.max_depth))
+                completed_task=completed_tasks, now_depth=str(depth), max_depth=str(self.max_depth))
             tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
                 sample_reward_code=generating_function)
 

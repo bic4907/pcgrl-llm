@@ -33,6 +33,7 @@ def get_function_signature(code_string, time):
 
 def parse_reward_function(message):
     patterns = [
+        r'```(.*?)```',
         r'```python(.*?)```',
         r'```(.*?)```',
     ]
