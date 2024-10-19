@@ -102,6 +102,11 @@ class RewardGenerator:
         self.logging(f'Reward generation arguments:\n{pprint.pformat(config, indent=4)}', logging.INFO)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
+        self.base_initial_user = file_to_string(path.join(self.file_path, PE_DIR, "base_initial_user.txt"))
+
+        self.max_depth = config.get('max_depth', 3)
+        self.branch_factor = config.get('branch_factor', 3)
+        self.tree = {"root": []}
 
 
     def logging(self, message, level=logging.DEBUG):
@@ -139,7 +144,7 @@ class RewardGenerator:
 
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
-                   verbose=False, seed=42, n_response=1):
+                   verbose=False, seed=42):
         try:
             if passthrough_response is None:
                 if verbose:
@@ -148,13 +153,9 @@ class RewardGenerator:
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
 
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response)
-                if n_response != 1:
-                    response = responses[:][0]
-                    context = responses[:][1]
-                else:
-                    response = responses[0][0]
-                    context = responses[0][1]
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=1)
+                response = responses[0][0]
+                context = responses[0][1]
 
                 if verbose:
                     self.logging("Received the response: ", response)
@@ -276,147 +277,130 @@ class RewardGenerator:
         feedback_prompt = file_to_string(self.config['feedback_path'])
         return feedback_prompt
 
-    def ToT_separate_task_prompt(self):
-        separate_task_user = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_user.txt"))
+    def generate_thought(self, depth: int, parent_thought: str, branch: int, basename: str = 'reward'):
+        prompt = self.ToT_initial_user(generating_function=parent_thought, completed_tasks=basename, depth=depth)
 
-        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
-        separate_task_prompt = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_inputs.txt"))
-        separate_task_prompt = separate_task_prompt.format(
-            array_shape=level_shape_str,
-            stats_keys='DIAMETER, N_REGIONS',
-            tile_enum='EMPTY = 1, WALL = 2',
-            Target_diameter=str(5)
-        )
-
-        # sample_code = """# Based on the above test, summarize {total_iteration} detailed tasks you will perform, and provide a detailed explanation for each task.""".format(total_iteration=self.config['total_iterations'])
-
-        sample_code = """# Based on the above test, summarize {total_iteration} detailed tasks you will perform, and provide a detailed explanation for each task.""".format(
-            total_iteration=str(5))
-
-        separate_task_user = separate_task_user.format(
-            target_character=self.config['target_character'],
-            separate_task_inputs=separate_task_prompt,
-            few_shot_code_string=sample_code
-        )
         messages = [
             {"role": "system", "content": self.initial_system},
-            {"role": "user", "content": separate_task_user}
+            {"role": "user", "content": prompt}
         ]
-
-        self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
-
         response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
 
-        self.task_list = response.split("\n\n")[1:]
+        response_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.response.pkl")
 
-        return self.task_list
+        with open(response_file_path, 'wb') as f:
+            pickle.dump(response, f)
 
-    def ToT_perform_task_prompt(self, saparate_tasks: list, generating_function_path: str = None, generating_function_error: str = None, trial=1):
-        performed_tasks = ''
-        base_initial_user = file_to_string(path.join(self.file_path, PE_DIR, "base_initial_user.txt"))
+        context_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.context.pkl")
+        with open(context_file_path, 'wb') as f:
+            pickle.dump(context, f)
 
-        for task in saparate_tasks:
+        parsed_reward_function = parse_reward_function(response)
 
-            if generating_function_error:
-                reward_code = file_to_string(generating_function_path)
+        log_dict = {
+            'request': messages,
+            'response': response,
+        }
 
-                sample_code = """
-                ## Reward Code
-                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-                ```python
-                {reward_code_string}
-                ```
-                Error Message:
-                {error_message}
-                
-                """.format(reward_code_string=reward_code, error_message=generating_function_error)
+        # Save reward function to .py
+        reward_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.py")
+        with open(reward_file_path, 'w') as f:
+            f.write(parsed_reward_function)
 
-                initial_user = copy.deepcopy(base_initial_user).format(
-                    completed_task="Nothing" if performed_tasks == "" else performed_tasks,
-                    generated_reward_function=sample_code,
-                    not_completed_task=task,
-                    thought_tips=self.get_pe_prompt(self.pe)
-                )
+        # Save the log to .json file
+        log_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.json")
+        with open(log_file_path, 'w') as f:
+            json.dump(log_dict, f, indent=4)
 
+        return response
 
-            elif self.config['feedback_path'] is not None:  # Feedback available
+    def evaluate_thought(self, thought):
+        prompt = f"On a scale of 0 to 1, how promising is this thought for solving the problem '{self.tot_prompt}'? Thought: '{thought}'\nJust respond with a number between 0 and 1."
 
-                reward_code = file_to_string(generating_function_path)
+        messages = [
+            {"role": "system", "content": self.initial_system},
+            {"role": "user", "content": prompt}
+        ]
+        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
 
-                sample_code = """
-                ## Previous Reward Code
-                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-                ```python
-                {reward_code_string}
-                ```
-                Feedback:
-                {feedback}
-                """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
+        try:
+            score = float(response)
+            return max(0, min(score, 1))  # Ensure score is between 0 and 1
+        except ValueError:
+            return 0.5  # Default score if parsing fails
 
-                initial_user = copy.deepcopy(base_initial_user).format(
-                    completed_task="Nothing" if performed_tasks == "" else performed_tasks,
-                    generated_reward_function=sample_code,
-                    not_completed_task=task,
-                    thought_tips=self.get_pe_prompt(self.pe)
-                )
+    def expand_tree(self, basename: str = 'reward', node="root", depth=0):
+        if depth >= self.max_depth:
+            return
 
-            else:
-                sample_code = """
-                ## Example Reward Code
-                ```python
-                {sample_reward_code}
-                ```
-                """.format(sample_reward_code=self.previous_reward_function)
+        if node not in self.tree:
+            self.tree[node] = []
 
-                initial_user = copy.deepcopy(base_initial_user).format(
-                    completed_task="Nothing" if performed_tasks == "" else performed_tasks,
-                    generated_reward_function=sample_code,
-                    not_completed_task=task,
-                    thought_tips=self.get_pe_prompt(self.pe)
-                )
-            messages = [
-                {"role": "system", "content": self.initial_system},
-                {"role": "user", "content": initial_user}
-            ]
-            if performed_tasks != "":
-                performed_tasks += '\n'+task
-            else:
-                performed_tasks += task
+        for i in range(self.branch_factor):
+            new_thought = self.generate_thought(basename=basename, depth=depth, parent_thought=node, branch=i)
+            score = self.evaluate_thought(new_thought)
+            self.tree[node].append((new_thought, score))
 
-            self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+            if score >= 0.5:  # Only expand promising thoughts DFS
+                self.expand_tree(node=new_thought, depth=depth + 1)
 
-            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=2)
-            self.logging(context, logging.INFO)
-            self.logging(response, logging.DEBUG)
+            time.sleep(1)  # To avoid hitting API rate limits
 
-            response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
-            with open(response_file_path, 'wb') as f:
-                pickle.dump(response, f)
+    def best_path(self):
+        path = ["root"]
+        current = "root"
+        while current in self.tree and self.tree[current]:
+            best_thought = max(self.tree[current], key=lambda x: x[1])
+            current = best_thought[0]
+            path.append(current)
+        return path
 
-            context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
-            with open(context_file_path, 'wb') as f:
-                pickle.dump(context, f)
+    def tot_solve(self, basename: str = 'reward'):
+        self.expand_tree(basename)
+        return self.best_path()
 
-            parsed_reward_function = parse_reward_function(response)
+    def ToT_initial_user(self, generating_function: str = None, completed_tasks: str = None, depth: int = 0):
+        initial_user = copy.deepcopy(self.base_initial_user)
 
-            log_dict = {
-                'request': messages,
-                'response': response,
-            }
+        if depth == 0:
+            sample_prompt = """# Based on the above tasks, choose only one task to enhance the provided reward function and create a reward function based on it.\nThe current progress is {now_depth} out of {max_depth} steps completed.\nSummarize in one line what task was performed before generating the function.""".format(
+                now_depth=str(depth), max_depth=str(self.max_depth))
+            tot_sample_code = """## Example Reward Code\n```python\n{sample_reward_code}\n```""".format(
+                sample_reward_code=self.previous_reward_function)
+        elif depth + 1 == self.max_depth:
+            sample_prompt = """# [Completed Tasks]\n{completed_task}\n\nThe current status is at the final stage.\nGenerate a reward function using the remaining tasks, excluding the ones already completed.\nSummarize in one line what task was performed before generating the function.""".format(
+                completed_task=completed_tasks)
+            tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
+                sample_reward_code=generating_function)
+        else:
+            sample_prompt = """# [Completed Tasks] \n{completed_task}\n\nThe current progress is {now_depth} out of {max_depth} steps completed.\nSelect one of the remaining tasks, excluding the ones already completed and generate a reward function using the selcted task.\nSummarize in one line what task was performed before generating the function.""".format(
+                completed_task="completed_tasks", now_depth=str(depth), max_depth=str(self.max_depth))
+            tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
+                sample_reward_code=generating_function)
 
-            # Save reward function to .py
-            reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
-            with open(reward_file_path, 'w') as f:
-                f.write(parsed_reward_function)
+        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-            # Save the log to .json file
-            log_file_path = path.join(self.reward_function_path, f"{basename}.json")
-            with open(log_file_path, 'w') as f:
-                json.dump(log_dict, f, indent=4)
+        reward_function_inputs = self.reward_function_inputs_template.format(
+            array_shape=level_shape_str,
+            stats_keys='DIAMETER = 0, N_REGIONS = 1',
+            tile_enum='EMPTY = 1, WALL = 2'
+        )
 
-        return reward_file_path
+        initial_user = initial_user.format(
+            target_character=self.config['target_character'],
+            few_shot_code_string=tot_sample_code,
+            reward_function_inputs=reward_function_inputs,
+            tot_sample_string=sample_prompt,
+            thought_tips=self.get_pe_prompt(self.pe),
+        )
+
+        if depth == 0:
+            self.tot_prompt = initial_user
+
+        return initial_user
+
 
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
@@ -430,11 +414,11 @@ class RewardGenerator:
         self.initial_system += '\n'
         self.initial_system += self.reward_code_tips_prompt
 
+        # 피드백 받는 부분 작성 필요함
+
         # Task 나누기(ToT)
         if self.pe == 'tot':
-            separated_tasks = self.ToT_separate_task_prompt()
-            self.ToT_perform_task_prompt(separated_tasks, generating_function_path, generating_function_error, trial)
-        # 피드백 받는 부분 작성 필요함
+            self.tot_solve(basename=basename)
         else:
             initial_user = copy.deepcopy(self.initial_user)
 
@@ -450,15 +434,15 @@ class RewardGenerator:
                 reward_code = file_to_string(generating_function_path)
 
                 sample_code = """
-                ## Reward Code
-                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-                ```python
-                {reward_code_string}
-                ```
-                Error Message:
-                {error_message}
+                                    ## Reward Code
+                                    Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+                                    ```python
+                                    {reward_code_string}
+                                    ```
+                                    Error Message:
+                                    {error_message}
 
-                """.format(reward_code_string=reward_code, error_message=generating_function_error)
+                                    """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
                 initial_user = initial_user.format(
                     few_shot_code_string=sample_code,
@@ -473,16 +457,16 @@ class RewardGenerator:
                 reward_code = file_to_string(generating_function_path)
 
                 sample_code = """
-                   ## Previous Reward Code
-                   Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-                   ```python
-                   {reward_code_string}
-                   ```
+                                       ## Previous Reward Code
+                                       Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+                                       ```python
+                                       {reward_code_string}
+                                       ```
 
-                   Feedback:
-                   {feedback}
+                                       Feedback:
+                                       {feedback}
 
-                   """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
+                                       """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
                 initial_user = initial_user.format(
                     few_shot_code_string=sample_code,
@@ -493,11 +477,11 @@ class RewardGenerator:
 
             else:
                 sample_code = """
-                ## Example Reward Code
-                ```python
-                {sample_reward_code}
-                ```
-                """.format(sample_reward_code=self.previous_reward_function)
+                                    ## Example Reward Code
+                                    ```python
+                                    {sample_reward_code}
+                                    ```
+                                    """.format(sample_reward_code=self.previous_reward_function)
 
                 initial_user = initial_user.format(
                     target_character=self.config['target_character'],
@@ -798,3 +782,40 @@ if __name__ == "__main__":
     args = vars(args)
     reward_generator = RewardGenerator(args)
     reward_generator.run()
+
+def ToT_separate_task_prompt(self):
+    separate_task_user = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_user.txt"))
+
+    level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
+    separate_task_prompt = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_inputs.txt"))
+    separate_task_prompt = separate_task_prompt.format(
+        array_shape=level_shape_str,
+        stats_keys='DIAMETER, N_REGIONS',
+        tile_enum='EMPTY = 1, WALL = 2',
+        Target_diameter=str(5)
+    )
+
+    # sample_code = """# Based on the above task, summarize {total_iteration} detailed tasks you will perform, and provide a detailed explanation for each task.""".format(total_iteration=self.config['total_iterations'])
+
+    sample_code = """Based on the above tasks, summarize {total_iteration} detailed tasks to enhance the provided reward function, and provide a detailed explanation of each task in more than three sentences. \nAlso, make sure not to miss any of the provided figures in the tasks.\nDo not write anything except for the {total_iteration} tasks and their content.""".format(
+        total_iteration=str(5))
+
+    separate_task_user = separate_task_user.format(
+        target_character=self.config['target_character'],
+        separate_task_inputs=separate_task_prompt,
+        few_shot_code_string=sample_code
+    )
+    messages = [
+        {"role": "system", "content": self.initial_system},
+        {"role": "user", "content": separate_task_user}
+    ]
+
+    self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+
+    response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
+    self.logging(context, logging.INFO)
+    self.logging(response, logging.DEBUG)
+
+    self.task_list = response.split("\n\n")
+
+    return self.task_list

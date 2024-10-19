@@ -92,6 +92,8 @@ class Config:
     _vid_dir: Optional[str] = None
     _img_dir: Optional[str] = None
     _numpy_dir: Optional[str] = None
+    current_iteration: int = 0
+
 
 @dataclass
 class EvoMapConfig(Config):
@@ -295,14 +297,19 @@ class TrainLLMConfig(Config):
 
 
     # reward generation setting
-    n_generation_trials: int = 10
+    n_generation_trials: int = 3
 
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
 
-    gpt_model: str = 'gpt-3.5-turbo' # 'llama3-8b-instruct'
+    gpt_model: str = 'gpt-3.5-turbo'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
+    evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
+    n_samples: int = 5
+
+    max_depth: int = 3
+    branch_factor: int =3
 
 
 cs = ConfigStore.instance()

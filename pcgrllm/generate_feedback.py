@@ -54,7 +54,6 @@ class FeedbackGenerator:
     def run(self):
         self.logging(f'FeedbackGenerator config: {self.config}', level=logging.INFO)
 
-        response = None
         if self.config['input_type'] == FeedbackInputType.Array:
             response = self.run_text_model()
         elif self.config['input_type'] == FeedbackInputType.Image:

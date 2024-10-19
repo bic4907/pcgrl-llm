@@ -7,12 +7,12 @@ prev_stats: dict : statistics of the previous game level
 curr_array: jnp.array : current game level represented with tile numbers
 curr_stats: dict : statistics of the current game level
 
-1. 'prev_array' and 'curr_array' (jnp.array, int32): {array_shape}
+1. 'prev_array' and 'curr_array' (jnp.array, int32)
 The array is a 2D array with the shape of (height, width) to represent the game level.
 The level is represented with tile numbers. The tile number is an integer value.
 
-[Tile Number]
-{tile_enum}
+Array shape: {array_shape}
+Tile Number: {tile_enum}
 
 - Generate reward function which fills "1 (Empty)" to show alphabet shape in the level.
 - Make sure "0 (Unavailable)" is not present in the level array. Fill the not passible tile with "2 (Wall)" tile number.
