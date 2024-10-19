@@ -272,6 +272,43 @@ class RewardGenerator:
         feedback_prompt = file_to_string(self.config['feedback_path'])
         return feedback_prompt
 
+    def ToT_separate_task_prompt(self):
+        separate_task_user = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_user.txt"))
+
+        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
+        separate_task_prompt = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_inputs.txt"))
+        separate_task_prompt = separate_task_prompt.format(
+            array_shape=level_shape_str,
+            stats_keys='DIAMETER, N_REGIONS',
+            tile_enum='EMPTY = 1, WALL = 2',
+            Target_diameter=str(5)
+        )
+
+        # sample_code = """# Based on the above test, summarize {total_iteration} detailed tasks you will perform, and provide a detailed explanation for each task.""".format(total_iteration=self.config['total_iterations'])
+
+        sample_code = """# Based on the above test, summarize {total_iteration} detailed tasks you will perform, and provide a detailed explanation for each task.""".format(
+            total_iteration=str(5))
+
+        separate_task_user = separate_task_user.format(
+            target_character=self.config['target_character'],
+            separate_task_inputs=separate_task_prompt,
+            few_shot_code_string=sample_code
+        )
+        messages = [
+            {"role": "system", "content": self.initial_system},
+            {"role": "user", "content": separate_task_user}
+        ]
+
+        self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+
+        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
+        self.logging(context, logging.INFO)
+        self.logging(response, logging.DEBUG)
+
+        self.task_list = response.split("\n\n")[1:]
+
+        return self.task_list
+
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
@@ -286,7 +323,7 @@ class RewardGenerator:
 
         # Task 나누기(ToT)
         if self.pe == 'tot':
-            # saperated_tasks = self.ToT_separate_task_prompt()
+            seperated_tasks = self.ToT_separate_task_prompt()
             # self.ToT_performed_task_prompt(saperated_tasks)
         # 피드백 받는 부분 작성 필요함
         else:
@@ -315,7 +352,6 @@ class RewardGenerator:
                 """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
                 initial_user = initial_user.format(
-                    _character=self._execution_config.target_character,
                     few_shot_code_string=sample_code,
                     reward_function_inputs=reward_function_inputs,
                     target_character=self.config['target_character'],

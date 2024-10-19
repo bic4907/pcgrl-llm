@@ -1,3 +1,0 @@
-You have to generate the reward function step-by-step in {max_iteration_num} iterations.
-Therefore, you should divide the tasks mentioned above into {max_iteration_num} sequential steps.
-You can get feedback form the reward function every iteration to improve the reward function.
