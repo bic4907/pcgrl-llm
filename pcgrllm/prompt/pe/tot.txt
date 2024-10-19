@@ -6,14 +6,4 @@ If the simple reward function generates the desired content, you can improve the
 However, the reward function do not generate the desired content, you have to go back to simple reward function.
 For example, you can think about the characteristics of each alphabet letter, and try implement each characteristic step-by-step.
 
-Previous completed tasks:
-{completed task}
-
-
-
-Now task to be preformed:
-{not completed task}
-
-
-
 Current Iteration: {curr_iteration_num} / Max Iteration: {max_iteration_num} ({perc_iteration})

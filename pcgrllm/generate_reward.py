@@ -139,7 +139,7 @@ class RewardGenerator:
 
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
-                   verbose=False, seed=42):
+                   verbose=False, seed=42, n_response=1):
         try:
             if passthrough_response is None:
                 if verbose:
@@ -148,9 +148,13 @@ class RewardGenerator:
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
 
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=1)
-                response = responses[0][0]
-                context = responses[0][1]
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response)
+                if n_response != 1:
+                    response = responses[:][0]
+                    context = responses[:][1]
+                else:
+                    response = responses[0][0]
+                    context = responses[0][1]
 
                 if verbose:
                     self.logging("Received the response: ", response)
@@ -309,6 +313,111 @@ class RewardGenerator:
 
         return self.task_list
 
+    def ToT_perform_task_prompt(self, saparate_tasks: list, generating_function_path: str = None, generating_function_error: str = None, trial=1):
+        performed_tasks = ''
+        base_initial_user = file_to_string(path.join(self.file_path, PE_DIR, "base_initial_user.txt"))
+
+        for task in saparate_tasks:
+
+            if generating_function_error:
+                reward_code = file_to_string(generating_function_path)
+
+                sample_code = """
+                ## Reward Code
+                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+                ```python
+                {reward_code_string}
+                ```
+                Error Message:
+                {error_message}
+                
+                """.format(reward_code_string=reward_code, error_message=generating_function_error)
+
+                initial_user = copy.deepcopy(base_initial_user).format(
+                    completed_task="Nothing" if performed_tasks == "" else performed_tasks,
+                    generated_reward_function=sample_code,
+                    not_completed_task=task,
+                    thought_tips=self.get_pe_prompt(self.pe)
+                )
+
+
+            elif self.config['feedback_path'] is not None:  # Feedback available
+
+                reward_code = file_to_string(generating_function_path)
+
+                sample_code = """
+                ## Previous Reward Code
+                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+                ```python
+                {reward_code_string}
+                ```
+                Feedback:
+                {feedback}
+                """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
+
+                initial_user = copy.deepcopy(base_initial_user).format(
+                    completed_task="Nothing" if performed_tasks == "" else performed_tasks,
+                    generated_reward_function=sample_code,
+                    not_completed_task=task,
+                    thought_tips=self.get_pe_prompt(self.pe)
+                )
+
+            else:
+                sample_code = """
+                ## Example Reward Code
+                ```python
+                {sample_reward_code}
+                ```
+                """.format(sample_reward_code=self.previous_reward_function)
+
+                initial_user = copy.deepcopy(base_initial_user).format(
+                    completed_task="Nothing" if performed_tasks == "" else performed_tasks,
+                    generated_reward_function=sample_code,
+                    not_completed_task=task,
+                    thought_tips=self.get_pe_prompt(self.pe)
+                )
+            messages = [
+                {"role": "system", "content": self.initial_system},
+                {"role": "user", "content": initial_user}
+            ]
+            if performed_tasks != "":
+                performed_tasks += '\n'+task
+            else:
+                performed_tasks += task
+
+            self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+
+            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=2)
+            self.logging(context, logging.INFO)
+            self.logging(response, logging.DEBUG)
+
+            response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
+            with open(response_file_path, 'wb') as f:
+                pickle.dump(response, f)
+
+            context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
+            with open(context_file_path, 'wb') as f:
+                pickle.dump(context, f)
+
+            parsed_reward_function = parse_reward_function(response)
+
+            log_dict = {
+                'request': messages,
+                'response': response,
+            }
+
+            # Save reward function to .py
+            reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
+            with open(reward_file_path, 'w') as f:
+                f.write(parsed_reward_function)
+
+            # Save the log to .json file
+            log_file_path = path.join(self.reward_function_path, f"{basename}.json")
+            with open(log_file_path, 'w') as f:
+                json.dump(log_dict, f, indent=4)
+
+        return reward_file_path
+
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
@@ -323,8 +432,8 @@ class RewardGenerator:
 
         # Task 나누기(ToT)
         if self.pe == 'tot':
-            seperated_tasks = self.ToT_separate_task_prompt()
-            # self.ToT_performed_task_prompt(saperated_tasks)
+            separated_tasks = self.ToT_separate_task_prompt()
+            self.ToT_perform_task_prompt(separated_tasks, generating_function_path, generating_function_error, trial)
         # 피드백 받는 부분 작성 필요함
         else:
             initial_user = copy.deepcopy(self.initial_user)

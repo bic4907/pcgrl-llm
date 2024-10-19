@@ -1,0 +1,16 @@
+# Task
+{not_completed_task}
+
+## Previous completed task
+
+{completed_task}
+
+{generated_reward_function}
+
+{thought_tips}
+
+
+## Output
+Reward function:
+```python
+```

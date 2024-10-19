@@ -11,6 +11,6 @@ Target letter: {target_character}
 {few_shot_code_string}
 
 ## Output
-Reward function:
+Separate Tasks:
 ```python
 ```
