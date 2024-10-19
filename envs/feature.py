@@ -115,15 +115,19 @@ def calculate_entropy_for_regions(env_map: chex.Array, num_unique_values: int = 
     Calculate the Shannon entropy for each of the 16 regions (4x4).
     """
     map_height, map_width = env_map.shape
-    region_height, region_width = map_height // 4, map_width // 4
 
-    entropies = jnp.zeros(16)
+    # Reshape the map into a structure where each block represents a 4x4 region
+    reshaped_map = env_map.reshape(4, map_height // 4, 4, map_width // 4)
 
-    for i in range(4):
-        for j in range(4):
-            region = env_map[i * region_height:(i + 1) * region_height, j * region_width:(j + 1) * region_width]
-            region_entropy = calculate_shannon_entropy_manual(region, num_unique_values=num_unique_values)
-            region_idx = i * 4 + j
-            entropies = entropies.at[region_idx].set(region_entropy)
+    # Flatten each region into a 16-element array
+    flattened_regions = reshaped_map.reshape(4, 4, -1)
+
+    # Apply the calculate_shannon_entropy_manual function across each region
+    entropies = jax.vmap(
+        lambda region: calculate_shannon_entropy_manual(region, num_unique_values)
+    )(flattened_regions.reshape(-1, 16))
+
+    # Reshape back to 4x4 entropy array
+    entropies = entropies.reshape(4, 4)
 
     return entropies

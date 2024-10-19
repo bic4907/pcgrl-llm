@@ -125,6 +125,7 @@ class LLMRewardWrapper(GymnaxWrapper):
         super().__init__(env)
 
         self.reward_fn = None
+        self.lc_features = None
 
     @partial(jax.jit, static_argnums=(0, 4))
     def step(
@@ -154,8 +155,15 @@ class LLMRewardWrapper(GymnaxWrapper):
 
         curr_array = env_state.env_map
 
-        llm_reward = self.reward_fn(prev_array, prev_stats, curr_array, curr_stats)
+        region_metrics_enum = self._env.prob.region_metrics_enum
 
+        for metric in region_metrics_enum:
+            prev_stats[metric.name] = state.prob_state.region_features[metric.value]
+
+        for metric in region_metrics_enum:
+            curr_stats[metric.name] = env_state.prob_state.region_features[metric.value]
+
+        llm_reward = self.reward_fn(prev_array, prev_stats, curr_array, curr_stats)
         reward = jnp.where(done, reward, llm_reward)
 
         env_state = env_state.replace(reward=reward)
@@ -168,6 +176,15 @@ class LLMRewardWrapper(GymnaxWrapper):
     def get_reward_fn(self):
         return self.reward_fn
 
+    def extract_lc_metrics(self, metrics_enum, prefix="LC_R"):
+        """
+        Dynamically extract metrics that start with a specific prefix (e.g., 'LC_R') followed by numbers.
+        This works for LC_R1_, LC_R2_, ..., LC_R16_.
+        """
+        if self.lc_features is None:
+            self.lc_features = [metric for metric in metrics_enum if metric.name.startswith(prefix)]
+
+        return self.lc_features
 
 class LLMRewardWrapperDebug(GymnaxWrapper):
     def __init__(self, env: environment.Environment):

@@ -20,6 +20,7 @@ class Stats(IntEnum):
 @struct.dataclass
 class ProblemState:
     stats: Optional[chex.Array] = None
+    region_features: Optional[chex.Array] = None
 
     # FIXME: A bit weird how we handle this, setting as None all over the place in problem classes...
     ctrl_trgs: Optional[chex.Array] = None
@@ -130,6 +131,7 @@ class Problem:
     tile_size: int = 16
     stat_weights: chex.Array
     metrics_enum: IntEnum
+    region_metrics_enum: IntEnum
     ctrl_metrics: chex.Array
     stat_trgs: chex.Array
     ctrl_threshes: chex.Array = None
@@ -151,6 +153,7 @@ class Problem:
         self.ctrl_metric_obs_idxs = np.array([0]) if len(self.ctrl_metrics) == 0 else self.ctrl_metrics
 
         self.metric_names = [metric.name for metric in self.metrics_enum]
+        self.region_metric_names = [metric.name for metric in self.region_metrics_enum]
 
         self.queued_ctrl_trgs = jnp.zeros(len(self.metric_names))  # dummy value to placate jax
         self.has_queued_ctrl_trgs = False
