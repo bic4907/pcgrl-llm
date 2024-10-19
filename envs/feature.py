@@ -89,3 +89,41 @@ def get_largest_component_size(flood_count: chex.Array) -> int:
     largest_region_size = jnp.max(jnp.where(unique_regions > 0, jnp.max(region_sizes), 0))
 
     return largest_region_size
+
+
+def calculate_shannon_entropy_manual(region: chex.Array, num_unique_values: int = 3) -> float:
+    """
+    Calculate the Shannon entropy of a given region manually.
+    """
+    # Get unique values and their counts
+    unique, counts = jnp.unique(region, return_counts=True, size=num_unique_values)
+
+    # Calculate probabilities of each unique value
+    total_count = jnp.sum(counts)
+    probabilities = counts / total_count
+
+    # Use jnp.where to filter out zero probabilities (instead of boolean indexing)
+    non_zero_probs = jnp.where(probabilities > 0, probabilities, 1e-10)  # Replace 0 with a small number to avoid log(0)
+
+    # Calculate the entropy manually using the formula
+    entropy_value = -jnp.sum(non_zero_probs * jnp.log2(non_zero_probs))
+
+    return entropy_value
+
+def calculate_entropy_for_regions(env_map: chex.Array, num_unique_values: int = 3) -> chex.Array:
+    """
+    Calculate the Shannon entropy for each of the 16 regions (4x4).
+    """
+    map_height, map_width = env_map.shape
+    region_height, region_width = map_height // 4, map_width // 4
+
+    entropies = jnp.zeros(16)
+
+    for i in range(4):
+        for j in range(4):
+            region = env_map[i * region_height:(i + 1) * region_height, j * region_width:(j + 1) * region_width]
+            region_entropy = calculate_shannon_entropy_manual(region, num_unique_values=num_unique_values)
+            region_idx = i * 4 + j
+            entropies = entropies.at[region_idx].set(region_entropy)
+
+    return entropies

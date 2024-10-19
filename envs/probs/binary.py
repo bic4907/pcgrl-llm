@@ -1,16 +1,12 @@
 from enum import IntEnum
 import os
 from typing import Optional, Tuple
-
-import chex
 from flax import struct
-import jax
-import jax.numpy as jnp
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 
-from envs.pathfinding import FloodPath, FloodPathState, FloodRegions, FloodRegionsState, calc_diameter, get_max_n_regions, get_max_path_length, get_max_path_length_static, get_path_coords_diam
-from envs.probs.problem import Problem, ProblemState, get_reward
+from envs.pathfinding import FloodPath, FloodRegions, calc_diameter, get_max_n_regions, get_max_path_length, get_max_path_length_static, get_path_coords_diam
+from envs.probs.problem import Problem, ProblemState
 from envs.feature import *
 
 
@@ -58,6 +54,23 @@ class BinaryMetrics(IntEnum):
     LC_R15_EMPTY_RATE = 21
     LC_R16_EMPTY_RATE = 22
 
+    # Shannon entropy
+    LC_R1_ENTROPY = 23
+    LC_R2_ENTROPY = 24
+    LC_R3_ENTROPY = 25
+    LC_R4_ENTROPY = 26
+    LC_R5_ENTROPY = 27
+    LC_R6_ENTROPY = 28
+    LC_R7_ENTROPY = 29
+    LC_R8_ENTROPY = 30
+    LC_R9_ENTROPY = 31
+    LC_R10_ENTROPY = 32
+    LC_R11_ENTROPY = 33
+    LC_R12_ENTROPY = 34
+    LC_R13_ENTROPY = 35
+    LC_R14_ENTROPY = 36
+    LC_R15_ENTROPY = 37
+    LC_R16_ENTROPY = 38
 
 class BinaryProblem(Problem):
     tile_enum = BinaryTiles
@@ -104,6 +117,8 @@ class BinaryProblem(Problem):
 
         for idx in range(16):
             bounds[BinaryMetrics.LC_R1_EMPTY_RATE + idx] = [0, 1]
+            bounds[BinaryMetrics.LC_R1_ENTROPY + idx] = [0, 1]
+
 
 
         return jnp.array(bounds)
@@ -158,6 +173,11 @@ class BinaryProblem(Problem):
         for idx in range(16):
             stats = stats.at[BinaryMetrics.LC_R1_EMPTY_RATE + idx].set(empty_block_rates[idx])
 
+        # Calculate Shannon entropy for each region
+        entropies = calculate_entropy_for_regions(env_map, num_unique_values=self.get_num_unique_tiles())
+        for idx in range(16):
+            stats = stats.at[BinaryMetrics.LC_R1_ENTROPY + idx].set(entropies[idx])
+
         # Return state with the new stats
         state = BinaryState(
             stats=stats, flood_count=flood_path_state.flood_count, ctrl_trgs=None
@@ -183,3 +203,6 @@ class BinaryProblem(Problem):
                 empty_rates = empty_rates.at[region_idx].set(n_empty_blocks / total_blocks)
 
         return empty_rates
+
+    def get_num_unique_tiles(self):
+        return len(BinaryTiles) - 1  # Subtract 1 to exclude BORDER
