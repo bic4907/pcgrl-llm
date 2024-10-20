@@ -30,10 +30,15 @@ def get_function_signature(code_string, time):
         input_lst.append(arg.arg)
     return signature, input_lst
 
+def get_first_line(message):
+
+    lines = message.strip().split('\n\n')
+    line = lines[0].strip().split('\n')[-1]
+
+    return line.strip()
 
 def parse_reward_function(message):
     patterns = [
-        r'```(.*?)```',
         r'```python(.*?)```',
         r'```(.*?)```',
     ]
@@ -46,7 +51,6 @@ def parse_reward_function(message):
     code_string = message if not code_string else code_string
 
     return code_string
-
 
 def filter_dataframe(df: pd.DataFrame, iteration: list, return_columns: list):
     df = df[df['LLM.RewardFunctionIteration'].isin(iteration)]
