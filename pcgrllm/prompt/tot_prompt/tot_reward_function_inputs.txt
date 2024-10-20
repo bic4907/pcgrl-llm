@@ -1,0 +1,28 @@
+## Reward Function Inputs
+def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -> float:
+    reward = 0.0
+
+prev_array: jnp.array : previous game level represented with tile numbers
+prev_stats: dict : statistics of the previous game level
+curr_array: jnp.array : current game level represented with tile numbers
+curr_stats: dict : statistics of the current game level
+
+1. Array shape(jnp.array, int32): {array_shape}
+A system is designed for 2D arrays.
+Each element of the array corresponds to a specific tile in the game, with the value of the element being an integer (int32).
+The array's shape is defined as {array_shape}, where the dimensions of the level are described by the number of rows and columns.
+
+2. 'prev_array' and 'curr_array' (jnp.array, int32): {array_shape}
+Design a reward function that compares two 2D arrays, prev_array and curr_array, which represent different versions of a game level.
+Each element is an integer (int32), and changes between the arrays should be used to calculate rewards or penalties.
+The reward function should effectively guide the agent towards generating or modifying levels in a way that improves playability and difficulty balance.
+The reward function should guide the agent in generating or modifying levels by detecting changes, identifying types of changes (e.g., walls, empty space, goal proximity), and applying rewards or penalties to improve playability and difficulty balance.
+
+3. stats: (dict[int]): ({stats_keys})
+The two metrics represent the structure and complexity of each map, so a balanced reward system should be designed based on them.
+The N_Regions means a number of connected empty regions.
+The diameter means the distance between the starting point and the ending point.
+
+4. Tile Number (jnp.array, int32): {tile_enum}
+Generate reward function which fills "1 (Empty)" to show alphabet shape in the level.
+Make sure "0 (Unavailable)" is not present in the level array. Fill the not passible tile with "2 (Wall)" tile number.

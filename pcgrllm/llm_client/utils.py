@@ -30,7 +30,7 @@ def get_function_signature(code_string, time):
         input_lst.append(arg.arg)
     return signature, input_lst
 
-def get_first_line(message):
+def get_task_line(message):
 
     lines = message.strip().split('\n\n')
     line = lines[0].strip().split('\n')[-1]

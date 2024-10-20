@@ -37,7 +37,7 @@ logger = logging.getLogger(basename(__file__))
 logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 PE_DIR = 'pe'
-
+ToT_DIR = 'tot_prompt'
 
 class RewardGenerator:
     def __init__(self, config: dict):
@@ -102,7 +102,8 @@ class RewardGenerator:
         self.logging(f'Reward generation arguments:\n{pprint.pformat(config, indent=4)}', logging.INFO)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
-        self.base_initial_user = file_to_string(path.join(self.file_path, PE_DIR, "base_initial_user.txt"))
+        self.base_initial_user = file_to_string(path.join(self.file_path, ToT_DIR, "base_initial_user.txt"))
+        self.tot_reward_function_inputs_template = file_to_string(path.join(self.file_path, ToT_DIR, "tot_reward_function_inputs.txt"))
 
         self.max_depth = config.get('max_depth', 3)
         self.branch_factor = config.get('branch_factor', 3)
@@ -298,7 +299,7 @@ class RewardGenerator:
             pickle.dump(context, f)
 
         parsed_reward_function = parse_reward_function(response)
-        new_completed_task = get_first_line(response)
+        new_completed_task = get_task_line(response)
 
         log_dict = {
             'request': messages,
@@ -383,7 +384,7 @@ class RewardGenerator:
 
         level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-        reward_function_inputs = self.reward_function_inputs_template.format(
+        reward_function_inputs = self.tot_reward_function_inputs_template.format(
             array_shape=level_shape_str,
             stats_keys='DIAMETER = 0, N_REGIONS = 1',
             tile_enum='EMPTY = 1, WALL = 2'
@@ -784,39 +785,3 @@ if __name__ == "__main__":
     reward_generator = RewardGenerator(args)
     reward_generator.run()
 
-def ToT_separate_task_prompt(self):
-    separate_task_user = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_user.txt"))
-
-    level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
-    separate_task_prompt = file_to_string(path.join(self.file_path, PE_DIR, "separate_task_inputs.txt"))
-    separate_task_prompt = separate_task_prompt.format(
-        array_shape=level_shape_str,
-        stats_keys='DIAMETER, N_REGIONS',
-        tile_enum='EMPTY = 1, WALL = 2',
-        Target_diameter=str(5)
-    )
-
-    # sample_code = """# Based on the above task, summarize {total_iteration} detailed tasks you will perform, and provide a detailed explanation for each task.""".format(total_iteration=self.config['total_iterations'])
-
-    sample_code = """Based on the above tasks, summarize {total_iteration} detailed tasks to enhance the provided reward function, and provide a detailed explanation of each task in more than three sentences. \nAlso, make sure not to miss any of the provided figures in the tasks.\nDo not write anything except for the {total_iteration} tasks and their content.""".format(
-        total_iteration=str(5))
-
-    separate_task_user = separate_task_user.format(
-        target_character=self.config['target_character'],
-        separate_task_inputs=separate_task_prompt,
-        few_shot_code_string=sample_code
-    )
-    messages = [
-        {"role": "system", "content": self.initial_system},
-        {"role": "user", "content": separate_task_user}
-    ]
-
-    self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
-
-    response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
-    self.logging(context, logging.INFO)
-    self.logging(response, logging.DEBUG)
-
-    self.task_list = response.split("\n\n")
-
-    return self.task_list
