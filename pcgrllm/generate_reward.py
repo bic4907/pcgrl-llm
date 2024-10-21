@@ -37,7 +37,7 @@ logger = logging.getLogger(basename(__file__))
 logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 PE_DIR = 'pe'
-
+FEATURE_DIR = 'feature'
 
 class RewardGenerator:
     def __init__(self, config: dict):
@@ -78,7 +78,13 @@ class RewardGenerator:
         self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
 
         self.reward_template = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
+
         self.pe = config.get('pe')
+        self.feature = config.get('feature')
+
+        if self.feature is not None:
+            self.feature = self.feature.split('+')
+
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
 
@@ -89,8 +95,6 @@ class RewardGenerator:
         self.previous_reward_function = file_to_string(self.previous_reward_function_path)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
-        # self._ensure_utility_files(self.reward_function_path)
-
 
 
         self.initial_reward_function = config.get('initial_reward_function', None)
@@ -272,6 +276,42 @@ class RewardGenerator:
         feedback_prompt = file_to_string(self.config['feedback_path'])
         return feedback_prompt
 
+    def get_input_prompt(self):
+
+        prompt = copy.deepcopy(self.reward_function_inputs_template)
+
+        if 'array' in self.feature:
+            prompt = prompt.replace('{array_feature_prompt}', self._get_array_feature())
+        else:
+            prompt = prompt.replace('{array_feature_prompt}', '(array features not available)')
+            prompt = prompt.replace('prev_array', 'unused1')
+            prompt = prompt.replace('curr_array', 'unused2')
+
+        if 'stats' in self.feature:
+            prompt = prompt.replace('{stats_feature_prompt}', self._get_stats_feature())
+        else:
+            prompt = prompt.replace('{stats_feature_prompt}', '(stats features not available)')
+            prompt = prompt.replace('prev_stats', 'unused3')
+            prompt = prompt.replace('curr_stats', 'unused4')
+        return prompt
+
+    def _get_array_feature(self):
+        prompt = self.get_feature_prompt('array')
+
+        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
+
+        prompt = prompt.format(
+            array_shape=level_shape_str,
+            stats_keys='DIAMETER = 0, N_REGIONS = 1',
+            tile_enum='EMPTY = 1, WALL = 2'
+        )
+
+        return prompt
+
+    def _get_stats_feature(self):
+        prompt = self.get_feature_prompt('stats')
+        return prompt
+
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
@@ -286,13 +326,9 @@ class RewardGenerator:
 
         initial_user = copy.deepcopy(self.initial_user)
 
-        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-        reward_function_inputs = self.reward_function_inputs_template.format(
-            array_shape=level_shape_str,
-            stats_keys='DIAMETER = 0, N_REGIONS = 1',
-            tile_enum='EMPTY = 1, WALL = 2'
-        )
+        reward_function_inputs = self.get_input_prompt()
+
 
         if generating_function_error:
 
@@ -429,6 +465,15 @@ class RewardGenerator:
         pe_str = f"\n\n## Thought Tips\n{pe_template}\n"
 
         return pe_str
+
+    def get_feature_prompt(self, feature: str):
+        if feature == 'array':
+            feature_file = read_file(path.join(self.file_path, FEATURE_DIR, 'array.txt'))
+        elif feature == 'stats':
+            feature_file = read_file(path.join(self.file_path, FEATURE_DIR, 'stats.txt'))
+        else:
+            raise ValueError(f"Unknown feature type: {feature}")
+        return feature_file
 
     def get_feedback_prompt(self):
         feedback_str = file_to_string(self.config['feedback_path'])
@@ -646,8 +691,14 @@ if __name__ == "__main__":
     parser.add_argument('--trial_count', type=int, default=10)
     parser.add_argument('--iteration_num', type=int, default=1)
     parser.add_argument('--previous_reward_function', type=str, default=None)
-
+    parser.add_argument('--map_width', type=int, default=16)
+    parser.add_argument('--map_height', type=int, default=16)
+    parser.add_argument('--feature', type=str, default='array')
+    parser.add_argument('--feedback_path', type=str, default=None)
     parser.add_argument('--initial_reward_function', type=str, default=None)
+    parser.add_argument('--target_character', type=str, default='A')
+    parser.add_argument('--total_iterations', type=int, default=1)
+    parser.add_argument('--pe', type=str, default='io')
 
     args = parser.parse_args()
 

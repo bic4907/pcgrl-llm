@@ -307,6 +307,7 @@ class TrainLLMConfig(Config):
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
     n_samples: int = 10
+    reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
 
 
 cs = ConfigStore.instance()

@@ -21,4 +21,7 @@ This reward-driven mechanism incentivizes the agent to improve its design strate
 The reward function is a function that calculates the reward value for the agent based on the playtested results.
 The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.
 
+<REWARD_FUNCTION_FORMAT>
+{reward_signature}
+</REWARD_FUNCTION_FORMAT>
 

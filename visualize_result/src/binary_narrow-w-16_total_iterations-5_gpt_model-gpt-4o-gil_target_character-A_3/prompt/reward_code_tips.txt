@@ -1,0 +1,10 @@
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp
+
+[Reward Code Tips]
+- Delta reward is calculated by the difference between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To generate diverse shape of target character, if possible, avoid creating "hard-coded levels". (e.g., just calculating the hamming distance with the target character)
