@@ -40,6 +40,19 @@ class NumpyResource:
         return np.load(self.path, allow_pickle=True).astype(dtype)
 
 
+class FeedbackResource:
+    """Represents a feedback resource."""
+    def __init__(self, path: str) -> None:
+        self.path: str = path
+
+    def __str__(self) -> str:
+        return f'FeedbackResource(path={self.path})'
+
+    def load(self) -> str:
+        """Loads the feedback as a string."""
+        with open(self.path, 'r') as f:
+            return f.read()
+
 class Iteration:
     """Represents an iteration containing images and numpy files inside the inference folder."""
     def __init__(self, iteration_num: int, root_path: str) -> None:
@@ -88,6 +101,20 @@ class Iteration:
             return None
         return EvaluationResult.from_dict(eval_json)
 
+    def get_evaluation(self) -> Optional[EvaluationResult]:
+        eval_path = join(self.root_path, 'evaluation.json')
+
+        try:
+            eval_json = json.load(open(eval_path, 'r'))
+        except:
+            return None
+        return EvaluationResult.from_dict(eval_json)
+
+    def get_feedback(self) -> Optional[FeedbackResource]:
+        feedback_path = join(self.root_path, 'feedback.txt')
+        if not isdir(feedback_path):
+            return FeedbackResource(feedback_path)
+        return None
 
 class Storage:
     """Manages multiple iterations and their resources."""
