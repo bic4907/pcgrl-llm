@@ -164,6 +164,7 @@ class Experiment:
             'feedback_path': path.abspath(self._current_feedback_path) if self._current_feedback_path else None,
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
+            'feature': self.config.reward_feature,
         }
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)

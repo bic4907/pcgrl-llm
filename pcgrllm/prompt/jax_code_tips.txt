@@ -14,3 +14,6 @@ if current_diameter > diameter_penalty_threshold:
 
 [After]
 jnp.where(current_diameter > diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
+
+### Array value allocation
+Instead of ``x[idx] = y``, use ``x = x.at[idx].set(y)``
