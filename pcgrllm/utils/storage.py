@@ -10,6 +10,7 @@ from pcgrllm.evaluation import EvaluationResult
 # Constants
 ITERATION_PREFIX: str = 'iteration_'
 INFERENCE_DIR: str = 'inference'
+TRAIN_DIR: str = 'train'
 IMAGE_DIR: str = 'images'
 NUMPY_DIR: str = 'numpy'
 
@@ -58,6 +59,7 @@ class Iteration:
     def __init__(self, iteration_num: int, root_path: str) -> None:
         self.iteration_num: int = iteration_num
         self.root_path: str = root_path
+        self.iterative_mode = True
 
     def __str__(self) -> str:
         return (
@@ -75,17 +77,23 @@ class Iteration:
     def get_path(self) -> str:
         return self.root_path
 
+    def get_train_dir(self) -> str:
+        return join(self.root_path, TRAIN_DIR if self.iterative_mode else '')
+
     def get_inference_dir(self) -> str:
         return join(self.root_path, INFERENCE_DIR)
 
-    def get_image_dir(self) -> str:
-        return join(self.get_inference_dir(), IMAGE_DIR)
+    def get_image_dir(self, train: bool = False) -> str:
+        if train:
+            return join(self.get_train_dir(), IMAGE_DIR)
+        else:
+            return join(self.get_inference_dir(), IMAGE_DIR)
 
     def get_numpy_dir(self) -> str:
         return join(self.get_inference_dir(), NUMPY_DIR)
 
-    def get_images(self) -> List[ImageResource]:
-        image_paths = glob(join(self.get_image_dir(), '*.png'))
+    def get_images(self, train: bool = False) -> List[ImageResource]:
+        image_paths = glob(join(self.get_image_dir(train), '*.png'))
         return [ImageResource(path) for path in image_paths]
 
     def get_numpy_files(self) -> List[NumpyResource]:

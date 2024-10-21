@@ -131,6 +131,8 @@ class TrainConfig(Config):
     reward_function_path: Optional[str] = None
 
     agents: int = 1
+    evaluator: str = 'vit' # 'vit', 'hr'
+    target_character: str = 'A'
 
 
 @dataclass
