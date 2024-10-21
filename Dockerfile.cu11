@@ -1,0 +1,39 @@
+# CUDA 11.8 이미지를 기반으로 함
+FROM nvidia/cuda:11.8.0-devel-ubuntu22.04
+
+# 필수 패키지 업데이트 및 설치
+RUN apt-get update && apt-get install -y \
+    wget \
+    coreutils \
+    util-linux \
+    && apt-get clean
+
+
+# 아나콘다 설치
+RUN wget https://repo.anaconda.com/archive/Anaconda3-2023.07-1-Linux-x86_64.sh -O ~/anaconda.sh
+RUN bash ~/anaconda.sh -b -p /opt/conda
+RUN rm ~/anaconda.sh
+# 아나콘다를 환경 변수에 추가
+ENV PATH="/opt/conda/bin:$PATH"
+#"
+
+# 기본 환경에서 Python 3.11 설치
+RUN conda install -y python=3.11
+
+# 작업 디렉토리 생성
+WORKDIR /app
+
+# requirements.txt 복사
+COPY requirements.txt .
+
+# 기본 환경에서 requirements.txt 설치
+RUN /opt/conda/bin/pip install -r requirements.txt
+RUN /opt/conda/bin/pip install opencv-python-headless
+# RUN pip install "jax[cuda11]"
+
+# RUN /opt/conda/bin/pip uninstall -y chex jax optax
+# RUN pip install jax==0.4.7 jaxlib==0.4.7+cuda11.cudnn82 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+RUN /opt/conda/bin/pip install jax==0.4.25 jaxlib==0.4.25+cuda11.cudnn86 -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html orbax-checkpoint chex flax optax nvidia-cudnn-cu11==8.6.0.163
+
+# 컨테이너 실행 시 기본 Python 명령어 설정
+CMD ["bash"]

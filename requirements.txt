@@ -25,3 +25,7 @@ tensorboardX
 tensorflow-probability[tf]
 tqdm==4.66.2
 wandb
+transformers==4.45.2
+safetensors
+openai==1.51.2
+opencv-python
