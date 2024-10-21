@@ -1,5 +1,6 @@
 from distutils.command.config import config
 from os.path import basename, dirname
+from typing import Optional
 
 import hydra
 import json
@@ -23,13 +24,15 @@ import site
 import platform
 import pprint
 
-from scipy.stats import dweibull
-
 from conf.config import TrainConfig
-from eval import main_eval
+from pcgrllm.evaluation.base import EvaluationResult
+from pcgrllm.evaluation.heuristic import HeuristicEvaluator
+from pcgrllm.evaluation.vit import ViTEvaluator
 
-from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data
+from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
+    log_evaluation_result
 from pcgrllm.utils.path_utils import init_config
+from pcgrllm.utils.storage import Iteration
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
 
 from pcgrllm.validate_reward import run_validate
@@ -168,7 +171,11 @@ class Experiment:
 
         # Start of the 'generate_reward.py'
         from pcgrllm.generate_reward import generate_reward
-        reward_name = generate_reward(config=self.config, generate_args=args_dict)
+        if self.config.pe == 'tot':
+            reward_name, performed_task = generate_reward(config=self.config, generate_args=args_dict)
+            self.config.performed_task = performed_task
+        else:
+            reward_name = generate_reward(config=self.config, generate_args=args_dict)
 
         return reward_name
 
@@ -281,7 +288,7 @@ class Experiment:
         config._vid_dir = os.path.join(media_dir, 'videos')
         config._img_dir = os.path.join(media_dir, 'images')
         config._numpy_dir = os.path.join(media_dir, 'numpy')
-        config.n_envs = 5
+        config.n_envs = self.config.n_samples
         config.n_eps = 1
 
         run_rollout(config)
@@ -309,11 +316,32 @@ class Experiment:
         tgt_dir = path.join(self.config.exp_dir, 'iteration_' + str(iteration_num))
         # save feedback text to iteratio, dir
         feedback_path = path.join(tgt_dir, f'feedback.txt')
-
         # copy feedback using shutil
         shutil.copy(feedback, feedback_path)
 
         return feedback_path
+
+    def run_evaluation(self):
+
+        exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+
+        if self.config.evaluator == 'vit':
+            evaluator = ViTEvaluator(logger=self.logger)
+        elif self.config.evaluator == 'hr':
+            evaluator = HeuristicEvaluator(logger=self.logger)
+
+        iteration = Iteration.from_path(exp_dir)
+        result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
+
+        # save to the iteration file
+        result_path = path.join(exp_dir, 'evaluation.json')
+        with open(result_path, 'w') as f:
+            json.dump(result.to_dict(), f)
+
+        log_evaluation_result(logger=self.logger, result=result, t=self.config.total_timesteps)
+
+        self.logging(result, level=logging.INFO)
+        return result
 
     def save_state(self):
         # target variables: iteration, current_reward_function_filename
@@ -334,6 +362,11 @@ class Experiment:
                     setattr(self, key, value)
         except FileNotFoundError:
             self.logging("State file not found. Exiting.")
+
+    def get_evaluation_result(self, iteration_num: int) -> Optional[EvaluationResult]:
+        """Returns the evaluation result for the given iteration number."""
+        iteration = Iteration(iteration_num, path.join(self._experiment_path, f'iteration_{iteration_num}'))
+        return iteration.get_evaluation_result()
 
     def run(self):
 
@@ -379,7 +412,13 @@ class Experiment:
                 output_dir = self.rollout_pcgrl(self._iteration)
                 log_rollout_data(logger=self.logger, target_path=output_dir, t=self.config.total_timesteps)
 
-                # if the last iteration, do not analyze the output
+
+                self._stage = Stage.Evaluation
+
+            elif self._stage == Stage.Evaluation:
+
+                self.run_evaluation()
+
                 if self._iteration >= self.config.total_iterations:
                     self._stage = Stage.FinishIteration
                 else:

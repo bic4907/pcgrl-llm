@@ -81,12 +81,13 @@ class RewardGenerator:
         self.pe = config.get('pe')
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
-
+        self.next_iter_initial_user = file_to_string(path.join(self.file_path, "next_iter_initial_user.txt"))
 
         self.previous_reward_function_path = config.get('previous_reward_function', None)
         if self.previous_reward_function_path is None:
             self.previous_reward_function_path = default_reward
         self.previous_reward_function = file_to_string(self.previous_reward_function_path)
+        self.output_prompt = """## Output\nReward function:\n```python\n```"""
 
         os.makedirs(self.reward_function_path, exist_ok=True)
         # self._ensure_utility_files(self.reward_function_path)
@@ -104,6 +105,7 @@ class RewardGenerator:
         os.makedirs(self.reward_function_path, exist_ok=True)
         self.base_initial_user = file_to_string(path.join(self.file_path, ToT_DIR, "base_initial_user.txt"))
         self.tot_reward_function_inputs_template = file_to_string(path.join(self.file_path, ToT_DIR, "tot_reward_function_inputs.txt"))
+        self.previous_initial_user = ''
 
         self.max_depth = config.get('max_depth', 3)
         self.branch_factor = config.get('branch_factor', 3)
@@ -193,7 +195,7 @@ class RewardGenerator:
                 generating_function_path = self.previous_reward_function_path
 
             self.logging(f"Generating reward function: {generating_function_path}", logging.DEBUG)
-
+            now_performed_task = ''
             for i_trial in range(1, self.trial_count + 1):
 
                 self._current_trial = i_trial
@@ -203,19 +205,24 @@ class RewardGenerator:
 
                 if self.current_inner == 1 and self.iteration_num == 1:
                     self.logging(f'Calling the zero-shot generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path = self.first_user_response(basename=basename,
+                    generating_function_path, performed_task = self.first_user_response(basename=basename,
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
-                                                                        trial=i_trial)
+                                                                        trial=i_trial
+                                                                        )
 
 
                     self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path = self.first_user_response(basename=basename,
-                                                                        generating_function_path=generating_function_path,
-                                                                        generating_function_error=generating_function_error,
-                                                                        trial=i_trial)
+                    generating_function_path, performed_task = self.first_user_response(basename=basename,
+                                                                                        generating_function_path=generating_function_path,
+                                                                                        generating_function_error=generating_function_error,
+                                                                                        trial=i_trial,
+                                                                                        previous_task=self._execution_config.performed_task,
+                                                                                        evaluation_value=self._execution_config.evaluator,  # evaluation value 넣기
+                                                                                        evaluation_method=self._execution_config.evaluator
+                                                                                        )
                     # TODO implement second_user_function with the feedback prompts
                     self.logging(f'Called the second_user_response function')
 
@@ -248,14 +255,14 @@ class RewardGenerator:
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
-
+                    now_performed_task += performed_task
                     break
                 else:
                     generating_function_error = error_message
 
             if not is_success:
                 self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
-                return False
+                return False, None
 
             self.current_inner += 1
 
@@ -267,7 +274,7 @@ class RewardGenerator:
             self.logging(f"Saving the reward function to the file: {reward_function_file_path}", logging.INFO)
             f.write(reward_function_string)
 
-        return reward_function_file_path
+        return reward_function_file_path, now_performed_task
 
 
     def set_execution_config(self, config: Config):
@@ -372,12 +379,12 @@ class RewardGenerator:
             tot_sample_code = """## Example Reward Code\n```python\n{sample_reward_code}\n```""".format(
                 sample_reward_code=self.previous_reward_function)
         elif depth + 1 == self.max_depth:
-            sample_prompt = """# From the tasks listed above, select one of the remaining tasks, excluding those that have already been completed.\nCreate a reward function based on it to enhance the previous reward function.\nBefore generating the function, also note which task number is performed now.\n\nThe following tasks have been completed:\n{completed_task}\n\nThe current status is at the final stage.""".format(
+            sample_prompt = """# From the tasks listed above, create a reward function for remaining tasks, excluding those that have already been completed to enhance the previous reward function.\nBefore generating the function, also note which task number is performed now.\n\nThe following tasks have been completed:\n{completed_task}\n\nThe current status is at the final stage.""".format(
                 completed_task=completed_tasks)
             tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
                 sample_reward_code=generating_function)
         else:
-            sample_prompt = """# From the tasks listed above, select of the remaining tasks, excluding those that have already been completed.\nCreate a reward function based on it to enhance the previous reward function.\nBefore generating the function, also note which task number is performed now.\n\nThe following tasks have been completed:\n{completed_task}\n\nThe current progress is {now_depth} out of {max_depth} steps completed.""".format(
+            sample_prompt = """# From the tasks listed above, select one of the remaining tasks, excluding those that have already been completed.\nCreate a reward function based on it to enhance the previous reward function.\nBefore generating the function, also note which task number is performed now.\n\nThe following tasks have been completed:\n{completed_task}\n\nThe current progress is {now_depth} out of {max_depth} steps completed.""".format(
                 completed_task=completed_tasks, now_depth=str(depth), max_depth=str(self.max_depth))
             tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
                 sample_reward_code=generating_function)
@@ -403,8 +410,38 @@ class RewardGenerator:
 
         return initial_user
 
+    def save_data(self, response: str, context: list, messages: list, basename: str = 'reward'):
 
-    def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
+        self.logging(context, logging.INFO)
+        self.logging(response, logging.DEBUG)
+
+        response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
+        with open(response_file_path, 'wb') as f:
+            pickle.dump(response, f)
+
+        context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
+        with open(context_file_path, 'wb') as f:
+            pickle.dump(context, f)
+
+        parsed_reward_function = parse_reward_function(response)
+
+        log_dict = {
+            'request': messages,
+            'response': response,
+        }
+
+        # Save reward function to .py
+        reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
+        with open(reward_file_path, 'w') as f:
+            f.write(parsed_reward_function)
+
+        # Save the log to .json file
+        log_file_path = path.join(self.reward_function_path, f"{basename}.json")
+        with open(log_file_path, 'w') as f:
+            json.dump(log_dict, f, indent=4)
+
+        return reward_file_path
+    def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1, previous_task: str=None, evaluation_value: str=None, evaluation_method: str=None):
 
         self.initial_system = self.initial_system.format(
             i='{i}',
@@ -419,9 +456,7 @@ class RewardGenerator:
         # 피드백 받는 부분 작성 필요함
 
         # Task 나누기(ToT)
-        if self.pe == 'tot':
-            self.tot_solve(basename=basename)
-        else:
+        if self.pe != 'tot' or previous_task is None:
             initial_user = copy.deepcopy(self.initial_user)
 
             level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
@@ -494,43 +529,86 @@ class RewardGenerator:
 
             messages = [
                 {"role": "system", "content": self.initial_system},
-                {"role": "user", "content": initial_user}
+                {"role": "user", "content": initial_user + self.output_prompt}
             ]
 
             self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
             response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
-            self.logging(context, logging.INFO)
-            self.logging(response, logging.DEBUG)
 
-            response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
-            with open(response_file_path, 'wb') as f:
-                pickle.dump(response, f)
+            reward_file_path = self.save_data(response=response, context=context, messages=messages, basename=basename)
 
-            context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
-            with open(context_file_path, 'wb') as f:
-                pickle.dump(context, f)
+            if self.pe == 'tot':
+                return reward_file_path, "1. Iteration 1 task\n"+initial_user
+            else:
+                return reward_file_path, None
 
-            parsed_reward_function = parse_reward_function(response)
+        else:
+            initial_user = copy.deepcopy(self.next_iter_initial_user)
+            iteration_perc_str = "{:.1f}%".format(
+                self.config['iteration_num'] / self.config['total_iterations'] * 100)
+            if generating_function_error:
+
+                reward_code = file_to_string(generating_function_path)
+
+                sample_code = """Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.\n```python\n{reward_code_string}\n```\nError Message:\n{error_message}\n""".format(
+                    reward_code_string=reward_code, error_message=generating_function_error)
+
+                initial_user = initial_user.format(
+                    previous_task=previous_task,
+                    few_shot_code_string=sample_code,
+                    evaluation_method=evaluation_method,
+                    evaluation_value=evaluation_value,
+                    curr_iteration_num=self.config['iteration_num'],
+                    max_iteration_num=self.config['total_iterations'],
+                    perc_iteration=iteration_perc_str
+                )
 
 
-            log_dict = {
-                'request': messages,
-                'response': response,
-            }
+            elif self.config['feedback_path'] is not None:  # Feedback available
 
-            # Save reward function to .py
-            reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
-            with open(reward_file_path, 'w') as f:
-                f.write(parsed_reward_function)
+                reward_code = file_to_string(generating_function_path)
 
-            # Save the log to .json file
-            log_file_path = path.join(self.reward_function_path, f"{basename}.json")
-            with open(log_file_path, 'w') as f:
-                json.dump(log_dict, f, indent=4)
+                sample_code = """Here is the previous reward function that you have generated.\n```python\n{reward_code_string}\n```\n\nFeedback:\n{feedback}""".format(
+                    reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
+                initial_user = initial_user.format(
+                    previous_task=previous_task,
+                    few_shot_code_string=sample_code,
+                    evaluation_method=evaluation_method,
+                    evaluation=evaluation_value,
+                    curr_iteration_num=self.config['iteration_num'],
+                    max_iteration_num=self.config['total_iterations'],
+                    perc_iteration=iteration_perc_str
+                )
 
-            return reward_file_path
+            else:
+                sample_code = """Here is the previous reward function that you have generated.\n```python\n{sample_reward_code}```""".format(
+                    sample_reward_code=self.previous_reward_function)
+
+                initial_user = initial_user.format(
+                    previous_task=previous_task,
+                    few_shot_code_string=sample_code,
+                    evaluation_method=evaluation_method,
+                    evaluation_value=evaluation_value,
+                    curr_iteration_num=self.config['iteration_num'],
+                    max_iteration_num=self.config['total_iterations'],
+                    perc_iteration=iteration_perc_str
+                )
+
+            messages = [
+                {"role": "system", "content": self.initial_system},
+                {"role": "user", "content": initial_user + self.output_prompt}
+            ]
+
+            self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+
+            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+
+            reward_file_path = self.save_data(response=response, context=context, messages=messages, basename=basename)
+
+            return reward_file_path, previous_task + "\n\n{iteration}. Iteration {iteration} task\n".format(iteration=self.config['iteration_num']) + initial_user
+
 
     def get_pe_prompt(self, pe: str):
         # files in the PE directory

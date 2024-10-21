@@ -280,7 +280,7 @@ class TrainLLMConfig(Config):
     ###########################################################################
 
     # LLM experiment setting
-    total_iterations: int = int(1)
+    total_iterations: int = int(2)
 
     # Eval rollout setting
     random_agent: bool = False
@@ -297,16 +297,17 @@ class TrainLLMConfig(Config):
 
 
     # reward generation setting
-    n_generation_trials: int = 3
+    n_generation_trials: int = 5
 
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
 
-    gpt_model: str = 'gpt-3.5-turbo'
+    gpt_model: str = 'gpt-4o'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
     n_samples: int = 5
+    performed_task: Optional[str] = None
 
     max_depth: int = 3
     branch_factor: int =3

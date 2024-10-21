@@ -12,8 +12,3 @@ Target letter: {target_character}
 
 {thought_tips}
 
-
-## Output
-Reward function:
-```python
-```
