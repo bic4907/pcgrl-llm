@@ -133,6 +133,8 @@ class TrainConfig(Config):
     agents: int = 1
     evaluator: str = 'vit' # 'vit', 'hr'
     target_character: str = 'A'
+    pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
+    total_iterations: int = 1
 
 
 @dataclass

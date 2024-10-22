@@ -141,27 +141,28 @@ class LLMRewardWrapper(GymnaxWrapper):
         obs, env_state, reward, done, info = self._env.step(key, state, action, params)
 
         metrics_enum = self._env.prob.metrics_enum
+        metrics_boundary = self._env.prob.get_metric_bounds(self._env.prob.map_shape)
 
-        # Previous state
-        prev_stats = dict()
-        for metric in metrics_enum:
-            prev_stats[metric.name] = state.prob_state.stats[metric.value]
-        prev_array = state.env_map
-
-        # Current state
-        curr_stats = dict()
-        for metric in metrics_enum:
-            curr_stats[metric.name] = env_state.prob_state.stats[metric.value]
-
-        curr_array = env_state.env_map
+        # Normalize the metrics
+        prev_array = (state.prob_state.stats - metrics_boundary[:, 0]) / (metrics_boundary[:, 1] - metrics_boundary[:, 0])
+        curr_array = (env_state.prob_state.stats - metrics_boundary[:, 0]) / (metrics_boundary[:, 1] - metrics_boundary[:, 0])
 
         region_metrics_enum = self._env.prob.region_metrics_enum
 
-        for metric in region_metrics_enum:
-            prev_stats[metric.name] = state.prob_state.region_features[metric.value]
+        # Previous state
+        prev_stats = dict()
+        curr_stats = dict()
+
+        for metric in metrics_enum:
+            prev_stats[metric.name] = prev_array[metric.value]
+            curr_stats[metric.name] = curr_array[metric.value]
 
         for metric in region_metrics_enum:
+            prev_stats[metric.name] = state.prob_state.region_features[metric.value]
             curr_stats[metric.name] = env_state.prob_state.region_features[metric.value]
+
+        prev_array = state.env_map
+        curr_array = env_state.env_map
 
         llm_reward = self.reward_fn(prev_array, prev_stats, curr_array, curr_stats)
         reward = jnp.where(done, reward, llm_reward)

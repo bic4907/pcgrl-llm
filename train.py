@@ -16,7 +16,7 @@ import orbax.checkpoint as ocp
 from jax.experimental.array_serialization.serialization import logger
 from tensorboardX import SummaryWriter
 
-from conf.config import Config, TrainConfig
+from conf.config import Config, TrainConfig, TrainLLMConfig
 from envs.pcgrl_env import (gen_dummy_queued_state, gen_dummy_queued_state_old,
                             OldQueuedState)
 from utils import render_callback
@@ -599,7 +599,7 @@ def main_chunk(config, rng, exp_dir):
     return out
 
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrl')
-def main(config: TrainConfig):
+def main(config: TrainLLMConfig):
     if config.initialize is None or config.initialize:
         config = init_config(config)
 
