@@ -309,8 +309,7 @@ class TrainLLMConfig(Config):
     n_samples: int = 5
     performed_task: Optional[str] = None
 
-    max_depth: int = 3
-    branch_factor: int =3
+    branch_factor: Optional[int] = None
 
 
 cs = ConfigStore.instance()

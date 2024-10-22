@@ -65,8 +65,13 @@ class RewardGenerator:
         if self.reference_csv == 'random_dataset.txt':
             self.reference_csv = path.join(self.example_path, self.reference_csv)
         self.current_state_path = path.abspath(path.join(self.shared_storage_path, 'example', 'testState.json'))
-        self.reward_function_path = path.join(self.shared_storage_path, self.reward_functions_dir,
+        self.current_branch = config.get('branch', None)
+        if self.current_branch is None:
+            self.reward_function_path = path.join(self.shared_storage_path, self.reward_functions_dir,
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
+        else:
+            self.reward_function_path = path.join(self.shared_storage_path, self.reward_functions_dir,
+                                                  (str(self.postfix) + '_branch_' + str(self.current_branch)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
@@ -180,7 +185,10 @@ class RewardGenerator:
     def run(self):
 
         while self.current_inner <= self.n_inner:
-            reward_function_name = f"{self.postfix}_inner_{self.current_inner}"
+            if self.current_branch is None:
+                reward_function_name = f"{self.postfix}_inner_{self.current_inner}"
+            else:
+                reward_function_name = f"{self.postfix}_branch_{self.current_branch}"
             is_success = False
 
             generating_function_path = None
@@ -255,7 +263,8 @@ class RewardGenerator:
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
-                    now_performed_task += performed_task
+                    if self.pe == 'tot':
+                        now_performed_task += performed_task
                     break
                 else:
                     generating_function_error = error_message
