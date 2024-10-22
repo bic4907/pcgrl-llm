@@ -104,6 +104,11 @@ def init_config(config: Config):
     if config.model == 'seqnca':
         config.hidden_dims = config.hidden_dims[:1]
 
+    # if config.pe == 'io', set config.total_iterations < 2 assert!
+    if config.pe == 'io':
+        assert config.total_iterations < 2, "Total iterations must be less than 2 for IO PE. Did you forget to change the 'pe=' argument?"
+
+
     return config
 
 

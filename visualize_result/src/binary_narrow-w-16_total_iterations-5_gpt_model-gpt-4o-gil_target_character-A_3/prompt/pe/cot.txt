@@ -1,0 +1,6 @@
+You have to generate the reward function step-by-step in several iterations.
+The reward function is revised trial-and-error and could get feedback on end of each iteration.
+For example, you can starts with a simple reward function and then add more conditions to make it more complex.
+If the complex reward function doesn't work well, you can simplify it again.
+
+Current Iteration: {curr_iteration_num} / Max Iteration: {max_iteration_num} ({perc_iteration})

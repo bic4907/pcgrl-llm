@@ -52,6 +52,7 @@ def parse_reward_function(message):
 
     return code_string
 
+
 def filter_dataframe(df: pd.DataFrame, iteration: list, return_columns: list):
     df = df[df['LLM.RewardFunctionIteration'].isin(iteration)]
     df = df[return_columns]

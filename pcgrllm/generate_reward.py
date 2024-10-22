@@ -38,6 +38,7 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 PE_DIR = 'pe'
 ToT_DIR = 'tot_prompt'
+FEATURE_DIR = 'feature'
 
 class RewardGenerator:
     def __init__(self, config: dict):
@@ -83,7 +84,13 @@ class RewardGenerator:
         self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
 
         self.reward_template = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
+
         self.pe = config.get('pe')
+        self.feature = config.get('feature')
+
+        if self.feature is not None:
+            self.feature = self.feature.split('+')
+
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
         self.next_iter_initial_user = file_to_string(path.join(self.file_path, "next_iter_initial_user.txt"))
@@ -95,8 +102,6 @@ class RewardGenerator:
         self.output_prompt = """## Output\nReward function:\n```python\n```"""
 
         os.makedirs(self.reward_function_path, exist_ok=True)
-        # self._ensure_utility_files(self.reward_function_path)
-
 
 
         self.initial_reward_function = config.get('initial_reward_function', None)
@@ -294,130 +299,41 @@ class RewardGenerator:
         feedback_prompt = file_to_string(self.config['feedback_path'])
         return feedback_prompt
 
-    def generate_thought(self, depth: int, parent_thought: str, branch: int, basename: str = 'reward', completed_task: str=None):
-        prompt = self.ToT_initial_user(generating_function=parent_thought, completed_tasks=completed_task, depth=depth)
+    def get_input_prompt(self):
 
-        messages = [
-            {"role": "system", "content": self.initial_system},
-            {"role": "user", "content": prompt}
-        ]
-        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
-        self.logging(context, logging.INFO)
-        self.logging(response, logging.DEBUG)
+        prompt = copy.deepcopy(self.reward_function_inputs_template)
 
-        response_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.response.pkl")
-
-        with open(response_file_path, 'wb') as f:
-            pickle.dump(response, f)
-
-        context_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.context.pkl")
-        with open(context_file_path, 'wb') as f:
-            pickle.dump(context, f)
-
-        parsed_reward_function = parse_reward_function(response)
-        new_completed_task = get_task_line(response)
-
-        log_dict = {
-            'request': messages,
-            'response': response,
-        }
-
-        # Save reward function to .py
-        reward_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.py")
-        with open(reward_file_path, 'w') as f:
-            f.write(parsed_reward_function)
-
-        # Save the log to .json file
-        log_file_path = path.join(self.reward_function_path, f"{basename}_depth_{depth}_branch_{branch}.json")
-        with open(log_file_path, 'w') as f:
-            json.dump(log_dict, f, indent=4)
-
-        return response, new_completed_task, parsed_reward_function
-
-    def evaluate_thought(self, thought):
-        prompt = f"On a scale of 0 to 1, how promising is this thought for solving the problem '{self.tot_prompt}'? Thought: '{thought}'\nJust respond with a number between 0 and 1."
-
-        messages = [
-            {"role": "system", "content": self.initial_system},
-            {"role": "user", "content": prompt}
-        ]
-        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token)
-
-        try:
-            score = float(response)
-            return max(0, min(score, 1))  # Ensure score is between 0 and 1
-        except ValueError:
-            return 0.5  # Default score if parsing fails
-
-    def expand_tree(self, basename: str = 'reward', node: str="root", completed_task: str=None, depth: int=0):
-        if depth >= self.max_depth:
-            return
-
-        if node not in self.tree:
-            self.tree[node] = []
-
-        for i in range(self.branch_factor):
-            new_thought, new_completed_task, generated_reward_function = self.generate_thought(basename=basename, depth=depth, parent_thought=node, branch=i, completed_task=completed_task)
-            score = self.evaluate_thought(new_thought)
-            self.tree[node].append((new_thought, score))
-
-            if score >= 0.5:  # Only expand promising thoughts DFS
-                self.expand_tree(node=generated_reward_function, completed_task=new_completed_task if not completed_task else completed_task+'\n'+new_completed_task, depth=depth + 1)
-
-            time.sleep(1)  # To avoid hitting API rate limits
-
-    def best_path(self):
-        path = ["root"]
-        current = "root"
-        while current in self.tree and self.tree[current]:
-            best_thought = max(self.tree[current], key=lambda x: x[1])
-            current = best_thought[0]
-            path.append(current)
-        return path
-
-    def tot_solve(self, basename: str = 'reward'):
-        self.expand_tree(basename)
-        return self.best_path()
-
-    def ToT_initial_user(self, generating_function: str = None, completed_tasks: str = None, depth: int = 0):
-        initial_user = copy.deepcopy(self.base_initial_user)
-
-        if depth == 0:
-            sample_prompt = """# Based on the above tasks, choose only one task to enhance the provided reward function and create a reward function based on it.\nBefore generating the function, also note which task number has been completed.\nThe current progress is {now_depth} out of {max_depth} steps completed.""".format(
-                now_depth=str(depth), max_depth=str(self.max_depth))
-            tot_sample_code = """## Example Reward Code\n```python\n{sample_reward_code}\n```""".format(
-                sample_reward_code=self.previous_reward_function)
-        elif depth + 1 == self.max_depth:
-            sample_prompt = """# From the tasks listed above, create a reward function for remaining tasks, excluding those that have already been completed to enhance the previous reward function.\nBefore generating the function, also note which task number is performed now.\n\nThe following tasks have been completed:\n{completed_task}\n\nThe current status is at the final stage.""".format(
-                completed_task=completed_tasks)
-            tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
-                sample_reward_code=generating_function)
+        if 'array' in self.feature:
+            prompt = prompt.replace('{array_feature_prompt}', self._get_array_feature())
         else:
-            sample_prompt = """# From the tasks listed above, select one of the remaining tasks, excluding those that have already been completed.\nCreate a reward function based on it to enhance the previous reward function.\nBefore generating the function, also note which task number is performed now.\n\nThe following tasks have been completed:\n{completed_task}\n\nThe current progress is {now_depth} out of {max_depth} steps completed.""".format(
-                completed_task=completed_tasks, now_depth=str(depth), max_depth=str(self.max_depth))
-            tot_sample_code = """## Reward Code\nHere is the previous reward function that you have generated.\n```python\n{sample_reward_code}\n```""".format(
-                sample_reward_code=generating_function)
+            prompt = prompt.replace('{array_feature_prompt}', '(array features not available)')
+            prompt = prompt.replace('prev_array', 'unused1')
+            prompt = prompt.replace('curr_array', 'unused2')
+
+        if 'stats' in self.feature:
+            prompt = prompt.replace('{stats_feature_prompt}', self._get_stats_feature())
+        else:
+            prompt = prompt.replace('{stats_feature_prompt}', '(stats features not available)')
+            prompt = prompt.replace('prev_stats', 'unused3')
+            prompt = prompt.replace('curr_stats', 'unused4')
+        return prompt
+
+    def _get_array_feature(self):
+        prompt = self.get_feature_prompt('array')
 
         level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-        reward_function_inputs = self.tot_reward_function_inputs_template.format(
+        prompt = prompt.format(
             array_shape=level_shape_str,
             stats_keys='DIAMETER = 0, N_REGIONS = 1',
             tile_enum='EMPTY = 1, WALL = 2'
         )
 
-        initial_user = initial_user.format(
-            target_character=self.config['target_character'],
-            few_shot_code_string=tot_sample_code,
-            reward_function_inputs=reward_function_inputs,
-            tot_sample_string=sample_prompt,
-            thought_tips=self.get_pe_prompt(self.pe),
-        )
+        return prompt
 
-        if depth == 0:
-            self.tot_prompt = initial_user
-
-        return initial_user
+    def _get_stats_feature(self):
+        prompt = self.get_feature_prompt('stats')
+        return prompt
 
     def save_data(self, response: str, context: list, messages: list, basename: str = 'reward'):
 
@@ -468,13 +384,8 @@ class RewardGenerator:
         if self.pe != 'tot' or previous_task is None:
             initial_user = copy.deepcopy(self.initial_user)
 
-            level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-            reward_function_inputs = self.reward_function_inputs_template.format(
-                array_shape=level_shape_str,
-                stats_keys='DIAMETER = 0, N_REGIONS = 1',
-                tile_enum='EMPTY = 1, WALL = 2'
-            )
+            reward_function_inputs = self.get_input_prompt()
             if generating_function_error:
 
                 reward_code = file_to_string(generating_function_path)
@@ -646,6 +557,15 @@ class RewardGenerator:
         pe_str = f"\n\n## Thought Tips\n{pe_template}\n"
 
         return pe_str
+
+    def get_feature_prompt(self, feature: str):
+        if feature == 'array':
+            feature_file = read_file(path.join(self.file_path, FEATURE_DIR, 'array.txt'))
+        elif feature == 'stats':
+            feature_file = read_file(path.join(self.file_path, FEATURE_DIR, 'stats.txt'))
+        else:
+            raise ValueError(f"Unknown feature type: {feature}")
+        return feature_file
 
     def get_feedback_prompt(self):
         feedback_str = file_to_string(self.config['feedback_path'])
@@ -863,12 +783,17 @@ if __name__ == "__main__":
     parser.add_argument('--trial_count', type=int, default=10)
     parser.add_argument('--iteration_num', type=int, default=1)
     parser.add_argument('--previous_reward_function', type=str, default=None)
-
+    parser.add_argument('--map_width', type=int, default=16)
+    parser.add_argument('--map_height', type=int, default=16)
+    parser.add_argument('--feature', type=str, default='array')
+    parser.add_argument('--feedback_path', type=str, default=None)
     parser.add_argument('--initial_reward_function', type=str, default=None)
+    parser.add_argument('--target_character', type=str, default='A')
+    parser.add_argument('--total_iterations', type=int, default=1)
+    parser.add_argument('--pe', type=str, default='io')
 
     args = parser.parse_args()
 
     args = vars(args)
     reward_generator = RewardGenerator(args)
     reward_generator.run()
-

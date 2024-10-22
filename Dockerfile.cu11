@@ -1,0 +1,52 @@
+# Use CUDA 11.8 base image
+FROM nvidia/cuda:11.8.0-devel-ubuntu20.04
+
+# Install required packages
+RUN apt-get update && apt-get install -y \
+    wget \
+    coreutils \
+    util-linux \
+    && apt-get clean
+
+# Install Anaconda
+RUN wget https://repo.anaconda.com/archive/Anaconda3-2023.07-1-Linux-x86_64.sh -O ~/anaconda.sh && \
+    bash ~/anaconda.sh -b -p /opt/conda && \
+    rm ~/anaconda.sh
+
+# Add Anaconda to the PATH
+ENV PATH="/opt/conda/bin:$PATH"
+
+# Install Python 3.11 in the base conda environment
+RUN conda install -y python=3.11
+
+# Set the working directory
+WORKDIR /app
+
+# Copy the requirements file
+COPY requirements.txt .
+
+# Install dependencies from requirements.txt using pip
+RUN /opt/conda/bin/pip install -r requirements.txt
+
+# Install additional dependencies
+RUN /opt/conda/bin/pip install opencv-python-headless
+
+# Install JAX and compatible CUDA versions
+RUN /opt/conda/bin/pip install jax==0.4.25 \
+    jaxlib==0.4.25+cuda11.cudnn86 \
+    -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html \
+    orbax-checkpoint chex flax optax nvidia-cudnn-cu11==8.6.0.163
+
+RUN apt-get update && apt-get install -y \
+    cuda-command-line-tools-11-8 \
+    cuda-cupti-dev-11-8 \
+    && apt-get clean
+
+# Ensure CUDA environment variables are set correctly
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:${LD_LIBRARY_PATH}
+ENV CUDA_HOME=/usr/local/cuda
+
+
+
+# Default command when starting the container
+CMD ["bash"]

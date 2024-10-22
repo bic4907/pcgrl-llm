@@ -1,5 +1,8 @@
+import json
 import os
 import warnings
+from typing import Optional
+
 import gymnax
 import jax
 import numpy as np
@@ -15,6 +18,10 @@ from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
 from marl.model import ActorRNN, ActorCategorical
 from marl.wrappers.baselines import MultiAgentWrapper
 from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, NCA, SeqNCA
+from pcgrllm.evaluation import EvaluationResult
+from pcgrllm.evaluation.heuristic import HeuristicEvaluator
+from pcgrllm.evaluation.vit import ViTEvaluator
+from pcgrllm.utils.storage import Iteration
 
 
 def get_exp_dir_evo_map(config: EvoMapConfig):
@@ -300,6 +307,25 @@ def load_sweep_hypers(cfg: SweepConfig):
     return hypers, eval_hypers
 
 
+def run_evaluation(config: Config, logger) -> Optional[EvaluationResult]:
+
+    if config.evaluator == 'vit':
+        evaluator = ViTEvaluator(logger=logger)
+    elif config.evaluator == 'hr':
+        evaluator = HeuristicEvaluator(logger=logger)
+
+    iteration = Iteration.from_path(config.exp_dir)
+
+    # if exp_dir includes 'iteration', then it is a path to the iteration directory
+    if config.initialize is False:
+        iteration.iterative_mode = True
+    else:
+        iteration.iterative_mode = False
+
+    result = evaluator.run(iteration=iteration, target_character=config.target_character, use_train=True)
+
+    return result
+
 def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_params: PCGRLEnvParams, runner_state):
     max_episode_len = env.max_steps  # Maximum steps per episode
 
@@ -360,7 +386,7 @@ def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_p
     return jax.jit(sim_render_episode)
 
 def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str = None, t: int = 0,
-                    max_steps: int = 0, logger=None, metric=None):
+                    max_steps: int = 0, logger=None, metric=None, config: Config = None):
     fps = 60  # 초당 프레임 수
 
     # 비디오 저장
@@ -380,7 +406,7 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
         # wandb에 비디오 로그
         if wandb.run is not None:
-            wandb.log({"video": wandb.Video(video_path, fps=fps, format="gif")}, step=t)
+            wandb.log({"Train/video": wandb.Video(video_path, fps=fps, format="gif")}, step=t)
 
     # 마지막 프레임을 PNG로 저장
     if image_dir is None:
@@ -399,4 +425,18 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
         # wandb에 이미지 로그
         if wandb.run is not None:
-            wandb.log({"image": wandb.Image(image_path)}, step=t)
+            wandb.log({"Train/image": wandb.Image(image_path)}, step=t)
+
+
+        # evaluate
+        if config is not None:
+            result = run_evaluation(config, logger)
+            if logger is not None:
+                if wandb.run is not None:
+                    wandb.log({"Train/similarity": result.similarity}, step=t)
+                logger.info(f"global step={t}; similarity={result.similarity:.4f}")
+            else:
+                print(f"global step={t}; similarity={result.similarity:.4f}")
+
+
+

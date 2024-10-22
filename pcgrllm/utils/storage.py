@@ -10,6 +10,7 @@ from pcgrllm.evaluation import EvaluationResult
 # Constants
 ITERATION_PREFIX: str = 'iteration_'
 INFERENCE_DIR: str = 'inference'
+TRAIN_DIR: str = 'train'
 IMAGE_DIR: str = 'images'
 NUMPY_DIR: str = 'numpy'
 
@@ -40,11 +41,25 @@ class NumpyResource:
         return np.load(self.path, allow_pickle=True).astype(dtype)
 
 
+class FeedbackResource:
+    """Represents a feedback resource."""
+    def __init__(self, path: str) -> None:
+        self.path: str = path
+
+    def __str__(self) -> str:
+        return f'FeedbackResource(path={self.path})'
+
+    def load(self) -> str:
+        """Loads the feedback as a string."""
+        with open(self.path, 'r') as f:
+            return f.read()
+
 class Iteration:
     """Represents an iteration containing images and numpy files inside the inference folder."""
     def __init__(self, iteration_num: int, root_path: str) -> None:
         self.iteration_num: int = iteration_num
         self.root_path: str = root_path
+        self.iterative_mode = True
 
     def __str__(self) -> str:
         return (
@@ -62,17 +77,23 @@ class Iteration:
     def get_path(self) -> str:
         return self.root_path
 
+    def get_train_dir(self) -> str:
+        return join(self.root_path, TRAIN_DIR if self.iterative_mode else '')
+
     def get_inference_dir(self) -> str:
         return join(self.root_path, INFERENCE_DIR)
 
-    def get_image_dir(self) -> str:
-        return join(self.get_inference_dir(), IMAGE_DIR)
+    def get_image_dir(self, train: bool = False) -> str:
+        if train:
+            return join(self.get_train_dir(), IMAGE_DIR)
+        else:
+            return join(self.get_inference_dir(), IMAGE_DIR)
 
     def get_numpy_dir(self) -> str:
         return join(self.get_inference_dir(), NUMPY_DIR)
 
-    def get_images(self) -> List[ImageResource]:
-        image_paths = glob(join(self.get_image_dir(), '*.png'))
+    def get_images(self, train: bool = False) -> List[ImageResource]:
+        image_paths = glob(join(self.get_image_dir(train), '*.png'))
         return [ImageResource(path) for path in image_paths]
 
     def get_numpy_files(self) -> List[NumpyResource]:
@@ -88,6 +109,20 @@ class Iteration:
             return None
         return EvaluationResult.from_dict(eval_json)
 
+    def get_evaluation(self) -> Optional[EvaluationResult]:
+        eval_path = join(self.root_path, 'evaluation.json')
+
+        try:
+            eval_json = json.load(open(eval_path, 'r'))
+        except:
+            return None
+        return EvaluationResult.from_dict(eval_json)
+
+    def get_feedback(self) -> Optional[FeedbackResource]:
+        feedback_path = join(self.root_path, 'feedback.txt')
+        if not isdir(feedback_path):
+            return FeedbackResource(feedback_path)
+        return None
 
 class Storage:
     """Manages multiple iterations and their resources."""

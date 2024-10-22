@@ -396,7 +396,7 @@ class Experiment:
                 self._stage = Stage.RewardGeneration
 
                 # start wandb
-                # start_wandb(config=self.config, iteration=self._iteration)
+                start_wandb(config=self.config, iteration=self._iteration)
 
 
             elif self._stage == Stage.RewardGeneration:
@@ -427,10 +427,7 @@ class Experiment:
                 self._stage = Stage.RolloutPCGRL
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
-                if self.config.pe == 'tot':
-                    output_dir = self.rollout_pcgrl(self._iteration, self._branch)
-                else:
-                    output_dir = self.rollout_pcgrl(self._iteration, self._branch)
+                output_dir = self.rollout_pcgrl(self._iteration, self._branch)
                 log_rollout_data(logger=self.logger, target_path=output_dir, t=self.config.total_timesteps)
 
 
@@ -461,7 +458,7 @@ class Experiment:
 
             elif self._stage == Stage.FinishIteration:
 
-                # finish_wandb()
+                finish_wandb()
                 if self.config.pe == 'tot':
                     if self._branch >= self.config.branch_factor * self._iteration:
                         if self._iteration >= self.config.total_iterations:
@@ -519,9 +516,6 @@ class Experiment:
         for line in message.splitlines():
             formatted_message = f'{prefix} {line}'
             self.logger.log(level, formatted_message)
-
-
-
 
 
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrllm')

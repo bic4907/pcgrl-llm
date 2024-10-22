@@ -3,6 +3,7 @@ from os.path import dirname, join, basename
 from PIL import Image
 import torch
 from scipy.spatial.distance import cosine
+from tensorboardX.summary import image
 from transformers import AutoImageProcessor, AutoModelForImageClassification
 
 from pcgrllm.evaluation.base import *
@@ -19,9 +20,11 @@ class ViTEvaluator(LevelEvaluator):
         self.processor = AutoImageProcessor.from_pretrained(model_name)
         self.model = AutoModelForImageClassification.from_pretrained(model_name).to(self.device)
 
-    def run(self, iteration: Iteration, target_character: str) -> EvaluationResult:
+    def run(self, iteration: Iteration, target_character: str, use_train: bool = False) -> EvaluationResult:
         target_character = target_character.upper()
-        image_files = iteration.get_images()
+
+        image_files = iteration.get_images(use_train)
+
         trials = [image_file.path for image_file in image_files]
         similarity_rate = 0
         diversity_rate = 0
@@ -46,7 +49,10 @@ class ViTEvaluator(LevelEvaluator):
                 distance = cosine(pair[0]['vector'], pair[1]['vector'])
                 diversity_rate += distance
 
-            diversity = diversity_rate / (total_trials * (total_trials - 1) / 2)
+            if total_trials > 1:
+                diversity = diversity_rate / (total_trials * (total_trials - 1) / 2)
+            else:
+                diversity = 0
 
             # return similarity, diversity
             return EvaluationResult(similarity=similarity, diversity=diversity, sample_size=total_trials)
