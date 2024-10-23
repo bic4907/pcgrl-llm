@@ -6,6 +6,7 @@ import shutil
 import multiprocessing
 import warnings
 from copy import deepcopy
+import random
 
 import pandas as pd
 import numpy as np
@@ -18,6 +19,8 @@ import logging
 
 from absl.logging import warning
 from tensorflow_probability.substrates.jax.stats import expected_calibration_error
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
@@ -143,7 +146,7 @@ class RewardGenerator:
 
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
-                   verbose=False, seed=42):
+                   verbose=False, seed=42, n_response=1):
         try:
             if passthrough_response is None:
                 if verbose:
@@ -152,9 +155,16 @@ class RewardGenerator:
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
 
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=1)
-                response = responses[0][0]
-                context = responses[0][1]
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response)
+                if n_response != 1:
+                    generated_responses = [response[0] for response in responses]
+                    generated_contexts = [response[1] for response in responses]
+                    index = self.response_cluster(generated_responses, n_clusters=3)
+                    response = generated_responses[index]
+                    context = generated_contexts[index]
+                else:
+                    response = responses[0][0]
+                    context = responses[0][1]
 
                 if verbose:
                     self.logging("Received the response: ", response)
@@ -266,6 +276,22 @@ class RewardGenerator:
             f.write(reward_function_string)
 
         return reward_function_file_path
+
+    def response_cluster(self, responses, n_clusters=3):
+        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+        embeddings = model.encode(responses)
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        labels = kmeans.fit_predict(embeddings)
+
+        clusters = {}
+        for i, label in enumerate(labels):
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(i)
+
+        largest_cluster = max(clusters.values(), key=len)
+        index = random.choice(largest_cluster)
+        return index
 
 
     def set_execution_config(self, config: Config):
@@ -405,7 +431,11 @@ class RewardGenerator:
 
         self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
-        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+        if self.pe == 'cotsc':
+            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=3)
+        else:
+            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
 
