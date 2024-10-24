@@ -6,19 +6,27 @@ from conf.config import Config
 from pcgrllm.utils.logger import get_wandb_name
 
 
-def start_wandb(config: Config, iteration: int):
+def start_wandb(config: Config):
     config = deepcopy(config)
-
-    config.exp_dir = path.join(config.exp_dir, f'iteration_{iteration}')
-    config.current_iteration = iteration
 
     if config.wandb_key and config.wandb_project:
         wandb.login(key=config.wandb_key)
-        wandb.init(
+        run = wandb.init(
             project=config.wandb_project,
+            resume=config.wandb_resume,
             name=get_wandb_name(config),
             save_code=True)
+
+        wandb.define_metric("Evaluation/llm_iteration")
+        # define which metrics will be plotted against it
+        wandb.define_metric("Evaluation/*", step_metric="Evaluation/llm_iteration")
+
+        wandb.define_metric("train/step")
+        wandb.define_metric("Iteration*", step_metric="train/step")
+
         wandb.config.update(dict(config), allow_val_change=True)
+
+
 
 
 def finish_wandb():

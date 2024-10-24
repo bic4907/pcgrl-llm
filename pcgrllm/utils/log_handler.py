@@ -84,8 +84,7 @@ class WandbLoggingHandler(BaseLoggingHandler):
         if not self.use_wandb:
             return
 
-
-        wandb.log(metric, step=t)
+        wandb.log(metric)
 
     def add_text(self, category, text, t=0):
         if not self.use_wandb:
@@ -101,6 +100,9 @@ class WandbLoggingHandler(BaseLoggingHandler):
             return html_text
 
         html_output = text_to_html(text)
+
+        if self.config.current_iteration > 0:
+            category = f'Iteration_{self.config.current_iteration}/' + category.lower()
 
         wandb.log({category: wandb.Html(html_output)})
 
