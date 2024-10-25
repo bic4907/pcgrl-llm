@@ -122,13 +122,8 @@ done
 exp_name=$(echo $exp_name | sed 's/_$//')
 
 echo "Running experiment with parameters: $PARAMS"
-if [ -n "$exp_name" ]; then
-    exp_name_arg="exp_name=$exp_name"
-else
-    exp_name_arg=""
-fi
 
 # Python 스크립트 실행
-python_command="python $python_file ${PARAMS//,/ } $exp_name_arg +wandb_key=ecd68e29f83835871f85d88e6f1b9e16bb93ff1c"
+python_command="python $python_file ${PARAMS//,/ } +wandb_key=ecd68e29f83835871f85d88e6f1b9e16bb93ff1c"
 echo "Python command to be executed: $python_command"
 $python_command
