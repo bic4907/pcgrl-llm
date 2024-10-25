@@ -389,6 +389,7 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
                     max_steps: int = 0, logger=None, metric=None, config: Config = None):
     fps = 60  # 초당 프레임 수
 
+
     # 비디오 저장
     if video_dir is None:
         warnings.warn("video_dir is not set. Skipping video save.")
@@ -407,6 +408,8 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
         # wandb에 비디오 로그
         if wandb.run is not None:
             key_name = f"Iteration_{config.current_iteration}/train/video" if config.current_iteration > 0 else "Train/video"
+
+            # convert to t to int
 
             wandb.log({key_name: wandb.Video(video_path, fps=fps, format="gif"), 'train/step': t})
 
@@ -442,7 +445,7 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
                 if logger is not None:
                     if wandb.run is not None:
                         key_name = f"Iteration_{config.current_iteration}/train/similarity" if config.current_iteration > 0 else "Train/similarity"
-                        wandb.log({key_name: result.similarity}, step=t)
+                        wandb.log({key_name: result.similarity, 'train/step': t})
                     logger.info(f"global step={t}; similarity={result.similarity:.4f}")
                 else:
                     print(f"global step={t}; similarity={result.similarity:.4f}")
