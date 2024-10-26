@@ -133,6 +133,8 @@ class TrainConfig(Config):
     agents: int = 1
     evaluator: str = 'vit' # 'vit', 'hr'
     target_character: str = 'A'
+    pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
+    total_iterations: int = 1
 
 
 @dataclass
@@ -299,7 +301,7 @@ class TrainLLMConfig(Config):
 
 
     # reward generation setting
-    n_generation_trials: int = 5
+    n_generation_trials: int = 10
 
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
@@ -309,10 +311,11 @@ class TrainLLMConfig(Config):
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
     n_samples: int = 5
+    reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
+
     performed_task: Optional[str] = None
 
     branch_factor: Optional[int] = None
-
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)

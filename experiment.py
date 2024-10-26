@@ -72,13 +72,13 @@ class Experiment:
 
     def initialize(self):
         self._iteration = 1
-        if self.config.branch_factor is not None:
-            self._branch = 1
-        else:
-            self._branch = None
+        self.max_score = 0
+        self.max_iteration = None
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
         self._current_feedback_path = None
+        self.previous_reward_function_path = None
+        self.previous_feedback_path = None
 
         self._copy_prompt()
 
@@ -149,14 +149,6 @@ class Experiment:
     def generate_reward_function(self):
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
-        if self.config.pe == 'tot':
-            previous_reward_function = None if self._iteration == 1 else path.join(self.config.exp_dir, "reward_functions", f"reward_outer_{self._iteration - 1}_branch_{int((self._branch - 1) // self.config.branch_factor + 1)}.py")
-
-        elif self.config.pe == 'cotsc':
-            previous_reward_function = None if self._iteration == 1 else path.join(self.config.exp_dir, "reward_functions", f"reward_outer_{self._iteration - 1}_branch_{self._branch}.py")
-
-        else:
-            previous_reward_function = self._current_reward_function_filename
 
         args_dict = {
             'shared_storage_path': self._experiment_path,
@@ -165,18 +157,21 @@ class Experiment:
             'gpt_model': self.config.gpt_model,
             'gpt_max_token': 4096,
             'verbose': None,
-            'previous_reward_function': previous_reward_function,
+            'previous_reward_function': self.previous_reward_function_path,
             'trial_count': self.config.n_generation_trials,
             'total_iterations': self.config.total_iterations,
             'n_inner': 1,
-            'branch': self._branch,
             'iteration_num': self._iteration,
             'target_character': self.config.target_character,
             'pe': self.config.pe,
+            'branch_factor': self.config.branch_factor,
             'feedback_path': path.abspath(self._current_feedback_path) if self._current_feedback_path else None,
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
+            'feature': self.config.reward_feature,
+            'performed_task': self.config.performed_task
         }
+
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
 
@@ -184,7 +179,7 @@ class Experiment:
         # Start of the 'generate_reward.py'
         from pcgrllm.generate_reward import generate_reward
         reward_name, performed_task = generate_reward(config=self.config, generate_args=args_dict)
-        if self.config.pe == 'tot':
+        if self.config.pe == 'tot' and self._iteration % self.config.branch_factor == 0:
             self.config.performed_task = performed_task
 
         return reward_name
@@ -257,10 +252,7 @@ class Experiment:
         """Runs the mlagents-learn command with the given parameters."""
 
         config = copy.deepcopy(self.config)
-        if self.config.branch_factor is None:
-            config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
-        else:
-            config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}',f'branch_{self._branch}')
+        config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
         config.initialize = False
         # config.initialize_wandb = False # Disable wandb in train.py
 
@@ -287,15 +279,12 @@ class Experiment:
         return True
 
 
-    def rollout_pcgrl(self, iteration_run_id, branch) -> str:
+    def rollout_pcgrl(self, iteration_run_id) -> str:
         from rollout import main_rollout as run_rollout
 
         config = copy.deepcopy(self.config)
         config.initialize = False
-        if self.config.branch_factor is None:
-            config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id))
-        else:
-            config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id), "branch_" + str(branch))
+        config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id))
         config.random_agent = False
 
         media_dir = path.join(config.exp_dir, 'inference')
@@ -322,7 +311,7 @@ class Experiment:
             'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
-            'reward_function': self._current_reward_function_filename,
+            'reward_function': self.previous_reward_function_path,
             'iteration': self._iteration,
         }
 
@@ -354,6 +343,18 @@ class Experiment:
         with open(result_path, 'w') as f:
             json.dump(result.to_dict(), f)
 
+        if self.config.pe == 'tot':
+            score = result.total
+            self.save_previous_reward()
+            if self.max_score < score:
+                self.max_score = score
+                self.max_iteration = self._iteration
+            if self._iteration % self.config.branch_factor == 0:
+                self.previous_reward_function_path = path.join(self.config.exp_dir, f'iteration_{self.max_iteration}',
+                                                               f"reward_outer_{self.max_iteration}_inner_1.py")
+                self.max_score = 0
+                self.max_iteration = None
+
         log_evaluation_result(logger=self.logger, result=result, t=self.config.total_timesteps)
 
         self.logging(result, level=logging.INFO)
@@ -366,6 +367,9 @@ class Experiment:
         with open(path.join(self._experiment_path, 'state.yaml'), 'w') as file:
             yaml.dump({item: getattr(self, item) for item in serialize_items}, file)
 
+    def save_previous_reward(self):
+        with open(path.join(self.config.exp_dir, f"iteration_{self._iteration}", "previous_reward_function.json"), 'w') as file:
+            yaml.dump({"previous_reward_function": self.previous_reward_function_path}, file)
 
     def load_state(self):
         self.logging("Loading state from the previous experiment.")
@@ -407,14 +411,14 @@ class Experiment:
                     reward_generation_fn = self.generate_reward_function
 
                 self._current_reward_function_filename = reward_generation_fn()
+                if self.config.pe != 'tot':
+                    self.previous_reward_function_path = self._current_reward_function_filename
 
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.")
                 else:
-                    if self.config.branch_factor is None:
-                        reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
-                    else:
-                        reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_branch_{self._branch}')
+                    reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
+
                     log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, t=self.config.total_timesteps)
                     self._stage = Stage.TrainPCGRL
 
@@ -427,7 +431,7 @@ class Experiment:
                 self._stage = Stage.RolloutPCGRL
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
-                output_dir = self.rollout_pcgrl(self._iteration, self._branch)
+                output_dir = self.rollout_pcgrl(self._iteration)
                 log_rollout_data(logger=self.logger, target_path=output_dir, t=self.config.total_timesteps)
 
 
@@ -436,11 +440,16 @@ class Experiment:
             elif self._stage == Stage.Evaluation:
 
                 self.run_evaluation()
-
-                if self._iteration >= self.config.total_iterations:
-                    self._stage = Stage.FinishIteration
+                if self.config.pe == 'tot':
+                    if self._iteration >= self.config.total_iterations * self.config.branch_factor:
+                        self._stage = Stage.FinishIteration
+                    else:
+                        self._stage = Stage.Analysis
                 else:
-                    self._stage = Stage.Analysis
+                    if self._iteration >= self.config.total_iterations:
+                        self._stage = Stage.FinishIteration
+                    else:
+                        self._stage = Stage.Analysis
 
             elif self._stage == Stage.Analysis:
                 # Analyze results
@@ -449,10 +458,15 @@ class Experiment:
                     feedback_generation_fn = self.bypass_feedback
                 else:
                     feedback_generation_fn = self.analyze_output
-
                 self._current_feedback_path = feedback_generation_fn(self._iteration)
 
                 log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), t=self.config.total_timesteps)
+
+                if self.config.pe == 'tot':
+                    if self._iteration == self.max_iteration:
+                        self.previous_feedback_path = self._current_feedback_path
+                    if self._iteration % self.config.branch_factor == 0:
+                        self._current_feedback_path = self.previous_feedback_path
 
                 self._stage = Stage.FinishIteration
 
@@ -460,26 +474,10 @@ class Experiment:
 
                 finish_wandb()
                 if self.config.pe == 'tot':
-                    if self._branch >= self.config.branch_factor * self._iteration:
-                        if self._iteration >= self.config.total_iterations:
-                            self._stage = Stage.Done
-                        else:
-                            self._iteration += 1
-                            self._branch = 1
-                            self._stage = Stage.StartIteration
+                    if self._iteration >= self.config.total_iterations * self.config.branch_factor:
+                        self._stage = Stage.Done
                     else:
-                        self._branch += 1
-                        self._stage = Stage.StartIteration
-                elif self.config.pe == 'cotsc':
-                    if self._branch >= self.config.branch_factor:
-                        if self._iteration >= self.config.total_iterations:
-                            self._stage = Stage.Done
-                        else:
-                            self._iteration += 1
-                            self._branch = 1
-                            self._stage = Stage.StartIteration
-                    else:
-                        self._branch += 1
+                        self._iteration += 1
                         self._stage = Stage.StartIteration
                 else:
                     if self._iteration >= self.config.total_iterations:

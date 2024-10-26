@@ -5,11 +5,6 @@
 ## Previous Reward Code
 {few_shot_code_string}
 
-## Evaluation of the previous reward function
-The evaluation of the PCGRL trained with the previous reward function was conducted using the {evaluation_method} approach.
-value: {evaluation}
-
 Current Iteration: {curr_iteration_num} / Max Iteration: {max_iteration_num} ({perc_iteration})
 
 # Based on the text above, generate a reward function by identifying any tasks that were not completed in the previous reward function or any parts that need to be revised based on the evaluation of the previous reward function.
-
