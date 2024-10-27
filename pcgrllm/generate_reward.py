@@ -154,14 +154,15 @@ class RewardGenerator:
 
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
-
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response)
+                if n_response != 1:
+                    temperature = 0.5
+                else:
+                    temperature = 0
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response, temperature=temperature)
                 if n_response != 1:
                     generated_responses = [response[0] for response in responses]
                     generated_contexts = [response[1] for response in responses]
                     index = self.response_cluster(generated_responses, n_clusters=3)
-                    response = generated_responses[index]
-                    context = generated_contexts[index]
                 else:
                     response = responses[0][0]
                     context = responses[0][1]
@@ -181,7 +182,10 @@ class RewardGenerator:
         except KeyboardInterrupt:
             raise Exception("Keyboard Interrupt while using the OpenAI API")
 
-        return response, context
+        if n_response != 1:
+            return generated_responses, generated_contexts, index
+        else:
+            return response, context
 
     def run(self):
 
@@ -277,7 +281,7 @@ class RewardGenerator:
 
         return reward_function_file_path
 
-    def response_cluster(self, responses, n_clusters=3):
+    def response_cluster(self, responses, n_clusters=2):
         model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
         embeddings = model.encode(responses)
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
@@ -432,7 +436,39 @@ class RewardGenerator:
         self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
         if self.pe == 'cotsc':
-            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=3)
+            responses, contexts, index = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=5)
+
+            for i, (response, context) in enumerate(zip(responses, contexts)):
+                self.logging(context, logging.INFO)
+                self.logging(response, logging.DEBUG)
+
+                response_file_path = path.join(self.reward_function_path, f"{basename}_{i}.response.pkl")
+                with open(response_file_path, 'wb') as f:
+                    pickle.dump(response, f)
+
+                context_file_path = path.join(self.reward_function_path, f"{basename}_{i}.context.pkl")
+                with open(context_file_path, 'wb') as f:
+                    pickle.dump(context, f)
+
+                parsed_reward_function = parse_reward_function(response)
+
+                log_dict = {
+                    'request': messages,
+                    'response': response,
+                }
+
+                # Save reward function to .py
+                reward_file_path = path.join(self.reward_function_path, f"{basename}_{i}.py")
+                with open(reward_file_path, 'w') as f:
+                    f.write(parsed_reward_function)
+
+                # Save the log to .json file
+                log_file_path = path.join(self.reward_function_path, f"{basename}_{i}.json")
+                with open(log_file_path, 'w') as f:
+                    json.dump(log_dict, f, indent=4)
+
+            response = responses[index]
+            context = contexts[index]
         else:
             response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
 
