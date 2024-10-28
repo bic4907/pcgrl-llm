@@ -29,3 +29,5 @@ transformers==4.45.2
 safetensors
 openai==1.51.2
 opencv-python
+tokenizers==0.20.0
+sentence-transformers==3.0.0

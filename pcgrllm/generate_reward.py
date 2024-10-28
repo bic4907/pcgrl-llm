@@ -13,12 +13,7 @@ import numpy as np
 from os import path
 import tempfile
 from os.path import abspath, basename
-import subprocess
-import traceback
 import logging
-
-from absl.logging import warning
-from tensorflow_probability.substrates.jax.stats import expected_calibration_error
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 
@@ -282,6 +277,10 @@ class RewardGenerator:
         return reward_function_file_path
 
     def response_cluster(self, responses, n_clusters=2):
+        # set environment variable for
+
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
         model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
         embeddings = model.encode(responses)
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
