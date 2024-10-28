@@ -395,7 +395,7 @@ class Experiment:
                 else:
 
                     reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
-                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self.config.total_timesteps)
+                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self._iteration)
                     self._stage = Stage.TrainPCGRL
 
 

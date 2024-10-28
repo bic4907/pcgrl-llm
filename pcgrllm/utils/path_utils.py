@@ -66,11 +66,15 @@ def get_exp_group(config):
         )
     return exp_group
 
-def get_exp_dir(config):
+def get_exp_name(config):
     exp_group = get_exp_group(config)
+    return f'{exp_group}_chr-{config.target_character}_s-{config.seed}'
 
 
-    return os.path.join('saves', f'{exp_group}_chr-{config.target_character}_s-{config.seed}')
+def get_exp_dir(config):
+    return os.path.join('saves', get_exp_name(config))
+
+
 
 
 def init_config(config: Config):
@@ -106,8 +110,9 @@ def init_config(config: Config):
 
     # if config.pe == 'io', set config.total_iterations < 2 assert!
     if config.pe == 'io':
-        assert config.total_iterations < 2, "Total iterations must be less than 2 for IO PE. Did you forget to change the 'pe=' argument?"
-
+        if config.total_iterations >= 2:
+            print("Total iterations must be less than 2 for IO PE. Did you forget to change the 'pe=' argument?")
+            exit(0)
 
     return config
 
