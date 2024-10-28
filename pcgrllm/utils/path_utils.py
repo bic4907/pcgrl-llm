@@ -66,16 +66,28 @@ def get_exp_group(config):
         )
     return exp_group
 
+def get_short_target(target: str) -> str:
+    # Split the target string into words
+    words = target.split()
+
+    # If there's only one word, return it with the length
+    if len(words) == 1:
+        return f"{words[0]}_{len(target)}"
+
+    # Otherwise, take the first and last words and include the length
+    return f"{words[0]}~{words[-1]}({len(target)})"
+
+
 def get_exp_name(config):
     exp_group = get_exp_group(config)
-    return f'{exp_group}_chr-{config.target_character}_s-{config.seed}'
+
+    target_character = get_short_target(config.target_character) if config.task == 'scenario' else config.target_character
+
+    return f'{exp_group}_chr-{target_character}_s-{config.seed}'
 
 
 def get_exp_dir(config):
     return os.path.join('saves', get_exp_name(config))
-
-
-
 
 def init_config(config: Config):
     config.n_gpus = jax.local_device_count()

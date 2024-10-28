@@ -165,6 +165,8 @@ class Experiment:
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
             'feature': self.config.reward_feature,
+            'available_tiles': self.config.available_tiles,
+            'task': self.config.task,
         }
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)

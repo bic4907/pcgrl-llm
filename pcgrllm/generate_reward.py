@@ -18,6 +18,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
+from envs.probs.binary import BinaryTiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
 from pcgrllm.validate_reward import run_validate, read_file
 
@@ -36,6 +37,7 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 PE_DIR = 'pe'
 FEATURE_DIR = 'feature'
+TASK_DIR = 'task'
 
 class RewardGenerator:
     def __init__(self, config: dict):
@@ -82,6 +84,9 @@ class RewardGenerator:
 
         if self.feature is not None:
             self.feature = self.feature.split('+')
+
+        self.task = config.get('task')
+        self.available_tiles = config.get('available_tiles')
 
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
@@ -331,10 +336,15 @@ class RewardGenerator:
 
         level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-        prompt = prompt.format(
+        available_tiles = set(self.available_tiles) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
+
+        # Filter the enum members based on available_tiles
+        tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in BinaryTiles if tile in available_tiles)
+
+        # Format the prompt with values
+        return prompt.format(
             array_shape=level_shape_str,
-            stats_keys='DIAMETER = 0, N_REGIONS = 1',
-            tile_enum='EMPTY = 1, WALL = 2'
+            tile_enum=tile_enum
         )
 
         return prompt
@@ -342,6 +352,19 @@ class RewardGenerator:
     def _get_stats_feature(self):
         prompt = self.get_feature_prompt('stats')
         return prompt
+
+    def get_initial_user(self):
+        initial_user = copy.deepcopy(self.initial_user)
+
+        # get the prompt file from the task dir
+        task_file = path.join(self.file_path, TASK_DIR, f"{self.task}.txt")
+        task_prompt = file_to_string(task_file)
+
+        task_prompt.format(target_character=self.config['target_character'])
+
+        initial_user = initial_user.replace('{task}', task_prompt)
+
+        return initial_user
 
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
@@ -355,7 +378,7 @@ class RewardGenerator:
         self.initial_system += '\n'
         self.initial_system += self.reward_code_tips_prompt
 
-        initial_user = copy.deepcopy(self.initial_user)
+        initial_user = self.get_initial_user()
 
 
         reward_function_inputs = self.get_input_prompt()
@@ -377,8 +400,8 @@ class RewardGenerator:
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
-                
-              
+
+
               _character=self._execution_config.target_character,
                 few_shot_code_string=sample_code,
                 reward_function_inputs=reward_function_inputs,
@@ -427,7 +450,6 @@ class RewardGenerator:
 
 
         # 피드백 받는 부분 작성 필요함
-
 
         messages = [
             {"role": "system", "content": self.initial_system},
