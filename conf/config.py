@@ -287,7 +287,7 @@ class TrainLLMConfig(Config):
     ###########################################################################
 
     # LLM experiment setting
-    total_iterations: int = int(1)
+    total_iterations: int = int(2)
 
     # Eval rollout setting
     random_agent: bool = False
@@ -313,8 +313,10 @@ class TrainLLMConfig(Config):
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
-    n_samples: int = 10
+    n_samples: int = 5
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
+
+    performed_task: Optional[str] = None
 
     branch_factor: Optional[int] = None
 

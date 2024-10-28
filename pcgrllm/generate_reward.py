@@ -384,7 +384,6 @@ class RewardGenerator:
 
         return reward_file_path
 
-
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
