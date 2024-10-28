@@ -355,7 +355,7 @@ class Experiment:
                 self.max_score = 0
                 self.max_iteration = None
 
-        log_evaluation_result(logger=self.logger, result=result, t=self.config.total_timesteps)
+        log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration)
 
         self.logging(result, level=logging.INFO)
         return result
@@ -392,16 +392,16 @@ class Experiment:
 
         self.logging("Running experiment", level=logging.DEBUG)
 
+        start_wandb(config=self.config)
+
         while not self._stage is Stage.Done:
 
             self.logging(f"Current stage: {self._stage}", level=logging.DEBUG)
 
+
             if self._stage == Stage.StartIteration:
+
                 self._stage = Stage.RewardGeneration
-
-                # start wandb
-                start_wandb(config=self.config, iteration=self._iteration)
-
 
             elif self._stage == Stage.RewardGeneration:
 
@@ -417,9 +417,9 @@ class Experiment:
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.")
                 else:
-                    reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
 
-                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, t=self.config.total_timesteps)
+                    reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
+                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self.config.total_timesteps)
                     self._stage = Stage.TrainPCGRL
 
 
@@ -432,7 +432,7 @@ class Experiment:
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
                 output_dir = self.rollout_pcgrl(self._iteration)
-                log_rollout_data(logger=self.logger, target_path=output_dir, t=self.config.total_timesteps)
+                log_rollout_data(logger=self.logger, target_path=output_dir, iteration=self._iteration)
 
 
                 self._stage = Stage.Evaluation
@@ -458,9 +458,10 @@ class Experiment:
                     feedback_generation_fn = self.bypass_feedback
                 else:
                     feedback_generation_fn = self.analyze_output
+
                 self._current_feedback_path = feedback_generation_fn(self._iteration)
 
-                log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), t=self.config.total_timesteps)
+                log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), iteration=self._iteration)
 
                 if self.config.pe == 'tot':
                     if self._iteration == self.max_iteration:
@@ -472,7 +473,6 @@ class Experiment:
 
             elif self._stage == Stage.FinishIteration:
 
-                finish_wandb()
                 if self.config.pe == 'tot':
                     if self._iteration >= self.config.total_iterations * self.config.branch_factor:
                         self._stage = Stage.Done
@@ -488,6 +488,7 @@ class Experiment:
 
             self.save_state()
 
+        finish_wandb()
         self.logging("Experiment finished.")
 
     def exit(self, message: str, code: int = 1):

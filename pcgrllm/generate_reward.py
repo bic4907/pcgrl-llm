@@ -53,6 +53,7 @@ class RewardGenerator:
         self.n_inner = config.get('n_inner', 3)
 
         self.current_inner = config.get('current_inner', 1)
+
         self.n_outer = config.get('n_outer', 3)
         self._current_trial = 0
         self.trial_count = config.get('trial_count', 3)
@@ -246,6 +247,7 @@ class RewardGenerator:
                     self.logging(str(e), logging.DEBUG)
                     is_success = False
 
+
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
@@ -358,9 +360,6 @@ class RewardGenerator:
         self.initial_system += '\n'
         self.initial_system += self.reward_code_tips_prompt
 
-        # 피드백 받는 부분 작성 필요함
-
-        # Task 나누기(ToT)
         if self.pe != 'tot' or previous_task is None:
             initial_user = copy.deepcopy(self.initial_user)
 

@@ -29,7 +29,7 @@ class Config:
     env_name: str = "PCGRL"
     ANNEAL_LR: bool = False
     DEBUG: bool = True
-    exp_name: str = "0"
+    exp_name: str = "def"
     seed: int = 0
 
     problem: str = "binary"
@@ -87,12 +87,15 @@ class Config:
     # Wandb
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
+    wandb_resume: str = 'allow'
+
     exp_group: Optional[str] = None
 
     _vid_dir: Optional[str] = None
     _img_dir: Optional[str] = None
     _numpy_dir: Optional[str] = None
     current_iteration: int = 0
+    fitness_evaluator: str = 'vit'
 
 
 @dataclass

@@ -51,14 +51,18 @@ def log_callback(metric, steps_prev_complete, config, writer, train_start_time):
                      [metric["returned_episode"]].mean())
         fps = (t - steps_prev_complete) / (timer() - train_start_time)
 
-        # wandb logging if enabled
+        prefix = f"Iteration_{config.current_iteration}/train/" if config.current_iteration > 0 else ""
+
         metric = {
-            "ep_return": ep_return_mean,
-            "ep_return_max": ep_return_max,
-            "ep_return_min": ep_return_min,
-            "ep_length": ep_length,
-            "fps": fps,
+            f"{prefix}ep_return": ep_return_mean,
+            f"{prefix}ep_return_max": ep_return_max,
+            f"{prefix}ep_return_min": ep_return_min,
+            f"{prefix}ep_length": ep_length,
+            f"{prefix}fps": fps,
+            f"train/step": t
         }
+
+        # log metrics
         writer.log(metric, t)
 
         print(f"fps: {fps}")

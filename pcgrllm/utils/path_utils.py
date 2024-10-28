@@ -36,14 +36,16 @@ def is_default_hiddims(config: Config):
 
 def get_exp_group(config):
     if config.env_name == 'PCGRL':
-        ctrl_str = '_ctrl_' + '_'.join(config.ctrl_metrics) if len(config.ctrl_metrics) > 0 else ''
+        config_dict = {
+            'pe': config.pe,
+            'it': config.total_iterations,
+            'fit': config.fitness_evaluator,
+            'exp': config.exp_name
+        }
+
+        # key와 value를 '_'로 구분하여 join
         exp_group = os.path.join(
-            f'{config.problem}{ctrl_str}_{config.representation}-' +
-            f'w-{config.map_width}_' + \
-            ('empty-start_' if config.empty_start else '') + \
-            ('pinpoints_' if config.pinpoints else '') + \
-            (f'{config.n_envs}-envs_' if config.profile_fps else '') + \
-            f'{config.exp_name}'
+            '_'.join([f'{key}-{value}' for key, value in config_dict.items()])
         )
     elif config.env_name == 'PlayPCGRL':
         exp_group = os.path.join(
@@ -66,15 +68,13 @@ def get_exp_group(config):
 
 def get_exp_dir(config):
     exp_group = get_exp_group(config)
-    return os.path.join('saves', f'{exp_group}_{config.seed}')
+
+
+    return os.path.join('saves', f'{exp_group}_chr-{config.target_character}_s-{config.seed}')
 
 
 def init_config(config: Config):
     config.n_gpus = jax.local_device_count()
-
-    if config.env_name == 'Candy':
-        config.exp_dir = get_exp_dir(config)
-        return config
 
     if config.representation in set({'wide', 'nca'}):
         # TODO: Technically, maybe arf/vrf size should affect kernel widths in (we're assuming here) the NCA model?
