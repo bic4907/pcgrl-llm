@@ -22,14 +22,21 @@ if function_call():
 jax.lax.cond(function_call(array, x, y), lambda _: arr.append((x, y)), lambda _: None, None) # condition, true_fun, false_fun, operand)
 
 [Before]
-cnt += function_call(curr_array, x, y)
+if jnp.all(sub_array == EMPTY):
+    room_count += 1
+
 [After]
-cnt = jax.lax.cond(
-    function_call(curr_array, x, y),
-    lambda x: x + 1,  # true_fn
-    lambda x: x,      # false_fn
-    cnt               # input
-)
+jax.lax.cond(jnp.all(sub_array == EMPTY), lambda x: x + 1, lambda x: x, room_count)
+
+[Before]
+if tile == EMPTY:
+    current_consecutive_empty += 1
+else:
+    current_consecutive_empty = 0
+
+[After]
+jax.lax.cond(tile == EMPTY, lambda x: x + 1, lambda x: 0, current_consecutive_empty)
+
 
 ### Array value allocation
 Instead of ``x[idx] = y``, use ``x = x.at[idx].set(y)``

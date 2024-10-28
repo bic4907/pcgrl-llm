@@ -4,6 +4,7 @@ import os, re, ast, sys, time, argparse, json, pickle
 import pprint
 import shutil
 import multiprocessing
+import traceback
 import warnings
 from copy import deepcopy
 import random
@@ -220,8 +221,6 @@ class RewardGenerator:
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
                                                                         trial=i_trial)
-
-
                     self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
@@ -255,6 +254,7 @@ class RewardGenerator:
                 except Exception as e:
                     self.logging(f"Failed to generating the reward function: {generating_function_path}", logging.INFO)
                     self.logging(str(e), logging.DEBUG)
+                    error_message = str(e)
                     is_success = False
 
 
@@ -376,7 +376,6 @@ class RewardGenerator:
 
         # Add jax code tips prompt
         initial_system += self.jax_code_tips_prompt
-        print(self.jax_code_tips_prompt)
         initial_system += '\n'
         initial_system += self.reward_code_tips_prompt
 
@@ -385,8 +384,11 @@ class RewardGenerator:
 
         reward_function_inputs = self.get_input_prompt()
 
+        print('Generating function error\n', generating_function_error)
+
 
         if generating_function_error:
+
 
             reward_code = file_to_string(generating_function_path)
 
@@ -762,7 +764,16 @@ class RewardGenerator:
             result = run_validate(config)
         except Exception as e:
             code = read_file(reward_function_path)
-            raise RewardExecutionException(code, e)
+
+            # get traceback from e
+            tb_list = traceback.format_exception(type(e), e, e.__traceback__)
+
+
+            string_lines = [line.strip() for line in tb_list if "File \"<string>\"" in line]
+            filtered_traceback = ''.join(string_lines).strip()
+
+
+            raise RewardExecutionException(code, f'{filtered_traceback}\n{e}')
 
         return result
 
