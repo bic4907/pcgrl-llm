@@ -294,9 +294,11 @@ class RewardGenerator:
             clusters[label].append(i)
 
         largest_cluster = max(clusters.values(), key=len)
-        index = random.choice(largest_cluster)
-        return index
+        largest_cluster_embeddings = embeddings[largest_cluster]
 
+        cluster_center = np.mean(largest_cluster_embeddings, axis=0)
+        index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
+        return index
 
     def set_execution_config(self, config: Config):
         self.logging(f"Setting the execution config: {config}", logging.INFO)
@@ -442,11 +444,11 @@ class RewardGenerator:
                 self.logging(context, logging.INFO)
                 self.logging(response, logging.DEBUG)
 
-                response_file_path = path.join(self.reward_function_path, f"{basename}_{i}.response.pkl")
+                response_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.response.pkl")
                 with open(response_file_path, 'wb') as f:
                     pickle.dump(response, f)
 
-                context_file_path = path.join(self.reward_function_path, f"{basename}_{i}.context.pkl")
+                context_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.context.pkl")
                 with open(context_file_path, 'wb') as f:
                     pickle.dump(context, f)
 
@@ -458,14 +460,20 @@ class RewardGenerator:
                 }
 
                 # Save reward function to .py
-                reward_file_path = path.join(self.reward_function_path, f"{basename}_{i}.py")
+                reward_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.py")
                 with open(reward_file_path, 'w') as f:
                     f.write(parsed_reward_function)
 
                 # Save the log to .json file
-                log_file_path = path.join(self.reward_function_path, f"{basename}_{i}.json")
+                log_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.json")
                 with open(log_file_path, 'w') as f:
                     json.dump(log_dict, f, indent=4)
+            log_dict = {
+                'selected_branch': f'branch_{index}'
+            }
+            log_file_path = path.join(self.reward_function_path, "selected_branch.json")
+            with open(log_file_path, 'w') as f:
+                json.dump(log_dict, f, indent=4)
 
             response = responses[index]
             context = contexts[index]
