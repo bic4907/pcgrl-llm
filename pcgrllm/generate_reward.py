@@ -57,10 +57,6 @@ class RewardGenerator:
         self.trial_count = config.get('trial_count', 3)
         self.iteration_num = config.get('iteration_num', 1)
         self.branch_factor = config.get('branch_factor', None)
-        if self.branch_factor is None:
-            self.total_iterations = config.get('total_iterations', 3)
-        else:
-            self.total_iterations = config.get('total_iterations', 3) * self.branch_factor
         self.reference_csv = config.get('reference_csv', 'random_dataset.txt')
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
         self.file_path = path.join(self.shared_storage_path, 'prompt')
