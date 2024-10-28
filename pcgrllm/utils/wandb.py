@@ -4,6 +4,7 @@ import wandb
 from os import path
 from conf.config import Config
 from pcgrllm.utils.logger import get_wandb_name
+# from pcgrllm.utils.path_utils import get_exp_name
 
 
 def start_wandb(config: Config):
@@ -17,6 +18,7 @@ def start_wandb(config: Config):
         wandb.login(key=config.wandb_key)
         run = wandb.init(
             project=config.wandb_project,
+            # resume=config.wandb_resume,
             name=get_wandb_name(config),
             save_code=True)
 

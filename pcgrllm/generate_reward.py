@@ -6,18 +6,16 @@ import shutil
 import multiprocessing
 import warnings
 from copy import deepcopy
+import random
 
 import pandas as pd
 import numpy as np
 from os import path
 import tempfile
 from os.path import abspath, basename
-import subprocess
-import traceback
 import logging
-
-from absl.logging import warning
-from tensorflow_probability.substrates.jax.stats import expected_calibration_error
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
@@ -65,7 +63,6 @@ class RewardGenerator:
             self.total_iterations = config.get('total_iterations', 3) * self.branch_factor
         self.reference_csv = config.get('reference_csv', 'random_dataset.txt')
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
-        self.performed_task = config.get('performed_task')
         self.file_path = path.join(self.shared_storage_path, 'prompt')
         self.example_path = path.join(self.shared_storage_path, 'example')
         if self.reference_csv == 'random_dataset.txt':
@@ -87,20 +84,21 @@ class RewardGenerator:
 
         self.pe = config.get('pe')
         self.feature = config.get('feature')
+
         if self.feature is not None:
             self.feature = self.feature.split('+')
 
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
-        self.next_iter_initial_user = file_to_string(path.join(self.file_path, "next_iter_initial_user.txt"))
+
 
         self.previous_reward_function_path = config.get('previous_reward_function', None)
         if self.previous_reward_function_path is None:
             self.previous_reward_function_path = default_reward
         self.previous_reward_function = file_to_string(self.previous_reward_function_path)
-        self.output_prompt = """## Output\nReward function:\n```python\n```"""
 
         os.makedirs(self.reward_function_path, exist_ok=True)
+
 
         self.initial_reward_function = config.get('initial_reward_function', None)
 
@@ -111,6 +109,7 @@ class RewardGenerator:
         self.logging(f'Reward generation arguments:\n{pprint.pformat(config, indent=4)}', logging.INFO)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
+
 
     def logging(self, message, level=logging.DEBUG):
         info_dict = {
@@ -147,7 +146,7 @@ class RewardGenerator:
 
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
-                   verbose=False, seed=42):
+                   verbose=False, seed=42, n_response=1):
         try:
             if passthrough_response is None:
                 if verbose:
@@ -155,10 +154,18 @@ class RewardGenerator:
 
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
-
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=1)
-                response = responses[0][0]
-                context = responses[0][1]
+                if n_response != 1:
+                    temperature = 0.5
+                else:
+                    temperature = 0
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response, temperature=temperature)
+                if n_response != 1:
+                    generated_responses = [response[0] for response in responses]
+                    generated_contexts = [response[1] for response in responses]
+                    index = self.response_cluster(generated_responses, n_clusters=3)
+                else:
+                    response = responses[0][0]
+                    context = responses[0][1]
 
                 if verbose:
                     self.logging("Received the response: ", response)
@@ -175,7 +182,10 @@ class RewardGenerator:
         except KeyboardInterrupt:
             raise Exception("Keyboard Interrupt while using the OpenAI API")
 
-        return response, context
+        if n_response != 1:
+            return generated_responses, generated_contexts, index
+        else:
+            return response, context
 
     def run(self):
 
@@ -205,20 +215,19 @@ class RewardGenerator:
 
                 if self.current_inner == 1 and self.iteration_num == 1:
                     self.logging(f'Calling the zero-shot generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path, performed_task = self.first_user_response(basename=basename,
+                    generating_function_path = self.first_user_response(basename=basename,
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
-                                                                        trial=i_trial
-                                                                        )
+                                                                        trial=i_trial)
 
+
+                    self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path, performed_task = self.first_user_response(basename=basename,
-                                                                                        generating_function_path=generating_function_path,
-                                                                                        generating_function_error=generating_function_error,
-                                                                                        trial=i_trial,
-                                                                                        previous_task=self.performed_task,
-                                                                                        )
+                    generating_function_path = self.first_user_response(basename=basename,
+                                                                        generating_function_path=generating_function_path,
+                                                                        generating_function_error=generating_function_error,
+                                                                        trial=i_trial)
                     # TODO implement second_user_function with the feedback prompts
                     self.logging(f'Called the second_user_response function')
 
@@ -251,14 +260,14 @@ class RewardGenerator:
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
-                    self.performed_task = performed_task
+
                     break
                 else:
                     generating_function_error = error_message
 
             if not is_success:
                 self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
-                return False, None
+                return False
 
             self.current_inner += 1
 
@@ -270,8 +279,30 @@ class RewardGenerator:
             self.logging(f"Saving the reward function to the file: {reward_function_file_path}", logging.INFO)
             f.write(reward_function_string)
 
-        return reward_function_file_path, self.performed_task
+        return reward_function_file_path
 
+    def response_cluster(self, responses, n_clusters=2):
+        # set environment variable for
+
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+        embeddings = model.encode(responses)
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        labels = kmeans.fit_predict(embeddings)
+
+        clusters = {}
+        for i, label in enumerate(labels):
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(i)
+
+        largest_cluster = max(clusters.values(), key=len)
+        largest_cluster_embeddings = embeddings[largest_cluster]
+
+        cluster_center = np.mean(largest_cluster_embeddings, axis=0)
+        index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
+        return index
 
     def set_execution_config(self, config: Config):
         self.logging(f"Setting the execution config: {config}", logging.INFO)
@@ -317,16 +348,20 @@ class RewardGenerator:
         prompt = self.get_feature_prompt('stats')
         return prompt
 
-    def save_data(self, response: str, context: list, messages: list, basename: str = 'reward'):
+    def save_data(self, response: str, context: list, messages: list, basename: str = 'reward', branch: int=None):
 
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
+        if branch is None:
+            file_name = f"{basename}"
+        else:
+            file_name = f"{basename}_branch_{branch}"
 
-        response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
+        response_file_path = path.join(self.reward_function_path, f"{file_name}.response.pkl")
         with open(response_file_path, 'wb') as f:
             pickle.dump(response, f)
 
-        context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
+        context_file_path = path.join(self.reward_function_path, f"{file_name}.context.pkl")
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
 
@@ -338,17 +373,19 @@ class RewardGenerator:
         }
 
         # Save reward function to .py
-        reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
+        reward_file_path = path.join(self.reward_function_path, f"{file_name}.py")
         with open(reward_file_path, 'w') as f:
             f.write(parsed_reward_function)
 
         # Save the log to .json file
-        log_file_path = path.join(self.reward_function_path, f"{basename}.json")
+        log_file_path = path.join(self.reward_function_path, f"{file_name}.json")
         with open(log_file_path, 'w') as f:
             json.dump(log_dict, f, indent=4)
 
         return reward_file_path
-    def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1, previous_task: str=None):
+
+
+    def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
         self.initial_system = self.initial_system.format(
             i='{i}',
@@ -360,139 +397,111 @@ class RewardGenerator:
         self.initial_system += '\n'
         self.initial_system += self.reward_code_tips_prompt
 
-        if self.pe != 'tot' or previous_task is None:
-            initial_user = copy.deepcopy(self.initial_user)
+        initial_user = copy.deepcopy(self.initial_user)
 
 
-            reward_function_inputs = self.get_input_prompt()
-            if generating_function_error:
-
-                reward_code = file_to_string(generating_function_path)
-
-                sample_code = """
-                ## Reward Code
-                Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-                ```python
-                {reward_code_string}
-                ```
-                Error Message:
-                {error_message}
-
-                """.format(reward_code_string=reward_code, error_message=generating_function_error)
-
-                initial_user = initial_user.format(
-                    few_shot_code_string=sample_code,
-                    reward_function_inputs=reward_function_inputs,
-                    target_character=self.config['target_character'],
-                    thought_tips=self.get_pe_prompt(self.pe),
-                )
+        reward_function_inputs = self.get_input_prompt()
 
 
-            elif self.config['feedback_path'] is not None:  # Feedback available
+        if generating_function_error:
 
-                reward_code = file_to_string(generating_function_path)
+            reward_code = file_to_string(generating_function_path)
 
-                sample_code = """
-                   ## Previous Reward Code
-                   Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-                   ```python
-                   {reward_code_string}
-                   ```
+            sample_code = """
+            ## Reward Code
+            Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+            ```python
+            {reward_code_string}
+            ```
+            Error Message:
+            {error_message}
+            
+            """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
-                   Feedback:
-                   {feedback}
+            initial_user = initial_user.format(
 
-                   """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
-                initial_user = initial_user.format(
-                    few_shot_code_string=sample_code,
-                    reward_function_inputs=reward_function_inputs,
-                    target_character=self.config['target_character'],
-                    thought_tips=self.get_pe_prompt(self.pe),
-                )
+              _character=self._execution_config.target_character,
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs,
+                target_character=self.config['target_character'],
+                thought_tips=self.get_pe_prompt(self.pe),
+            )
 
-            else:
-                sample_code = """
-                    ## Example Reward Code
-                    ```python
-                    {sample_reward_code}
-                    ```
-                    """.format(sample_reward_code=self.previous_reward_function)
 
-                initial_user = initial_user.format(
-                    target_character=self.config['target_character'],
-                    few_shot_code_string=sample_code,
-                    reward_function_inputs=reward_function_inputs,
-                    thought_tips=self.get_pe_prompt(self.pe),
-                )
+        elif self.config['feedback_path'] is not None: # Feedback available
 
-            messages = [
-                {"role": "system", "content": self.initial_system},
-                {"role": "user", "content": initial_user + self.output_prompt}
-            ]
+            reward_code = file_to_string(generating_function_path)
 
-            self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+            sample_code = """
+               ## Previous Reward Code
+               Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+               ```python
+               {reward_code_string}
+               ```
+               
+               Feedback:
+               {feedback}
 
-            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+               """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
-            reward_file_path = self.save_data(response=response, context=context, messages=messages, basename=basename)
-
-            if self.pe == 'tot':
-                return reward_file_path, "1. Iteration 1 task\n"+initial_user
-            else:
-                return reward_file_path, None
+            initial_user = initial_user.format(
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs,
+                target_character=self.config['target_character'],
+                thought_tips=self.get_pe_prompt(self.pe),
+            )
 
         else:
-            initial_user = copy.deepcopy(self.next_iter_initial_user)
-            current_iteration = int((self.iteration_num + 1) // self.branch_factor)
-            iteration_perc_str = "{:.1f}%".format(
-                current_iteration / self.config['total_iterations'] * 100)
-            if generating_function_error:
+            sample_code = """
+            ## Example Reward Code
+            ```python
+            {sample_reward_code}
+            ```
+            """.format(sample_reward_code=self.previous_reward_function)
 
-                reward_code = file_to_string(generating_function_path)
+            initial_user = initial_user.format(
+                target_character=self.config['target_character'],
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs,
+                thought_tips=self.get_pe_prompt(self.pe),
+            )
 
-                current_modify_prompt = generating_function_error
 
-                sample_code = """Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.\n```python\n{reward_code_string}\n```\nError Message:\n{error_message}\n""".format(
-                    reward_code_string=reward_code, error_message=current_modify_prompt)
+        # 피드백 받는 부분 작성 필요함
 
-                initial_user = initial_user.format(
-                    previous_task=previous_task,
-                    few_shot_code_string=sample_code,
-                    curr_iteration_num=current_iteration,
-                    max_iteration_num=self.config['total_iterations'],
-                    perc_iteration=iteration_perc_str
-                )
 
-            elif self.config['feedback_path'] is not None:  # Feedback available
+        messages = [
+            {"role": "system", "content": self.initial_system},
+            {"role": "user", "content": initial_user}
+        ]
 
-                reward_code = file_to_string(generating_function_path)
-                current_modify_prompt = self.get_feedback_prompt()
+        self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
-                sample_code = """Here is the previous reward function that you have generated.\n```python\n{reward_code_string}\n```\n\n## Feedback:\n{feedback}""".format(
-                    reward_code_string=reward_code, feedback=current_modify_prompt)
+        if self.pe == 'cotsc':
+            responses, contexts, index = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=5)
 
-                initial_user = initial_user.format(
-                    previous_task=previous_task,
-                    few_shot_code_string=sample_code,
-                    curr_iteration_num=current_iteration,
-                    max_iteration_num=self.config['total_iterations'],
-                    perc_iteration=iteration_perc_str
-                )
+            for i, (response, context) in enumerate(zip(responses, contexts)):
+                self.logging(context, logging.INFO)
+                self.logging(response, logging.DEBUG)
 
-            messages = [
-                {"role": "system", "content": self.initial_system},
-                {"role": "user", "content": initial_user + self.output_prompt}
-            ]
+                reward_file_path = self.save_data(response=response, context=context, messages=messages, branch=i)
 
-            self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
+            log_dict = {
+                'selected_branch': f'branch_{index}'
+            }
+            log_file_path = path.join(self.reward_function_path, "selected_branch.json")
+            with open(log_file_path, 'w') as f:
+                json.dump(log_dict, f, indent=4)
 
+            response = responses[index]
+            context = contexts[index]
+        else:
             response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
 
-            reward_file_path = self.save_data(response=response, context=context, messages=messages, basename=basename)
+        reward_file_path = self.save_data(response=response, context=context, messages=messages)
 
-            return reward_file_path, previous_task + "\n\n{iteration}. Iteration {iteration} task\n".format(iteration=current_iteration) + current_modify_prompt
-
+        return reward_file_path
 
     def get_pe_prompt(self, pe: str):
         # files in the PE directory
@@ -513,11 +522,12 @@ class RewardGenerator:
 
         pe_template = file_to_string(pe_file)
         if self.pe == 'tot':
-            current_iteraiton = int((self.config['iteration_num'] + 1) // self.branch_factor)
-            iteration_perc_str = "{:.1f}%".format(current_iteraiton / self.config['total_iterations'] * 100)
+            current_iteration = int((self.iteration_num - 1) // self.branch_factor + 1)
+            total_iterations = int((self.config['total_iterations'] - 1) // self.branch_factor + 1)
+            iteration_perc_str = "{:.1f}%".format(current_iteration / total_iterations * 100)
             pe_template = pe_template.format(
-                curr_iteration_num=current_iteraiton,
-                max_iteration_num=self.config['total_iterations'],
+                curr_iteration_num=current_iteration,
+                max_iteration_num=total_iterations,
                 perc_iteration=iteration_perc_str
             )
         else:

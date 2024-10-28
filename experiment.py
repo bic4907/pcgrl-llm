@@ -79,6 +79,7 @@ class Experiment:
         self._current_feedback_path = None
         self.previous_reward_function_path = None
         self.previous_feedback_path = None
+        self.max_iteration_feedback_path = None
 
         self._copy_prompt()
 
@@ -149,6 +150,16 @@ class Experiment:
     def generate_reward_function(self):
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
+        if self.config.pe =='tot':
+            if self.previous_reward_function_path is None:
+                current_feedback_path = None
+            else:
+                current_feedback_path = path.abspath(self.previous_feedback_path)
+        else:
+            if self._current_feedback_path is None:
+                current_feedback_path = None
+            else:
+                current_feedback_path = path.abspath(self._current_feedback_path)
 
         args_dict = {
             'shared_storage_path': self._experiment_path,
@@ -165,22 +176,18 @@ class Experiment:
             'target_character': self.config.target_character,
             'pe': self.config.pe,
             'branch_factor': self.config.branch_factor,
-            'feedback_path': path.abspath(self._current_feedback_path) if self._current_feedback_path else None,
+            'feedback_path': current_feedback_path,
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
             'feature': self.config.reward_feature,
-            'performed_task': self.config.performed_task
         }
-
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
 
 
         # Start of the 'generate_reward.py'
         from pcgrllm.generate_reward import generate_reward
-        reward_name, performed_task = generate_reward(config=self.config, generate_args=args_dict)
-        if self.config.pe == 'tot' and self._iteration % self.config.branch_factor == 0:
-            self.config.performed_task = performed_task
+        reward_name = generate_reward(config=self.config, generate_args=args_dict)
 
         return reward_name
 
@@ -254,6 +261,7 @@ class Experiment:
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
         config.initialize = False
+        config.current_iteration = self._iteration
         # config.initialize_wandb = False # Disable wandb in train.py
 
         media_dir = path.join(config.exp_dir, 'train')
@@ -349,7 +357,7 @@ class Experiment:
             if self.max_score < score:
                 self.max_score = score
                 self.max_iteration = self._iteration
-            if self._iteration % self.config.branch_factor == 0:
+            if self._iteration % self.config.branch_factor == 0 or self._iteration >= self.config.total_iterations:
                 self.previous_reward_function_path = path.join(self.config.exp_dir, f'iteration_{self.max_iteration}',
                                                                f"reward_outer_{self.max_iteration}_inner_1.py")
                 self.max_score = 0
@@ -369,8 +377,11 @@ class Experiment:
 
     def save_previous_reward(self):
         with open(path.join(self.config.exp_dir, f"iteration_{self._iteration}", "previous_reward_function.json"), 'w') as file:
-            yaml.dump({"previous_reward_function": self.previous_reward_function_path}, file)
+            yaml.dump({"previous_reward_function": self.previous_reward_function_path}, file, indent=4)
 
+    def save_best_reward(self):
+        with open(path.join(self.config.exp_dir, "best_reward_function.json"), 'w') as file:
+            yaml.dump({"best_reward_function": self.previous_reward_function_path}, file, indent=4)
     def load_state(self):
         self.logging("Loading state from the previous experiment.")
 
@@ -419,7 +430,7 @@ class Experiment:
                 else:
 
                     reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
-                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self.config.total_timesteps)
+                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self._iteration)
                     self._stage = Stage.TrainPCGRL
 
 
@@ -440,16 +451,11 @@ class Experiment:
             elif self._stage == Stage.Evaluation:
 
                 self.run_evaluation()
-                if self.config.pe == 'tot':
-                    if self._iteration >= self.config.total_iterations * self.config.branch_factor:
-                        self._stage = Stage.FinishIteration
-                    else:
-                        self._stage = Stage.Analysis
+
+                if self._iteration >= self.config.total_iterations:
+                    self._stage = Stage.FinishIteration
                 else:
-                    if self._iteration >= self.config.total_iterations:
-                        self._stage = Stage.FinishIteration
-                    else:
-                        self._stage = Stage.Analysis
+                    self._stage = Stage.Analysis
 
             elif self._stage == Stage.Analysis:
                 # Analyze results
@@ -465,26 +471,20 @@ class Experiment:
 
                 if self.config.pe == 'tot':
                     if self._iteration == self.max_iteration:
-                        self.previous_feedback_path = self._current_feedback_path
+                        self.max_iteration_feedback_path = self._current_feedback_path
                     if self._iteration % self.config.branch_factor == 0:
-                        self._current_feedback_path = self.previous_feedback_path
+                        self.previous_feedback_path = self.max_iteration_feedback_path
 
                 self._stage = Stage.FinishIteration
 
             elif self._stage == Stage.FinishIteration:
 
-                if self.config.pe == 'tot':
-                    if self._iteration >= self.config.total_iterations * self.config.branch_factor:
-                        self._stage = Stage.Done
-                    else:
-                        self._iteration += 1
-                        self._stage = Stage.StartIteration
+                if self._iteration >= self.config.total_iterations:
+                    self.save_best_reward()
+                    self._stage = Stage.Done
                 else:
-                    if self._iteration >= self.config.total_iterations:
-                        self._stage = Stage.Done
-                    else:
-                        self._iteration += 1
-                        self._stage = Stage.StartIteration
+                    self._iteration += 1
+                    self._stage = Stage.StartIteration
 
             self.save_state()
 

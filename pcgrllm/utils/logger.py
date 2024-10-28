@@ -4,7 +4,7 @@ import numpy as np
 import wandb
 from glob import glob
 
-# from tensorflow.python.autograph.utils.tensors import is_tensor_array
+from tensorflow.python.autograph.utils.tensors import is_tensor_array
 
 from conf.config import Config
 from pcgrllm.evaluation.base import EvaluationResult
