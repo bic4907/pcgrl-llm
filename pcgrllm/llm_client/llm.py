@@ -63,7 +63,8 @@ class UnifiedLLMClient:
                    model=None,
                    n_response=1,
                    seed=42,
-                   top_p=0.99):
+                   top_p=0.99,
+                   temperature=0):
         model_config = self.config[model]
         api_host = model_config["api_host"]
         api_key = model_config["api_key"]

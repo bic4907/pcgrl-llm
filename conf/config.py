@@ -29,7 +29,7 @@ class Config:
     env_name: str = "PCGRL"
     ANNEAL_LR: bool = False
     DEBUG: bool = True
-    exp_name: str = "0"
+    exp_name: str = "def"
     seed: int = 0
 
     problem: str = "binary"
@@ -87,12 +87,15 @@ class Config:
     # Wandb
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
+    wandb_resume: str = 'allow'
+
     exp_group: Optional[str] = None
 
     _vid_dir: Optional[str] = None
     _img_dir: Optional[str] = None
     _numpy_dir: Optional[str] = None
     current_iteration: int = 0
+    fitness_evaluator: str = 'vit'
 
 
 @dataclass
@@ -284,7 +287,7 @@ class TrainLLMConfig(Config):
     ###########################################################################
 
     # LLM experiment setting
-    total_iterations: int = int(2)
+    total_iterations: int = int(1)
 
     # Eval rollout setting
     random_agent: bool = False
@@ -301,19 +304,17 @@ class TrainLLMConfig(Config):
 
 
     # reward generation setting
-    n_generation_trials: int = 10
+    n_generation_trials: int = 5
 
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
 
-    gpt_model: str = 'gpt-4o'
+    gpt_model: str = 'llama3-80b-instruct'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
-    n_samples: int = 5
+    n_samples: int = 10
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
-
-    performed_task: Optional[str] = None
 
     branch_factor: Optional[int] = None
 
