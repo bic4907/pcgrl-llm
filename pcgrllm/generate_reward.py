@@ -480,6 +480,29 @@ class RewardGenerator:
                 self.logging(context, logging.INFO)
                 self.logging(response, logging.DEBUG)
 
+                response_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.response.pkl")
+                with open(response_file_path, 'wb') as f:
+                    pickle.dump(response, f)
+
+                context_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.context.pkl")
+                with open(context_file_path, 'wb') as f:
+                    pickle.dump(context, f)
+
+                log_dict = {
+                    'request': messages,
+                    'response': response,
+                }
+
+                # Save reward function to .py
+                reward_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.py")
+                with open(reward_file_path, 'w') as f:
+                    f.write(parsed_reward_function)
+
+                # Save the log to .json file
+                log_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.json")
+                with open(log_file_path, 'w') as f:
+                    json.dump(log_dict, f, indent=4)
+
                 reward_file_path = self.save_data(response=response, context=context, messages=messages, branch=i)
 
             log_dict = {
@@ -494,6 +517,20 @@ class RewardGenerator:
         else:
             response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
 
+            
+        self.logging(context, logging.INFO)
+        self.logging(response, logging.DEBUG)
+
+        response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
+        with open(response_file_path, 'wb') as f:
+            pickle.dump(response, f)
+
+        context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
+        with open(context_file_path, 'wb') as f:
+            pickle.dump(context, f)
+            
+        parsed_reward_function = parse_reward_function(response)
+   
         reward_file_path = self.save_data(response=response, context=context, messages=messages)
 
         return reward_file_path
