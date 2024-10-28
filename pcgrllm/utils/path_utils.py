@@ -75,7 +75,7 @@ def get_short_target(target: str) -> str:
         return f"{words[0]}_{len(target)}"
 
     # Otherwise, take the first and last words and include the length
-    return f"{words[0]}~{words[-1]}({len(target)})"
+    return f"{words[0]}X{words[-1]}{len(target)}"
 
 
 def get_exp_name(config):

@@ -69,6 +69,7 @@ class RewardGenerator:
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
+        print(path.join(self.file_path, "jax_code_tips.txt"))
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
         self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
@@ -368,15 +369,16 @@ class RewardGenerator:
 
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
-        self.initial_system = self.initial_system.format(
+        initial_system = self.initial_system.format(
             i='{i}',
             reward_signature=self.reward_template,
         )
 
         # Add jax code tips prompt
-        self.initial_system += self.jax_code_tips_prompt
-        self.initial_system += '\n'
-        self.initial_system += self.reward_code_tips_prompt
+        initial_system += self.jax_code_tips_prompt
+        print(self.jax_code_tips_prompt)
+        initial_system += '\n'
+        initial_system += self.reward_code_tips_prompt
 
         initial_user = self.get_initial_user()
 
@@ -452,7 +454,7 @@ class RewardGenerator:
         # 피드백 받는 부분 작성 필요함
 
         messages = [
-            {"role": "system", "content": self.initial_system},
+            {"role": "system", "content": initial_system},
             {"role": "user", "content": initial_user}
         ]
 
