@@ -304,7 +304,7 @@ class TrainLLMConfig(Config):
 
 
     # reward generation setting
-    n_generation_trials: int = 10
+    n_generation_trials: int = 5
 
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
@@ -313,7 +313,8 @@ class TrainLLMConfig(Config):
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
-    n_samples: int = 5
+
+    n_samples: int = 10
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
 
     performed_task: Optional[str] = None

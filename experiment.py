@@ -254,6 +254,8 @@ class Experiment:
         config = copy.deepcopy(self.config)
         config.exp_dir = path.join(config.exp_dir, f'iteration_{self._iteration}')
         config.initialize = False
+        config.current_iteration = self._iteration
+
         # config.initialize_wandb = False # Disable wandb in train.py
 
         media_dir = path.join(config.exp_dir, 'train')
@@ -355,6 +357,7 @@ class Experiment:
                 self.max_score = 0
                 self.max_iteration = None
 
+
         log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration)
 
         self.logging(result, level=logging.INFO)
@@ -445,6 +448,7 @@ class Experiment:
                         self._stage = Stage.FinishIteration
                     else:
                         self._stage = Stage.Analysis
+
                 else:
                     if self._iteration >= self.config.total_iterations:
                         self._stage = Stage.FinishIteration

@@ -87,6 +87,7 @@ class RewardGenerator:
 
         self.pe = config.get('pe')
         self.feature = config.get('feature')
+
         if self.feature is not None:
             self.feature = self.feature.split('+')
 
@@ -282,7 +283,6 @@ class RewardGenerator:
         return feedback_prompt
 
     def get_input_prompt(self):
-
         prompt = copy.deepcopy(self.reward_function_inputs_template)
 
         if 'array' in self.feature:
@@ -293,7 +293,7 @@ class RewardGenerator:
             prompt = prompt.replace('curr_array', 'unused2')
 
         if 'stats' in self.feature:
-            prompt = prompt.replace('{stats_feature_prompt}', self._get_stats_feature())
+            prompt = prompt.replace('{stats_feature_prompt}', self._f_feature())
         else:
             prompt = prompt.replace('{stats_feature_prompt}', '(stats features not available)')
             prompt = prompt.replace('prev_stats', 'unused3')
@@ -316,6 +316,90 @@ class RewardGenerator:
     def _get_stats_feature(self):
         prompt = self.get_feature_prompt('stats')
         return prompt
+
+        
+    def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
+
+        self.initial_system = self.initial_system.format(
+            i='{i}',
+            reward_signature=self.reward_template,
+        )
+
+        # Add jax code tips prompt
+        self.initial_system += self.jax_code_tips_prompt
+        self.initial_system += '\n'
+        self.initial_system += self.reward_code_tips_prompt
+
+        initial_user = copy.deepcopy(self.initial_user)
+        reward_function_inputs = self.get_input_prompt()
+
+
+        if generating_function_error:
+
+            reward_code = file_to_string(generating_function_path)
+
+            sample_code = """
+            ## Reward Code
+            Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+            ```python
+            {reward_code_string}
+            ```
+            Error Message:
+            {error_message}
+            
+            """.format(reward_code_string=reward_code, error_message=generating_function_error)
+
+            initial_user = initial_user.format(
+                
+              
+              _character=self._execution_config.target_character,
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs,
+                target_character=self.config['target_character'],
+                thought_tips=self.get_pe_prompt(self.pe),
+            )
+
+
+        elif self.config['feedback_path'] is not None: # Feedback available
+
+            reward_code = file_to_string(generating_function_path)
+
+            sample_code = """
+               ## Previous Reward Code
+               Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
+               ```python
+               {reward_code_string}
+               ```
+               
+               Feedback:
+               {feedback}
+
+               """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
+
+            initial_user = initial_user.format(
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs,
+                target_character=self.config['target_character'],
+                thought_tips=self.get_pe_prompt(self.pe),
+            )
+
+        else:
+            sample_code = """
+            ## Example Reward Code
+            ```python
+            {sample_reward_code}
+            ```
+            """.format(sample_reward_code=self.previous_reward_function)
+
+            initial_user = initial_user.format(
+                target_character=self.config['target_character'],
+                few_shot_code_string=sample_code,
+                reward_function_inputs=reward_function_inputs,
+                thought_tips=self.get_pe_prompt(self.pe),
+            )
+
+
+        # 피드백 받는 부분 작성 필요함
 
     def save_data(self, response: str, context: list, messages: list, basename: str = 'reward'):
 
@@ -348,6 +432,7 @@ class RewardGenerator:
             json.dump(log_dict, f, indent=4)
 
         return reward_file_path
+      
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1, previous_task: str=None):
 
         self.initial_system = self.initial_system.format(
