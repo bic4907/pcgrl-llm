@@ -6,18 +6,16 @@ import shutil
 import multiprocessing
 import warnings
 from copy import deepcopy
+import random
 
 import pandas as pd
 import numpy as np
 from os import path
 import tempfile
 from os.path import abspath, basename
-import subprocess
-import traceback
 import logging
-
-from absl.logging import warning
-from tensorflow_probability.substrates.jax.stats import expected_calibration_error
+from sentence_transformers import SentenceTransformer
+from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
@@ -143,7 +141,7 @@ class RewardGenerator:
 
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
-                   verbose=False, seed=42):
+                   verbose=False, seed=42, n_response=1):
         try:
             if passthrough_response is None:
                 if verbose:
@@ -151,10 +149,18 @@ class RewardGenerator:
 
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
-
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=1)
-                response = responses[0][0]
-                context = responses[0][1]
+                if n_response != 1:
+                    temperature = 0.5
+                else:
+                    temperature = 0
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response, temperature=temperature)
+                if n_response != 1:
+                    generated_responses = [response[0] for response in responses]
+                    generated_contexts = [response[1] for response in responses]
+                    index = self.response_cluster(generated_responses, n_clusters=3)
+                else:
+                    response = responses[0][0]
+                    context = responses[0][1]
 
                 if verbose:
                     self.logging("Received the response: ", response)
@@ -171,7 +177,10 @@ class RewardGenerator:
         except KeyboardInterrupt:
             raise Exception("Keyboard Interrupt while using the OpenAI API")
 
-        return response, context
+        if n_response != 1:
+            return generated_responses, generated_contexts, index
+        else:
+            return response, context
 
     def run(self):
 
@@ -267,6 +276,28 @@ class RewardGenerator:
 
         return reward_function_file_path
 
+    def response_cluster(self, responses, n_clusters=2):
+        # set environment variable for
+
+        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
+        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+        embeddings = model.encode(responses)
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        labels = kmeans.fit_predict(embeddings)
+
+        clusters = {}
+        for i, label in enumerate(labels):
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(i)
+
+        largest_cluster = max(clusters.values(), key=len)
+        largest_cluster_embeddings = embeddings[largest_cluster]
+
+        cluster_center = np.mean(largest_cluster_embeddings, axis=0)
+        index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
+        return index
 
     def set_execution_config(self, config: Config):
         self.logging(f"Setting the execution config: {config}", logging.INFO)
@@ -405,7 +436,49 @@ class RewardGenerator:
 
         self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
-        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+        if self.pe == 'cotsc':
+            responses, contexts, index = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=5)
+
+            for i, (response, context) in enumerate(zip(responses, contexts)):
+                self.logging(context, logging.INFO)
+                self.logging(response, logging.DEBUG)
+
+                response_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.response.pkl")
+                with open(response_file_path, 'wb') as f:
+                    pickle.dump(response, f)
+
+                context_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.context.pkl")
+                with open(context_file_path, 'wb') as f:
+                    pickle.dump(context, f)
+
+                parsed_reward_function = parse_reward_function(response)
+
+                log_dict = {
+                    'request': messages,
+                    'response': response,
+                }
+
+                # Save reward function to .py
+                reward_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.py")
+                with open(reward_file_path, 'w') as f:
+                    f.write(parsed_reward_function)
+
+                # Save the log to .json file
+                log_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.json")
+                with open(log_file_path, 'w') as f:
+                    json.dump(log_dict, f, indent=4)
+            log_dict = {
+                'selected_branch': f'branch_{index}'
+            }
+            log_file_path = path.join(self.reward_function_path, "selected_branch.json")
+            with open(log_file_path, 'w') as f:
+                json.dump(log_dict, f, indent=4)
+
+            response = responses[index]
+            context = contexts[index]
+        else:
+            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
 
