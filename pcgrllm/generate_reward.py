@@ -250,13 +250,13 @@ class RewardGenerator:
                 except Exception as e:
                     self.logging(f"Failed to generating the reward function: {generating_function_path}", logging.INFO)
                     self.logging(str(e), logging.DEBUG)
+                    error_message = str(e)
                     is_success = False
 
 
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
-
                     break
                 else:
                     generating_function_error = error_message
