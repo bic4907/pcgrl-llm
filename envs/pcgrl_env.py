@@ -481,8 +481,8 @@ def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
             lvl_img = lvl_img.at[y*tile_size: (y+1)*tile_size,
                                  x*tile_size: (x+1)*tile_size, :].set(tile_img)
 
-    lvl_img = env.prob.draw_path(lvl_img=lvl_img, env_map=env_map,
-                                 path_coords_tpl=path_coords_tpl, border_size=border_size, tile_size=tile_size)
+    # lvl_img = env.prob.draw_path(lvl_img=lvl_img, env_map=env_map,
+    #                              path_coords_tpl=path_coords_tpl, border_size=border_size, tile_size=tile_size)
 
     clr = (255, 255, 255, 255)
     y_border = jnp.zeros((2, tile_size, 4), dtype=jnp.uint8)
