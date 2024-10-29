@@ -59,6 +59,7 @@ class RewardGenerator:
         self._current_trial = 0
         self.trial_count = config.get('trial_count', 3)
         self.iteration_num = config.get('iteration_num', 1)
+        self.branch_factor = config.get('branch_factor', None)
         self.reference_csv = config.get('reference_csv', 'random_dataset.txt')
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
         self.file_path = path.join(self.shared_storage_path, 'prompt')
@@ -261,7 +262,6 @@ class RewardGenerator:
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
-
                     break
                 else:
                     generating_function_error = error_message
@@ -354,6 +354,7 @@ class RewardGenerator:
         prompt = self.get_feature_prompt('stats')
         return prompt
 
+
     def get_initial_user(self):
         initial_user = copy.deepcopy(self.initial_user)
 
@@ -366,6 +367,43 @@ class RewardGenerator:
         initial_user = initial_user.replace('{task}', task_prompt)
 
         return initial_user
+
+    def save_data(self, response: str, context: list, messages: list, basename: str = 'reward', branch: int=None):
+
+        self.logging(context, logging.INFO)
+        self.logging(response, logging.DEBUG)
+        if branch is None:
+            file_name = f"{basename}"
+        else:
+            file_name = f"{basename}_branch_{branch}"
+
+        response_file_path = path.join(self.reward_function_path, f"{file_name}.response.pkl")
+        with open(response_file_path, 'wb') as f:
+            pickle.dump(response, f)
+
+        context_file_path = path.join(self.reward_function_path, f"{file_name}.context.pkl")
+        with open(context_file_path, 'wb') as f:
+            pickle.dump(context, f)
+
+        parsed_reward_function = parse_reward_function(response)
+
+        log_dict = {
+            'request': messages,
+            'response': response,
+        }
+
+        # Save reward function to .py
+        reward_file_path = path.join(self.reward_function_path, f"{file_name}.py")
+        with open(reward_file_path, 'w') as f:
+            f.write(parsed_reward_function)
+
+        # Save the log to .json file
+        log_file_path = path.join(self.reward_function_path, f"{file_name}.json")
+        with open(log_file_path, 'w') as f:
+            json.dump(log_dict, f, indent=4)
+
+        return reward_file_path
+
 
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
@@ -475,8 +513,6 @@ class RewardGenerator:
                 with open(context_file_path, 'wb') as f:
                     pickle.dump(context, f)
 
-                parsed_reward_function = parse_reward_function(response)
-
                 log_dict = {
                     'request': messages,
                     'response': response,
@@ -491,6 +527,9 @@ class RewardGenerator:
                 log_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.json")
                 with open(log_file_path, 'w') as f:
                     json.dump(log_dict, f, indent=4)
+
+                reward_file_path = self.save_data(response=response, context=context, messages=messages, branch=i)
+
             log_dict = {
                 'selected_branch': f'branch_{index}'
             }
@@ -503,6 +542,7 @@ class RewardGenerator:
         else:
             response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
 
+            
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
 
@@ -513,25 +553,10 @@ class RewardGenerator:
         context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
-
+            
         parsed_reward_function = parse_reward_function(response)
-
-
-        log_dict = {
-            'request': messages,
-            'response': response,
-        }
-
-        # Save reward function to .py
-        reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
-        with open(reward_file_path, 'w') as f:
-            f.write(parsed_reward_function)
-
-        # Save the log to .json file
-        log_file_path = path.join(self.reward_function_path, f"{basename}.json")
-        with open(log_file_path, 'w') as f:
-            json.dump(log_dict, f, indent=4)
-
+   
+        reward_file_path = self.save_data(response=response, context=context, messages=messages)
 
         return reward_file_path
 
@@ -553,12 +578,22 @@ class RewardGenerator:
             pe_file = path.join(self.file_path, PE_DIR, 'io.txt')
 
         pe_template = file_to_string(pe_file)
-        iteration_perc_str = "{:.1f}%".format(self.config['iteration_num'] / self.config['total_iterations'] * 100)
-        pe_template = pe_template.format(
-            curr_iteration_num=self.config['iteration_num'],
-            max_iteration_num=self.config['total_iterations'],
-            perc_iteration=iteration_perc_str
-        )
+        if self.pe == 'tot':
+            current_iteration = int((self.iteration_num - 1) // self.branch_factor + 1)
+            total_iterations = int((self.config['total_iterations'] - 1) // self.branch_factor + 1)
+            iteration_perc_str = "{:.1f}%".format(current_iteration / total_iterations * 100)
+            pe_template = pe_template.format(
+                curr_iteration_num=current_iteration,
+                max_iteration_num=total_iterations,
+                perc_iteration=iteration_perc_str
+            )
+        else:
+            iteration_perc_str = "{:.1f}%".format(self.config['iteration_num'] / self.config['total_iterations'] * 100)
+            pe_template = pe_template.format(
+                curr_iteration_num=self.config['iteration_num'],
+                max_iteration_num=self.config['total_iterations'],
+                perc_iteration=iteration_perc_str
+            )
         pe_str = f"\n\n## Thought Tips\n{pe_template}\n"
 
         return pe_str
@@ -766,10 +801,8 @@ class RewardGenerator:
             # get traceback from e
             tb_list = traceback.format_exception(type(e), e, e.__traceback__)
 
-
             string_lines = [line.strip() for line in tb_list if "File \"<string>\"" in line]
             filtered_traceback = ''.join(string_lines).strip()
-
 
             raise RewardExecutionException(code, f'{filtered_traceback}\n{e}')
 

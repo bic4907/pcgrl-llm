@@ -1,6 +1,6 @@
 from os.path import dirname, join, basename
 
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageOps
 import torch
 from scipy.spatial.distance import cosine
 from tensorboardX.summary import image
@@ -65,8 +65,23 @@ class ViTEvaluator(LevelEvaluator):
             return EvaluationResult(similarity=float('-inf'), diversity=float('-inf'), sample_size=0)
 
     def predict(self, file_path: str):
-        image = Image.open(file_path)
+        image = Image.open(file_path).convert("RGBA")
+        pixels = image.load()
+
+        # 이미지의 픽셀 순회하면서 색상 변경
+        for y in range(image.height):
+            for x in range(image.width):
+                r, g, b, a = pixels[x, y]
+                # 붉은 계열 색상을 흰색으로 변경
+                if (r > 100 and g < 100 and b < 100) or (r > 100 and g > 50 and g < 150 and b < 100):
+                    pixels[x, y] = (255, 255, 255, a)  # 흰색으로 설정
+
+        # contrast 조절
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1.5)
         image = image.convert("RGB")
+        # image.show()
+
         inputs = self.processor(images=image, return_tensors="pt").to(self.device)
         outputs = self.model(**inputs)
         logits = outputs.logits
@@ -141,7 +156,7 @@ if __name__ == '__main__':
     evaluator = ViTEvaluator(logger=logger)
 
     # Define the letters and the base path for the evaluations
-    letters = ['A', 'B', 'H']
+    letters = ['A', 'B', 'C', 'D', 'E']
     base_path = join(dirname(__file__), 'example')
 
     # Run the cross-validation and show sorted results with visualization enabled

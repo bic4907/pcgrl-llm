@@ -72,9 +72,14 @@ class Experiment:
 
     def initialize(self):
         self._iteration = 1
+        self.max_score = 0
+        self.max_iteration = None
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
         self._current_feedback_path = None
+        self.previous_reward_function_path = None
+        self.previous_feedback_path = None
+        self.max_iteration_feedback_path = None
 
         self._copy_prompt()
 
@@ -145,7 +150,16 @@ class Experiment:
     def generate_reward_function(self):
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
-
+        if self.config.pe =='tot':
+            if self.previous_reward_function_path is None:
+                current_feedback_path = None
+            else:
+                current_feedback_path = path.abspath(self.previous_feedback_path)
+        else:
+            if self._current_feedback_path is None:
+                current_feedback_path = None
+            else:
+                current_feedback_path = path.abspath(self._current_feedback_path)
 
         args_dict = {
             'shared_storage_path': self._experiment_path,
@@ -154,14 +168,15 @@ class Experiment:
             'gpt_model': self.config.gpt_model,
             'gpt_max_token': 4096,
             'verbose': None,
-            'previous_reward_function': self._current_reward_function_filename,
+            'previous_reward_function': self.previous_reward_function_path,
             'trial_count': self.config.n_generation_trials,
             'total_iterations': self.config.total_iterations,
             'n_inner': 1,
             'iteration_num': self._iteration,
             'target_character': self.config.target_character,
             'pe': self.config.pe,
-            'feedback_path': path.abspath(self._current_feedback_path) if self._current_feedback_path else None,
+            'branch_factor': self.config.branch_factor,
+            'feedback_path': current_feedback_path,
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
             'feature': self.config.reward_feature,
@@ -306,7 +321,8 @@ class Experiment:
             'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
-            'reward_function': self._current_reward_function_filename,
+            'reward_function': self.previous_reward_function_path,
+            'available_tiles': self.config.available_tiles,
             'iteration': self._iteration,
         }
 
@@ -338,6 +354,18 @@ class Experiment:
         with open(result_path, 'w') as f:
             json.dump(result.to_dict(), f)
 
+        if self.config.pe == 'tot':
+            score = result.total
+            self.save_previous_reward()
+            if self.max_score < score:
+                self.max_score = score
+                self.max_iteration = self._iteration
+            if self._iteration % self.config.branch_factor == 0 or self._iteration >= self.config.total_iterations:
+                self.previous_reward_function_path = path.join(self.config.exp_dir, f'iteration_{self.max_iteration}',
+                                                               f"reward_outer_{self.max_iteration}_inner_1.py")
+                self.max_score = 0
+                self.max_iteration = None
+
         log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration)
 
         self.logging(result, level=logging.INFO)
@@ -350,7 +378,13 @@ class Experiment:
         with open(path.join(self._experiment_path, 'state.yaml'), 'w') as file:
             yaml.dump({item: getattr(self, item) for item in serialize_items}, file)
 
+    def save_previous_reward(self):
+        with open(path.join(self.config.exp_dir, f"iteration_{self._iteration}", "previous_reward_function.json"), 'w') as file:
+            yaml.dump({"previous_reward_function": self.previous_reward_function_path}, file, indent=4)
 
+    def save_best_reward(self):
+        with open(path.join(self.config.exp_dir, "best_reward_function.json"), 'w') as file:
+            yaml.dump({"best_reward_function": self.previous_reward_function_path}, file, indent=4)
     def load_state(self):
         self.logging("Loading state from the previous experiment.")
 
@@ -391,6 +425,8 @@ class Experiment:
                     reward_generation_fn = self.generate_reward_function
 
                 self._current_reward_function_filename = reward_generation_fn()
+                if self.config.pe != 'tot':
+                    self.previous_reward_function_path = self._current_reward_function_filename
 
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.")
@@ -436,11 +472,18 @@ class Experiment:
 
                 log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), iteration=self._iteration)
 
+                if self.config.pe == 'tot':
+                    if self._iteration == self.max_iteration:
+                        self.max_iteration_feedback_path = self._current_feedback_path
+                    if self._iteration % self.config.branch_factor == 0:
+                        self.previous_feedback_path = self.max_iteration_feedback_path
+
                 self._stage = Stage.FinishIteration
 
             elif self._stage == Stage.FinishIteration:
 
                 if self._iteration >= self.config.total_iterations:
+                    self.save_best_reward()
                     self._stage = Stage.Done
                 else:
                     self._iteration += 1

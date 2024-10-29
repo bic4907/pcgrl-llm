@@ -97,6 +97,7 @@ class Config:
     current_iteration: int = 0
     fitness_evaluator: str = 'vit'
 
+
     ###########################################################################
     # Note: BORDER, EMPTY, WALL is mandatory for all problems, so don't include them in below lists.
     available_tiles: List[int] = field(default_factory=lambda: [])
@@ -320,6 +321,7 @@ class TrainLLMConfig(Config):
     n_samples: int = 10
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
 
+    branch_factor: Optional[int] = 2
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
