@@ -4,6 +4,7 @@ import os, re, ast, sys, time, argparse, json, pickle
 import pprint
 import shutil
 import multiprocessing
+import traceback
 import warnings
 from copy import deepcopy
 import random
@@ -772,7 +773,14 @@ class RewardGenerator:
             result = run_validate(config)
         except Exception as e:
             code = read_file(reward_function_path)
-            raise RewardExecutionException(code, e)
+
+            # get traceback from e
+            tb_list = traceback.format_exception(type(e), e, e.__traceback__)
+
+            string_lines = [line.strip() for line in tb_list if "File \"<string>\"" in line]
+            filtered_traceback = ''.join(string_lines).strip()
+
+            raise RewardExecutionException(code, f'{filtered_traceback}\n{e}')
 
         return result
 
