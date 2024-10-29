@@ -70,7 +70,7 @@ class RewardGenerator:
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
-        print(path.join(self.file_path, "jax_code_tips.txt"))
+
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
         self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
@@ -383,8 +383,6 @@ class RewardGenerator:
 
 
         reward_function_inputs = self.get_input_prompt()
-
-        print('Generating function error\n', generating_function_error)
 
 
         if generating_function_error:
