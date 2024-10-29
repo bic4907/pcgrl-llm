@@ -1,0 +1,187 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><title>Experiment Results - pe-io_it-1_fit-vit_exp-def_chr-C_s-0</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: #f7f8fa;
+            margin: 0;
+            padding: 20px;
+            color: #2c3e50;
+        }
+        .container {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #34495e;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .message-box {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .message-container {
+            margin-bottom: 20px;
+        }
+        .message.user .message-box {
+            background-color: #dce8f6;  /* Soft Blue */
+            color: #1c2833;
+            align-self: flex-start;
+        }
+        .message.assistant .message-box {
+            background-color: #f4e1d2;  /* Soft Peach */
+            color: #1c2833;
+            align-self: flex-end;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+    </head><body>
+<h1>src/pe-io_it-1_fit-vit_exp-def_chr-C_s-0</h1>
+<div class="container"><h2>Iteration 1</h2>
+<div class="message-container"><h3>Trial 1</h3>
+
+                <div class="message user">
+                    <div class="message-box"><h1>PCG Agent Reward Function Generation Task</h1>
+<p>You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.</p>
+<p>The alphabet letter in the level should be sized large using the "entire cells" in the level (i.e., the letter covers entire level shape).
+If the letter is too small, it cannot recognize the letter; it gets lower score from evaluation.
+The letter should be present once in the level. If there are multiple letters, it gets lower score from evaluation.</p>
+<h2>PCGRL Environment</h2>
+<p>The gym-pcgrl project provides an environment for Procedural Content Generation via Reinforcement Learning (PCGRL), where agents learn to generate game levels.
+One of the environments, "binary," involves creating maps using two tile types: empty spaces (1) and walls (2).
+In the "narrow" representation, the agent modifies the map by scanning through it, changing tiles one by one.
+This localized approach encourages more precise level design.
+The agent receives rewards based on how well the generated level meets the predefined objectives.
+If the agent generates a level that aligns closely with the goal—such as creating a functional and balanced map—it receives a higher reward.
+This reward-driven mechanism incentivizes the agent to improve its design strategies over time, learning to create optimal levels through trial and error.</p>
+<h2>Reward Function</h2>
+<p>The reward function is a function that calculates the reward value for the agent based on the playtested results.
+The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.</p>
+<h1>Tips for Jax code implementation</h1>
+<p>The reward code is written in JAX, a numerical computing library that is similar to NumPy, but with the ability to run on accelerators like GPUs and TPUs.
+Most of the NumPy functions have been implemented in JAX, but there are some differences and limitations that you should be aware of when writing JAX code.
+The code is compiled using a just-in-time (JIT) compiler and there are unusable Python constructs in JAX, such as loops and conditionals.
+Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)</p>
+<h3>Attempted boolean conversion of traced array with shape bool[].</h3>
+<p>This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use <code>jnp.where</code> to achieve the same result.</p>
+<p>[Before]
+if current_diameter &gt; diameter_penalty_threshold:
+    diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
+    reward -= diameter_penalty</p>
+<p>[After]
+jnp.where(current_diameter &gt; diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)</p>
+<h3>Array value allocation</h3>
+<p>Instead of <code>x[idx] = y</code>, use <code>x = x.at[idx].set(y)</code>
+[Reward Code Rules]
+Import the necessary library for the reward function code.
+- import jax.numpy as jnp</p>
+<p>[Reward Code Tips]
+- Delta reward is calculated by subtracting between the current reward and the previous reward to measure the improvement.
+- Write general reward function code that would work in diverse level sizes (width and height).
+- The alphabet is represented in a big size in the game level. If the letter is too small, it cannot recognize the letter.
+- Thickness of the alphabet should be considered. If the thickness is too thin, the agent get very sparse reward and fail to learn.
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- To generate diverse shape of target character, if possible, avoid creating "hard-coded levels". (e.g., just calculating the hamming distance with the target character)</p></div>
+                </div>
+                
+
+                <div class="message user">
+                    <div class="message-box"><h1>Task</h1>
+<p>The task is to generate a level with two-dimensional array looks like alphabet-letter
+The reward function gives higher reward when the generated level looks like the "target letter".
+The reward function get inputs level array and target letter, and return the reward value.
+Consider the shape of the level array and create an alphabet shape to fill it.</p>
+<p>Target letter: C</p>
+<pre><code>        ## Example Reward Code
+        ```python
+        import jax.numpy as jnp
+</code></pre>
+<p>def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -&gt; float:
+    reward = 0.0</p>
+<pre><code>return reward
+        ```
+</code></pre>
+<h3>Reward Function Inputs</h3>
+<p>def compute_reward(prev_array, unused3, curr_array, unused4) -&gt; float:
+    reward = 0.0</p>
+<h3>'prev_array' and 'curr_array' (jnp.array, int32): (16, 16)</h3>
+<p>prev_array: jnp.array : previous game level represented with tile numbers
+curr_array: jnp.array : current game level represented with tile numbers</p>
+<p>The array is a 2D array with the shape of (height, width) to represent the game level.
+The level is represented with tile numbers. The tile number is an integer value.</p>
+<p>[Tile Number]
+EMPTY = 1, WALL = 2</p>
+<ul>
+<li>Generate reward function which fills "1 (Empty)" to show alphabet shape in the level.</li>
+<li>Make sure "0 (Unavailable)" is not present in the level array. Fill the not passible tile with "2 (Wall)" tile number.</li>
+</ul>
+<p>(stats features not available)</p>
+<h2>Thought Tips</h2>
+<p>You have only one chance to generate a reward function.
+Make a reward function to work on the environment.</p>
+<h2>Output</h2>
+<p>Reward function:</p>
+<pre><code class="language-python"></code></pre></div>
+                </div>
+                
+
+            <div class="message assistant">
+                <div class="message-box"><pre><code class="language-python">import jax.numpy as jnp
+
+def compute_reward(prev_array, unused3, curr_array, unused4) -&gt; float:
+    reward = 0.0
+
+    # Define the target letter &quot;C&quot; shape
+    height, width = curr_array.shape
+    target_shape = jnp.zeros((height, width), dtype=jnp.int32)
+
+    # Create a &quot;C&quot; shape in the target_shape array
+    # The &quot;C&quot; should be large and cover most of the level
+    thickness = max(1, min(height, width) // 5)  # Adjust thickness based on level size
+    for i in range(thickness):
+        target_shape = target_shape.at[i, :].set(1)  # Top horizontal line
+        target_shape = target_shape.at[height - 1 - i, :].set(1)  # Bottom horizontal line
+        target_shape = target_shape.at[:, i].set(1)  # Left vertical line
+
+    # Calculate the reward based on how similar the current array is to the target &quot;C&quot; shape
+    similarity = jnp.sum(curr_array == target_shape)
+    max_similarity = jnp.sum(target_shape == 1)
+
+    # Normalize the reward to be between 0 and 1
+    reward = similarity / max_similarity
+
+    return reward
+</code></pre></div>
+            </div>
+            </div>  <!-- Close message-container -->
+            
+<div class="message-container"><h3>Result numpy/image files</h3>
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAEgCAYAAAAUg66AAAAFsUlEQVR4nO3cMW6cVRQF4Bc0duXCpIvcUERBSLjKAixXXgAFErsIJQvwUpAovIBUEQugsiXK0FjpwMVUdhEKQMjEtvB9Y525M99Xzo010+Ro/pPjPHv/5tXHX37eG/d5fbQc7u7u7k9x/+zeC8ATE0BAzLP3b159TH8IYDst/vt8ln4mdHd33567RzAgRgABMTogIGYxxlirZ0J3d/ftuXsEA2IEEBCjAwJi7IDc3d1jd49gQIwAAmJ0QEDM9A7o7OUXK/9QQA+nBxd2QEBPAgiIme6Afrj8elWfBWjm9OBi6ufnd0Av7/5z1/s3Y/liOcYYY+/D3ti92pn6oMD6mc2PxVN8qN+/+mO8PXz37wuHY5ycH4/nv37+FG8HNLXyDuh6/+Z2+Pzt7eG7cb1/s+q3AxpbvD5afvLiXa/ddz+7vH3757HrLssXy/H8yrcg2BSz+TG9A7qvAwK2w1rtgPY+3P9mD92A7bPyANq92hkn58efvH5yfuxfwoBbnmwH5J/hYfOt7Q5o92pH4QwbbjY//CoGECOAgBi/CwaUTXdAY9gBAXVrtQMC+L8EEBCjAwLK1nYHBGw+OyCgLQEExOiAgDI7ICDKDghoSQABMTogoMwOCIixAwLaEkBAjA4IKLMDAqLsgICWBBAQowMCyuyAgBg7IKAtAQTE6ICAMjsgIMoOCGhJAAExOiCgzA4IiLEDAtoSQECMDggoswMCouyAgJYEEBCjAwLK7ICAGDsgoC0BBMTogIAyOyAgyg4IaEkAATE6IKDMDgiIsQMC2hJAQIwOCCizAwKi7ICAlgQQEKMDAsrsgIAYOyCgLQEExOiAgDI7ICDKDghoSQABMTogoMwOCIixAwLaEkBAjA4IKLMDAqLsgICWBBAQowMCyuyAgBg7IKAtAQTE6ICAMjsgIMoOCGhJAAExOiCgzA4IiLEDAtoSQECMDggoswMCouyAgJYEEBCjAwLK7ICAGDsgoC0BBMTogIAyOyAgyg4IaEkAATE6IKDMDgiIsQMC2hJAQIwOCCizAwKi7ICAlgQQEKMDAsrsgIAYOyCgLQEExOiAgDI7ICDKDghoSQABMTogoMwOCIixAwLaEkBAjA4IKLMDAqLsgICWBBAQowMCyuyAgBg7IKAtAQTE6ICAMjsgIMoOCGhJAAExOiCgzA4IiLEDAtoSQECMDggoswMCouyAgJYEEBCjAwLK7ICAGDsgoC0BBMTogIAyOyAgyg4IaEkAATE6IKDMDgiIsQMC2hJAQIwOCCizAwKi7ICAlgQQEKMDAsrsgIAYOyCgLQEExOiAgDI7ICDKDghoSQABMTogoMwOCIixAwLaEkBAjA4IKLMDAqLsgICWBBAQowMCyuyAgBg7IKAtAQTE6ICAMjsgIMoOCGhJAAExOiCgzA4IiLEDAtoSQECMDggoswMCouyAgJYEEBCjAwLK7ICAGDsgoC0BBMTogIAyOyAgyg4IaEkAATE6IKDMDgiIsQMC2hJAQIwOCCizAwKi7ICAlgQQEKMDAsrsgIAYOyCgLQEExOiAgDI7ICDKDghoSQABMTogoMwOCIixAwLaEkBAjA4IKLMDAqLsgICWBBAQowMCyuyAgBg7IKAtAQTE6ICAMjsgIMoOCGhJAAExOiCgzA4IiLEDAtoSQECMDggoswOCLfbjT2dTP//dt99MfwY7IKClRfoDAPMe+01m9pvTqizG+Otr0kMeup9drvYDAb3M5IcdEFBmBwS0JYCAmMVdz2ePeabTAcH2ms0POyBgih0Q0JIAAmLsgIApdkBAhB0Q0JbfBYMNsC6/2/VYdkBAWXwHdHp0MfXz7u7u9ftv3385+fd37v3HgR0Q0JQAAmKm/09ogKr5HZC7u7t78e4RDIgRQECMDgiImd4Bubu7u1fvHsGAGAEExOiAgBg7IHd399jdIxgQI4CAGB0QEPMnm58vBzBV49wAAAAASUVORK5CYII=" alt="level_2.png" />
+<img src="data:image/png;base64,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" alt="level_3.png" />
+<img src="data:image/png;base64,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" alt="level_1.png" />
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAEgCAYAAAAUg66AAAAGnklEQVR4nO3csW5URxQG4HFkqFyAO+SGAhFFCg1+AIuKKhVFpLwFKfMAfpRIkeIHoEJ5gFS2RBMJGkSXuNgKCtIEJcZe4p0Z+/fM/b6OPYx8i92jvWfP/bdeP3/48fffdso6+weroq6urn4V9a/WVgCumAYExGy9fv7wY/oigGXa/vz+LH1PqK6uvpy6WzAgRgMCYsyAgJjtUsqNuidUV1dfTt0tGBCjAQExZkBAjD0gdXX1WN0tGBCjAQExZkBATPMe0NGD+90vChjD4d6JPSBgTBoQENM8A/rp7be9rgUYzOHeSdP59j2gBxf/v/d3PpTVvVUppZSddzvl9umtjS7Meeedv/nnW/vH9kZXdUl/fvNXefHo5b8vPCrl6fGTsvvqrvPOOz/5+U10nwG9v/Ph7MX/48Wjl+X9nQ/OO+/8xOc3tb1/sDr34kWvrasfvT1b+/S17SKre6uye/rlLuq8886Pc761fzTvAa2bAQHLcKP2gHberf9jX6o577zz45/fVPcGdPv0Vnl6/OTc60+Pn1xqEu+8886Pe35TV7YHNMrPiM4773z9+dY9oK1fHz8+04A2/R3fs2CwXM/+eHPm3/KAgGFoQECMZ8GAas3PgpViDwiod6P2gAAuSwMCYsyAgGo3Ng8IGNfQeUDAuIbOAwLGNXweEDAueUDAUOwBAV0MnwcEjGuaPCBgXNeVB2QPCDjn9umt/w2wL6V9D8gtGBCjAQExZkBANXlAQJQ9IGBIGhAQYwYEVLMHBHQnDwiIkAcERMgDAmLkAQFDsQcEdCEPCIiRBwTEyQMCYuQBAdPTgIAYMyCgmjwgCDrcO2n6/Bw9uH8FV3W97AEBQ9KAgBgzIGjQOgMZ/fNjDwiCZv38yAMCIuQBARHXnQdkBgQNZpsBnfv28x8XfQuyBwRhS//82AMCupAHBMTIA4KBzDYD+kQeEAxg1s+PPCBgehoQEGMGBA1mnQFdlj0gopaehzN6A+nBHhAwJA0IiDEDosnSZyBLZw+IKO+fOckDAiLkAQER8oAYihnQXOQBMRzvn2WzBwR0IQ8IiJEHxFDMgOYkD4gheP/MSR4QMD0NCIgxA6KJGdCy2QMiSgPBHhAwJA0IiDEDAqrZAwK6kwcERMgDAiKuOw9oe/9gde7Fi15bVz962/2agJBPt13rap8/ntHaP+wBAU3sAQFdyAMCYuQBAXHygIAYeUDA9DQgIMYMCKgmDwiIsgcEDEkDAmLMgIBq9oCA7uQBARHygIAIeUBAjDwgYCj2gIAu5AEBMfKAgDh5QECMPCBgehoQEGMGBFSTBwRE2QMChqQBATFmQEA1e0BAd/KAgAh5QECEPCAgRh4QMBR7QEAX8oCAGHlAQJw8ICBGHhAwPQ0IiDEDAqrJAwKi7AEBQ9KAgBgzIKCaPSCgO3lAQIQ8ICBCHhAQIw8IGIo9IKALeUBAjDwgIE4eEBAjDwiYngYExJgBAdXkAQFR9oCAIWlAQIwZEFDNHhDQnTwgIEIeEBAhDwiIkQcEDMUeENCFPCAgRh4QECcPCIiRBwRMTwMCYsyAgGrygIAoe0DAkDQgIMYMCKhmDwjoTh4QECEPCIiQBwTEyAMChmIPCOhCHhAQIw8IiJMHBMTIAwKmpwEBMWZAQDV5QECUPSBgSBoQEGMGBFSzBwR0Jw8IiJAHBETIAwJi5AEBQ7EHBHQhDwiIkQcExMkDAmLkAQHT04CAGDMgoJo8ICDKHhAwJA0IiDEDAqrZAwK6kwcERMgDAiLkAQEx8oCAodgDArqQBwTEyAMC4uQBATHygIDpaUBAjBkQUE0eEBBlDwgYkgYExJgBAdXsAQHdyQMCIuQBARHygIAYeUDAUOwBAV3IAwJi5AEBcfKAgBh5QMD0NCAgxgwIqCYPCIiyBwQMSQMCYsyAgGr2gIDu5AEBEfKAgAh5QECMPCBgKPaAgC7kAQEx8oCAOHlAQIw8IGB6GhAQYwYEVJMHBAv28y9HTed/+P5Z8zXYAwKG5GFUmMCm32Ravzn1sl3KZs9ufM6zYLBsLf3DHhBwjjwgIEIeEBAhDwiIkQcEDMUeENCFPCAg5rrzgOwBAWfsvrpbnr377lI/w5diDwjoTB4QMD2LiDCBm/Js16bsAQHV4ntAhwcnTefV1dXr629+/Lrx89v298uePSBgUBoQENOcCQ1Qq30PSF1dXb2y7hYMiNGAgBgzICCmeQ9IXV1dvbbuFgyI0YCAGDMgIMYekLq6eqzuFgyI0YCAGDMgIOZvOFs1dA3EfxQAAAAASUVORK5CYII=" alt="level_0.png" />
+<img src="data:image/png;base64,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" alt="level_4.png" />
+<img src="data:image/png;base64,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" alt="level_5.png" />
+<img src="data:image/png;base64,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" alt="level_7.png" />
+<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASAAAAEgCAYAAAAUg66AAAAGoElEQVR4nO3cMW5UVxQG4EtkqFwAHXJDgRJFCg0swKKiSkURKbsgZRbgpUSKFC+ACmUBqbBEEwkaRJe4mAoK0gQlxh7w3Hvt3+fN93XM4cqveUfzzpz3X3v19OsPf/y+29Z5uL9q6urq6hdR/2ptBeCCaUBAzLVXT7/+kL4IYDvtfPp8ln4mVFdX3566RzAgRgMCYsyAgJid1tqVeiZUV1ffnrpHMCBGAwJizICAGHtA6urqsbpHMCBGAwJizICAmOE9oMN7d6dfFFDDwd6RPSCgJg0IiBmeAf385rtZ1wIUc7B3NHR+fA/o3tn/793N9211Z9Vaa2337W67cXx9owtz3nnnr/750f6xs9FVndNf3/7dnt1//t8H91t7/OJRu/3ylvPOO7/w85uYPgN6d/P9yYv/17P7z9u7m++dd975BZ/f1M7D/dWpD8/6bF398M3J2sevbWdZ3Vm128ef76LOO+98nfOj/WN4D2jdDAjYDldqD2j37fo/9rma8847X//8pqY3oBvH19vjF49Off74xaNzTeKdd975uuc3dWF7QFV+RnTeeef7z4/uAV377cGDEw1o09/xvQsG2+vJn69P/FseEFCGBgTEeBcM6Db8Llhr9oCAfldqDwjgvDQgIMYMCOh2ZfOAgLpK5wEBdZXOAwLqKp8HBNQlDwgoxR4QMEX5PCCgrsXkAQF1XVYekD0g4JQbx9e/GGDf2vgekEcwIEYDAmLMgIBu8oCAKHtAQEkaEBBjBgR0swcETCcPCIiQBwREyAMCYuQBAaXYAwKmkAcExMgDAuLkAQEx8oCAxdOAgBgzIKCbPCDYYgd7R0P37+G9u8PXYA8IKEkDAmLMgKCw0RnM6P1rDwi22EXdv/KAgAh5QEDEZecBmQFBYbNnQKe+/fzPWd+C7AHBlkvfv/aAgCnkAQEx8oCAc7uoPSB5QMAXXdT9Kw8IWDwNCIgxA4LCyr8L1lp+jwCqSufxXIUvAPaAgJI0ICDGDAgGpGcwafaAIGip9488ICBCHhAQIQ8IClnaDEgeEBSz7fePPSBgCnlAQIw8IChkaTOgj+QBQQFLvX/kAQGLpwEBMWZAMGCpM6DzsgcEQdUbyAz2gICSNCAgxgwI6GYPCJhOHhAQIQ8IiLjsPKCdh/urUx+e9dm6+uGb6dcEhHx87FpX+/T1jNH+YQ8IGGIPCJhCHhAQIw8IiJMHBMTIAwIWTwMCYsyAgG7ygIAoe0BASRoQEGMGBHSzBwRMJw8IiJAHBETIAwJi5AEBpdgDAqaQBwTEyAMC4uQBATHygIDF04CAGDMgoJs8ICDKHhBQkgYExJgBAd3sAQHTyQMCIuQBARHygIAYeUBAKfaAgCnkAQEx8oCAOHlAQIw8IGDxNCAgxgwI6CYPCIiyBwSUpAEBMWZAQDd7QMB08oCACHlAQIQ8ICBGHhBQij0gYAp5QECMPCAgTh4QECMPCFg8DQiIMQMCuskDAqLsAQElaUBAjBkQ0M0eEDCdPCAgQh4QECEPCIiRBwSUYg8ImEIeEBAjDwiIkwcExMgDAhZPAwJizICAbvKAgCh7QEBJGhAQYwYEdLMHBEwnDwiIkAcERMgDAmLkAQGl2AMCppAHBMTIAwLi5AEBMfKAgMXTgIAYMyCgmzwgIMoeEFCSBgTEmAEB3ewBAdPJAwIi5AEBEfKAgBh5QEAp9oCAKeQBATHygIA4eUBAjDwgYPE0ICDGDAjoJg8IiLIHBJSkAQExZkBAN3tAwHTygIAIeUBAhDwgIEYeEFCKPSBgCnlAQIw8ICBOHhAQIw8IWDwNCIgxAwK6yQMCouwBASVpQECMGRDQzR4QMJ08ICBCHhAQIQ8IiJEHBJRiDwiYQh4QECMPCIiTBwTEyAMCFk8DAmLMgIBu8oCAKHtAQEkaEBBjBgR0swcETCcPCIiQBwREyAMCYuQBAaXYAwKmkAcExMgDAuLkAQEx8oCAxdOAgBgzIKCbPCDYYr/8ejh0/scfngxfgz0goCQvo8ICbPpNZvSb0yw7rW327sanvAsG222kf9gDAk6RBwREyAMCIuQBATHygIBS7AEBU8gDAmIuOw/IHhBwwu2Xt9qTt9+f62f41uwBAZPJAwIWzyIiLMBVebdrU/aAgG7xPaCD/aOh8+rq6v311z99M3j/jv39tmcPCChKAwJihjOhAXqN7wGpq6urd9Y9ggExGhAQYwYExAzvAamrq6v31j2CATEaEBBjBgTE2ANSV1eP1T2CATEaEBBjBgTE/AMNSDV0qD3n/AAAAABJRU5ErkJggg==" alt="level_6.png" />
+<img src="data:image/png;base64,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" alt="level_8.png" />
+<img src="data:image/png;base64,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" alt="level_9.png" />
+</div>  <!-- Close container -->
+</body></html>

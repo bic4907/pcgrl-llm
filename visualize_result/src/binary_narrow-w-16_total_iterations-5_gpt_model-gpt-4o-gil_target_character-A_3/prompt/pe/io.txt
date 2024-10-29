@@ -1,2 +1,0 @@
-You have only one chance to generate a reward function.
-Make a reward function to work on the environment.
