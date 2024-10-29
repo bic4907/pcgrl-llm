@@ -19,12 +19,6 @@ class BinaryTiles(IntEnum):
     BORDER = 0
     EMPTY = 1
     WALL = 2
-    PLAYER = 3
-    BAT = 4
-    SCORPION = 5
-    SPIDER = 6
-    KEY = 7
-    DOOR = 8
 
 @struct.dataclass
 class BinaryState(ProblemState):
@@ -115,31 +109,7 @@ class BinaryProblem(Problem):
             ).convert('RGBA'),
             BinaryTiles.BORDER: Image.open(
                 f"{__location__}/tile_ims/solid.png"
-            ).convert('RGBA'),
-            BinaryTiles.KEY: Image.open(
-                f"{__location__}/tile_ims/key.png"
-            ).convert('RGBA'),
-            BinaryTiles.DOOR: Image.open(
-                f"{__location__}/tile_ims/door.png"
-            ).convert('RGBA'),
-            BinaryTiles.PLAYER: Image.open(
-                f"{__location__}/tile_ims/player.png"
-            ).convert('RGBA'),
-            BinaryTiles.BAT: Image.open(
-                f"{__location__}/tile_ims/bat.png"
-            ).convert('RGBA'),
-            BinaryTiles.SCORPION: Image.open(
-                f"{__location__}/tile_ims/scorpion.png"
-            ).convert('RGBA'),
-            BinaryTiles.SPIDER: Image.open(
-                f"{__location__}/tile_ims/spider.png"
-            ).convert('RGBA'),
-            len(BinaryTiles): Image.open(f"{__location__}/tile_ims/path_g.png").convert(
-                'RGBA'
-            ),
-            len(BinaryTiles) + 1: Image.open(f"{__location__}/tile_ims/path_purple.png").convert(
-                'RGBA'
-            )
+            ).convert('RGBA')
         }
         self.graphics = jnp.array(idx_dict_to_arr(self.graphics))
         super().init_graphics()
