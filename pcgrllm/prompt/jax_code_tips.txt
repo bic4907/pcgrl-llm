@@ -5,7 +5,7 @@ The code is compiled using a just-in-time (JIT) compiler and there are unusable 
 Also, the different array shape between input and output could make some errors on methods (e.g., jnp.unique)
 
 ### Attempted boolean conversion of traced array with shape bool[].
-This error occurs when you try to convert a JAX array to a boolean. JAX does not support this operation. You can use `jnp.where` to achieve the same result.
+In JAX, standard Python if statements cannot be used within JIT-compiled functions, as they create dynamic control flow that JAX’s JIT compiler cannot process. This restriction exists because JAX requires static, vectorized operations to perform optimized computation. To handle conditional logic, use JAX functions like jax.numpy.where or mask arrays instead of if statements. Additionally, consider structuring the code with static conditions outside of JIT-compiled functions if possible, or using control flow functions provided by JAX such as jax.lax.cond and jax.lax.switch for cases requiring conditional branching.
 
 [Before]
 if current_diameter > diameter_penalty_threshold:
@@ -15,5 +15,29 @@ if current_diameter > diameter_penalty_threshold:
 [After]
 jnp.where(current_diameter > diameter_penalty_threshold, (current_diameter - diameter_penalty_threshold) * 0.5, reward)
 
+[Before]
+if function_call():
+    arr.append((x, y))
+[After]
+jax.lax.cond(function_call(array, x, y), lambda _: arr.append((x, y)), lambda _: None, None) # condition, true_fun, false_fun, operand)
+
+[Before]
+if jnp.all(sub_array == EMPTY):
+    room_count += 1
+
+[After]
+jax.lax.cond(jnp.all(sub_array == EMPTY), lambda x: x + 1, lambda x: x, room_count)
+
+[Before]
+if tile == EMPTY:
+    current_consecutive_empty += 1
+else:
+    current_consecutive_empty = 0
+
+[After]
+jax.lax.cond(tile == EMPTY, lambda x: x + 1, lambda x: 0, current_consecutive_empty)
+
+
 ### Array value allocation
 Instead of ``x[idx] = y``, use ``x = x.at[idx].set(y)``
+

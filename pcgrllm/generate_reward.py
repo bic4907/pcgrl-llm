@@ -19,6 +19,7 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
+from envs.probs.binary import BinaryTiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
 from pcgrllm.validate_reward import run_validate, read_file
 
@@ -37,6 +38,7 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 PE_DIR = 'pe'
 FEATURE_DIR = 'feature'
+TASK_DIR = 'task'
 
 class RewardGenerator:
     def __init__(self, config: dict):
@@ -69,6 +71,7 @@ class RewardGenerator:
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
+
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
         self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
@@ -84,6 +87,9 @@ class RewardGenerator:
 
         if self.feature is not None:
             self.feature = self.feature.split('+')
+
+        self.task = config.get('task')
+        self.available_tiles = config.get('available_tiles')
 
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
@@ -216,8 +222,6 @@ class RewardGenerator:
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
                                                                         trial=i_trial)
-
-
                     self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
@@ -333,10 +337,15 @@ class RewardGenerator:
 
         level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-        prompt = prompt.format(
+        available_tiles = set(self.available_tiles) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
+
+        # Filter the enum members based on available_tiles
+        tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in BinaryTiles if tile in available_tiles)
+
+        # Format the prompt with values
+        return prompt.format(
             array_shape=level_shape_str,
-            stats_keys='DIAMETER = 0, N_REGIONS = 1',
-            tile_enum='EMPTY = 1, WALL = 2'
+            tile_enum=tile_enum
         )
 
         return prompt
@@ -344,6 +353,20 @@ class RewardGenerator:
     def _get_stats_feature(self):
         prompt = self.get_feature_prompt('stats')
         return prompt
+
+
+    def get_initial_user(self):
+        initial_user = copy.deepcopy(self.initial_user)
+
+        # get the prompt file from the task dir
+        task_file = path.join(self.file_path, TASK_DIR, f"{self.task}.txt")
+        task_prompt = file_to_string(task_file)
+
+        task_prompt.format(target_character=self.config['target_character'])
+
+        initial_user = initial_user.replace('{task}', task_prompt)
+
+        return initial_user
 
     def save_data(self, response: str, context: list, messages: list, basename: str = 'reward', branch: int=None):
 
@@ -381,25 +404,27 @@ class RewardGenerator:
 
         return reward_file_path
 
+
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
-        self.initial_system = self.initial_system.format(
+        initial_system = self.initial_system.format(
             i='{i}',
             reward_signature=self.reward_template,
         )
 
         # Add jax code tips prompt
-        self.initial_system += self.jax_code_tips_prompt
-        self.initial_system += '\n'
-        self.initial_system += self.reward_code_tips_prompt
+        initial_system += self.jax_code_tips_prompt
+        initial_system += '\n'
+        initial_system += self.reward_code_tips_prompt
 
-        initial_user = copy.deepcopy(self.initial_user)
+        initial_user = self.get_initial_user()
 
 
         reward_function_inputs = self.get_input_prompt()
 
 
         if generating_function_error:
+
 
             reward_code = file_to_string(generating_function_path)
 
@@ -466,9 +491,8 @@ class RewardGenerator:
 
         # 피드백 받는 부분 작성 필요함
 
-
         messages = [
-            {"role": "system", "content": self.initial_system},
+            {"role": "system", "content": initial_system},
             {"role": "user", "content": initial_user}
         ]
 
