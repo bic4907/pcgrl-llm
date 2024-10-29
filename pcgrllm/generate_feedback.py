@@ -15,6 +15,7 @@ from os.path import abspath, basename, join, dirname
 
 
 from conf.config import Config
+from envs.probs.binary import BinaryTiles
 from pcgrllm.llm_client.llm import UnifiedLLMClient, ChatContext
 from pcgrllm.utils.storage import Storage
 
@@ -88,6 +89,13 @@ class FeedbackGenerator:
         if self.config['condition_prompt'] is None:
             warnings.warn('Condition prompt is not provided. Please provide a condition prompt.')
             self.config['condition_prompt'] = 'N/A'
+
+        if input_type == FeedbackInputType.Array:
+            available_tiles = set(self.config['available_tiles']) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
+
+            # Filter the enum members based on available_tiles
+            tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in BinaryTiles if tile in available_tiles)
+            content = f'Available tiles: {tile_enum}\n\n{content}'
 
         user_prompt = user_prompt.format(
             evaluation_criteria=self.config['condition_prompt'] ,

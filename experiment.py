@@ -320,6 +320,7 @@ class Experiment:
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
             'reward_function': self.previous_reward_function_path,
+            'available_tiles': self.config.available_tiles,
             'iteration': self._iteration,
         }
 

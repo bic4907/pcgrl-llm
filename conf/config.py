@@ -1,6 +1,6 @@
 from typing import Iterable, List, Optional, Tuple, Union
 from hydra.core.config_store import ConfigStore
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # @dataclass
@@ -96,6 +96,9 @@ class Config:
     _numpy_dir: Optional[str] = None
     current_iteration: int = 0
     fitness_evaluator: str = 'vit'
+
+    available_tiles: List[int] = field(default_factory=lambda: [])
+
 
 
 @dataclass
