@@ -316,7 +316,7 @@ class TrainLLMConfig(Config):
     n_samples: int = 10
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
 
-    branch_factor: Optional[int] = None
+    branch_factor: Optional[int] = 2
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
