@@ -20,6 +20,8 @@ from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
 from envs.probs.binary import BinaryTiles
+from envs.probs.dungeon import DungeonTiles
+from envs.probs.dungeon2 import Dungeon2Tiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
 from pcgrllm.validate_reward import run_validate, read_file
 
@@ -340,7 +342,7 @@ class RewardGenerator:
         available_tiles = set(self.available_tiles) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
 
         # Filter the enum members based on available_tiles
-        tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in BinaryTiles if tile in available_tiles)
+        tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in Dungeon2Tiles if tile in available_tiles)
 
         # Format the prompt with values
         return prompt.format(
