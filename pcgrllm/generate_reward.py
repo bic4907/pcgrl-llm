@@ -518,6 +518,8 @@ class RewardGenerator:
                     'response': response,
                 }
 
+                parsed_reward_function = parse_reward_function(response)
+
                 # Save reward function to .py
                 reward_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.py")
                 with open(reward_file_path, 'w') as f:
