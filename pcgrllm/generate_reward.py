@@ -532,7 +532,7 @@ class RewardGenerator:
                 with open(log_file_path, 'w') as f:
                     json.dump(log_dict, f, indent=4)
 
-                reward_file_path = self.save_data(response=response, context=context, messages=messages, branch=i)
+                self.save_data(response=response, context=context, messages=messages, branch=i)
 
             log_dict = {
                 'selected_branch': f'branch_{index}'
@@ -557,9 +557,7 @@ class RewardGenerator:
         context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
-            
-        parsed_reward_function = parse_reward_function(response)
-   
+
         reward_file_path = self.save_data(response=response, context=context, messages=messages)
 
         return reward_file_path
