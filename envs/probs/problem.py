@@ -126,12 +126,14 @@ def gen_init_map(rng, tile_enum, map_shape, tile_probs, randomize_map_shape=Fals
 
     return MapData(init_map, actual_map_shape)
 
+class Placeholder(IntEnum):
+    pass
 
 class Problem:
     tile_size: int = 16
     stat_weights: chex.Array
     metrics_enum: IntEnum
-    region_metrics_enum: IntEnum
+    region_metrics_enum: IntEnum = Placeholder
     ctrl_metrics: chex.Array
     stat_trgs: chex.Array
     ctrl_threshes: chex.Array = None
