@@ -463,9 +463,9 @@ class RewardGenerator:
                {reward_code_string}
                ```
                
-               Feedback:
+               ### Feedback:
                {feedback}
-
+                Please update the reward function based on the feedback and generate the reward function again.
                """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
             initial_user = initial_user.format(

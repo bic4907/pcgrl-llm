@@ -15,9 +15,12 @@ If multiple factors influence the reward calculation, calculate the difference f
 ### Dense Reward
 **Case 1:**
 If the shape created by the reward function is too small, the reward values may become sparse. Small shapes may not be easily recognized by the evaluation function, so to ensure the agent receives prompt rewards, the shape size in the target map should be large enough. To address this, the target shape’s width should be appropriately scaled relative to the map size, and the shape’s thickness should be adjusted to control reward frequency.
+Moreover, the convolutional neural network (CNN) cannot recognize small shapes effectively, so it is crucial to ensure the shape is large enough for the CNN to detect it accurately.
 
 ** Case 2:**
-The shape created by the reward function should have a certain level of thickness, and it is advisable to set this thickness generously. If the shape is too thin (width is similar to 1), the agent will receive rewards infrequently, leading to sparse feedback and slower learning. To ensure consistent rewards and optimal performance, adjust the shape's thickness to be ample enough for the evaluation function to recognize it effectively within the target map.
+The shape created by the reward function should have a certain level of thickness, and it is advisable to set this thickness generously.
+If the shape is too thin (width is similar to 1), the agent will receive rewards infrequently, leading to sparse feedback and slower learning.
+To ensure consistent rewards and optimal performance, consider the shape's **thickness** to be ample enough for the evaluation function to recognize it effectively within the target map.
 
 **Case 3:**
 When calculating rewards based on specific conditions, highly strict conditions can result in sparse rewards. For example:
