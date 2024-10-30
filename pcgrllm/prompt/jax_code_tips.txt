@@ -37,7 +37,14 @@ else:
 [After]
 jax.lax.cond(tile == EMPTY, lambda x: x + 1, lambda x: 0, current_consecutive_empty)
 
+### Abstract tracer value encountered where concrete value is expected: traced array with shape bool[]
+[Before]
+int(curr_has_path)
+[After]
+curr_has_path.astype(int)
 
 ### Array value allocation
 Instead of ``x[idx] = y``, use ``x = x.at[idx].set(y)``
 
+### Looping
+Avoid using double for-loops, as they can lead to performance issues. Instead, try to use `jax.vmap` to vectorize the operation over the first axis.

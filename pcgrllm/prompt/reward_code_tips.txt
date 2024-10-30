@@ -24,7 +24,7 @@ When calculating rewards based on specific conditions, highly strict conditions 
 **reward += jax.lax.cond(num_players == target_count, lambda _: reward_value, lambda _: penalty_value, None)**
 
 Instead, make the conditions more flexible for continuous rewards, which encourages more dense rewards. Compute the error between the current and previous states first and then apply delta reward as the reward value. This provides feedback each time the criteria change:
-**reward = abs(current_count - target_count) - abs(previous_count - target_count)**
+**reward = abs(previous_count - target_count) - abs(current_count - target_count)**
 
 ---
 
