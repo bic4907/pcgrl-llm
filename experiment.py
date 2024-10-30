@@ -25,6 +25,7 @@ import platform
 import pprint
 
 from conf.config import TrainConfig
+from envs.pcgrl_env import get_prob_cls, ProbEnum, get_available_tiles
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
@@ -180,7 +181,7 @@ class Experiment:
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
             'feature': self.config.reward_feature,
-            'available_tiles': self.config.available_tiles,
+            'available_tiles': get_available_tiles(self.config.problem),
             'task': self.config.task,
         }
 
@@ -322,7 +323,7 @@ class Experiment:
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
             'reward_function': self.previous_reward_function_path,
-            'available_tiles': self.config.available_tiles,
+            'available_tiles': get_available_tiles(self.config.problem),
             'iteration': self._iteration,
         }
 
