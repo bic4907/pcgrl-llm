@@ -78,14 +78,7 @@ class Experiment:
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
         self._current_feedback_path = None
-        if not self.config.fewshot:
-            previous_reward_fucntion_path = None
-        elif self.config.fewshot_type == 'base':
-            previous_reward_fucntion_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}.py')
-        else:
-            previous_reward_fucntion_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot',
-                                                      f'shape_{self.config.target_character.lower()}_{self.config.fewshot_type}.py')
-        self.previous_reward_function_path = previous_reward_fucntion_path
+        self.previous_reward_function_path = None if not self.config.fewshot else path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}_thick.py')
         self.previous_feedback_path = None
         self.max_iteration_feedback_path = None
 
