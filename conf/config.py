@@ -315,6 +315,7 @@ class TrainLLMConfig(Config):
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
     n_samples: int = 10
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
+    fewshot: bool = False
 
     branch_factor: Optional[int] = 2
 
