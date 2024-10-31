@@ -3,12 +3,10 @@ Calculating rewards based only on the current state can result in a large reward
 **R = R(S_(t)) - R(S_(t-1))**
 
 This approach allows rewards to reflect the improvement between the current and previous states:
-**reward = current_reward - previous_reward**
+**reward = current_reward - previous_reward** (Reward for maximize the current reward)
 
 If multiple factors influence the reward calculation, calculate the difference for each factor separately, then add them to the total reward. When different weights apply to each factor, calculate the difference, multiply it by the weight, and add it to the reward. For example:
 
-**diff = factor_current_state - factor_previous_state**
-**reward = diff * weight**
 
 ---
 
@@ -26,8 +24,9 @@ To ensure consistent rewards and optimal performance, consider the shape's **thi
 When calculating rewards based on specific conditions, highly strict conditions can result in sparse rewards. For example:
 **reward += jax.lax.cond(num_players == target_count, lambda _: reward_value, lambda _: penalty_value, None)**
 
+** Minimizing error **
 Instead, make the conditions more flexible for continuous rewards, which encourages more dense rewards. Compute the error between the current and previous states first and then apply delta reward as the reward value. This provides feedback each time the criteria change:
-**reward = abs(previous_count - target_count) - abs(current_count - target_count)**
+**reward -= (abs(current_count - target_count) - abs(previous_count - target_count))** (Reward for minimize the error, careful on the sign)
 
 ---
 
