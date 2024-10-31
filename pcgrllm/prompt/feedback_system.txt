@@ -6,7 +6,6 @@ The feedback system have evaluation the level with the evaluation condition, com
 If some parts of the content are not represent the reward function, the feedback system will provide the recommendation to revise the reward function.
 The alphabet is represented in a big size in the game level. If the letter is too small, the reward function should be revised to give higher reward for bigger letters.
 
-
 ## If the reward function is provided:
 - Generate the feedback based on the content and reward function.
 - Response with the recommendation to revise the reward function.

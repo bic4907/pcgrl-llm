@@ -173,6 +173,16 @@ def gen_static_tiles(rng, static_tile_prob, n_freezies, map_shape):
 def get_prob_cls(problem: str):
     return PROB_CLASSES[problem]
 
+def get_available_tiles(problem_str: str) -> list:
+    prob = get_prob_cls(getattr(ProbEnum, problem_str.upper()))
+    tiles = [int(tile) for tile in prob.tile_enum]
+
+    # remove 0 from tiles
+    tiles.remove(0)
+
+    # get the int from the enum
+    return tiles
+
 
 class PCGRLEnv(Environment):
     pinpoints = False

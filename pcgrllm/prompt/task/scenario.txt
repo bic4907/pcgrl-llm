@@ -1,0 +1,7 @@
+The task is to generate a level represented by a two-dimensional array that aligns closely with the "target scenario."
+The reward function provides a higher reward when the generated level accurately reflects the characteristics of the "target scenario."
+The reward function takes as inputs the level array and the target scenario, returning a reward value based on alignment.
+Consider the shape and structure of the level array to create a layout that fits the given scenario.
+
+Target scenario: {target_character}
+

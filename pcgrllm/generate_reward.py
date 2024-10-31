@@ -19,6 +19,9 @@ from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
+from envs.probs.binary import BinaryTiles
+from envs.probs.dungeon import DungeonTiles
+from envs.probs.dungeon2 import Dungeon2Tiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
 from pcgrllm.validate_reward import run_validate, read_file
 
@@ -37,6 +40,7 @@ logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 PE_DIR = 'pe'
 FEATURE_DIR = 'feature'
+TASK_DIR = 'task'
 
 class RewardGenerator:
     def __init__(self, config: dict):
@@ -69,6 +73,7 @@ class RewardGenerator:
                                          (str(self.postfix) + '_inner_' + str(self.n_inner)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
+
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
         self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
@@ -84,6 +89,9 @@ class RewardGenerator:
 
         if self.feature is not None:
             self.feature = self.feature.split('+')
+
+        self.task = config.get('task')
+        self.available_tiles = config.get('available_tiles')
 
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
@@ -216,8 +224,6 @@ class RewardGenerator:
                                                                         generating_function_path=generating_function_path,
                                                                         generating_function_error=generating_function_error,
                                                                         trial=i_trial)
-
-
                     self.logging(f'Called the first_user_response function')
                 else:
                     self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
@@ -333,10 +339,15 @@ class RewardGenerator:
 
         level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
-        prompt = prompt.format(
+        available_tiles = set(self.available_tiles) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
+
+        # Filter the enum members based on available_tiles
+        tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in Dungeon2Tiles if tile in available_tiles)
+
+        # Format the prompt with values
+        return prompt.format(
             array_shape=level_shape_str,
-            stats_keys='DIAMETER = 0, N_REGIONS = 1',
-            tile_enum='EMPTY = 1, WALL = 2'
+            tile_enum=tile_enum
         )
 
         return prompt
@@ -344,6 +355,20 @@ class RewardGenerator:
     def _get_stats_feature(self):
         prompt = self.get_feature_prompt('stats')
         return prompt
+
+
+    def get_initial_user(self):
+        initial_user = copy.deepcopy(self.initial_user)
+
+        # get the prompt file from the task dir
+        task_file = path.join(self.file_path, TASK_DIR, f"{self.task}.txt")
+        task_prompt = file_to_string(task_file)
+
+        task_prompt.format(target_character=self.config['target_character'])
+
+        initial_user = initial_user.replace('{task}', task_prompt)
+
+        return initial_user
 
     def save_data(self, response: str, context: list, messages: list, basename: str = 'reward', branch: int=None):
 
@@ -381,25 +406,27 @@ class RewardGenerator:
 
         return reward_file_path
 
+
     def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
 
-        self.initial_system = self.initial_system.format(
+        initial_system = self.initial_system.format(
             i='{i}',
             reward_signature=self.reward_template,
         )
 
         # Add jax code tips prompt
-        self.initial_system += self.jax_code_tips_prompt
-        self.initial_system += '\n'
-        self.initial_system += self.reward_code_tips_prompt
+        initial_system += self.jax_code_tips_prompt
+        initial_system += '\n'
+        initial_system += self.reward_code_tips_prompt
 
-        initial_user = copy.deepcopy(self.initial_user)
+        initial_user = self.get_initial_user()
 
 
         reward_function_inputs = self.get_input_prompt()
 
 
         if generating_function_error:
+
 
             reward_code = file_to_string(generating_function_path)
 
@@ -436,9 +463,9 @@ class RewardGenerator:
                {reward_code_string}
                ```
                
-               Feedback:
+               ### Feedback:
                {feedback}
-
+                Please update the reward function based on the feedback and generate the reward function again.
                """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
 
             initial_user = initial_user.format(
@@ -466,9 +493,8 @@ class RewardGenerator:
 
         # 피드백 받는 부분 작성 필요함
 
-
         messages = [
-            {"role": "system", "content": self.initial_system},
+            {"role": "system", "content": initial_system},
             {"role": "user", "content": initial_user}
         ]
 
@@ -494,6 +520,8 @@ class RewardGenerator:
                     'response': response,
                 }
 
+                parsed_reward_function = parse_reward_function(response)
+
                 # Save reward function to .py
                 reward_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.py")
                 with open(reward_file_path, 'w') as f:
@@ -504,7 +532,7 @@ class RewardGenerator:
                 with open(log_file_path, 'w') as f:
                     json.dump(log_dict, f, indent=4)
 
-                reward_file_path = self.save_data(response=response, context=context, messages=messages, branch=i)
+                self.save_data(response=response, context=context, messages=messages, branch=i)
 
             log_dict = {
                 'selected_branch': f'branch_{index}'
@@ -529,9 +557,7 @@ class RewardGenerator:
         context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
-            
-        parsed_reward_function = parse_reward_function(response)
-   
+
         reward_file_path = self.save_data(response=response, context=context, messages=messages)
 
         return reward_file_path
@@ -589,172 +615,6 @@ class RewardGenerator:
         feedback_prompt = f"\n\n## Feedback\n{feedback_str}\n"
 
         return feedback_prompt
-
-    # FIX ME: Implement the function
-    # def second_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
-    #     playtesting_result = ""
-    #     parsed_code = ast.parse(self.previous_reward_function)
-    #     error_message = None
-    #
-    #     sampled_data_path = abspath(path.join(self.reward_function_path, f"{basename}.data.json"))
-    #     preprocess_dataset(self.arbitrary_dataset, sampled_data_path)
-    #     # read the sampled data and save the lines with array
-    #
-    #     # This section is for module test of the reward function
-    #
-    #     sample_data_arr = list()
-    #     with open(sampled_data_path, 'r') as file:
-    #         for line in file:
-    #             sample_data_arr.append(preprocessing(json.loads(line)))
-    #
-    #     try:
-    #         for node in ast.walk(parsed_code):
-    #             if isinstance(node, ast.FunctionDef) and node.name == 'compute_reward':
-    #
-    #                 inner_node_list = list()
-    #
-    #                 for inner_node in ast.iter_child_nodes(node):
-    #                     if isinstance(inner_node, ast.FunctionDef):
-    #                         inner_node_list.append(inner_node.name)
-    #
-    #                         nested_function_code = astor.to_source(inner_node)
-    #                         exec(nested_function_code, globals())
-    #
-    #                 self.logging(f'Founded ({len(inner_node_list)}) sub reward functions: {inner_node_list} and sample data: {len(sample_data_arr)}', logging.DEBUG)
-    #
-    #                 result_dict = dict()
-    #
-    #                 for inner_node in ast.iter_child_nodes(node):
-    #                     if isinstance(inner_node, ast.Assign):
-    #                         if isinstance(inner_node.value, ast.Constant):
-    #                             exec(astor.to_source(inner_node), globals())
-    #
-    #                     if isinstance(inner_node, ast.FunctionDef):
-    #
-    #                         try:
-    #                             result_list = list()
-    #
-    #                             # Input the arbitrary game data to the sub reward function
-    #                             for kwarg in sample_data_arr:
-    #                                 result = globals()[inner_node.name](kwarg['Current'])
-    #                                 result_list.append(result)
-    #
-    #                             average_value = sum(result_list) / len(result_list)
-    #                             standard_deviation = sum([(x - average_value) ** 2 for x in result_list]) / len(
-    #                                 result_list) ** 0.5
-    #
-    #                             result_dict[inner_node.name] = {'Average': average_value, 'Standard deviation': standard_deviation}
-    #
-    #                         except:
-    #                             error_msg = traceback.format_exc()
-    #                             result_dict[inner_node.name] = {'Error': error_msg }
-    #                             self.logging(error_msg, logging.ERROR)
-    #
-    #                 # End of loop
-    #
-    #         # Result for sub reward functions
-    #         if len(result_dict) > 0:
-    #             _playtesting_result = "[Sub-reward Output Analysis]\n"
-    #
-    #             for node_name, item in result_dict.items():
-    #                 if isinstance(item, dict):
-    #                     _playtesting_result += f"({node_name}) "  # node_name 한 번만 출력
-    #                     result_line = []
-    #                     for key, value in item.items():
-    #                         # 실수는 소수점 3자리까지 출력
-    #                         if isinstance(value, float):
-    #                             value_str = f"{value:.3f}"
-    #                         else:
-    #                             value_str = str(value)
-    #
-    #                         # key-value 쌍을 리스트에 추가
-    #                         result_line.append(f"{key}: {value_str}")
-    #
-    #                     # 각 node_name에 대한 결과를 한 줄로 출력
-    #                     _playtesting_result += '  '.join(result_line) + '\n'
-    #
-    #
-    #             playtesting_result =_playtesting_result.strip()  # 마지막 공백 제거
-    #
-    #         # Result for the main reward function
-    #         required_node_list = ['agent_0', 'agent_1', 'agent_2', 'agent_3']
-    #         # 부족한 항목과 추가된 항목을 비교
-    #         missing_nodes = set(required_node_list) - set(inner_node_list)
-    #         extra_nodes = set(inner_node_list) - set(required_node_list)
-    #
-    #         # 메시지 작성
-    #         node_message = ""
-    #
-    #         if extra_nodes:
-    #             node_message += f"\nExtra nodes found, please remove: {', '.join(extra_nodes)}\n"
-    #         if missing_nodes:
-    #             node_message += f"\nMissing nodes: {', '.join(missing_nodes)}\n"
-    #
-    #         playtesting_result += node_message
-    #
-    #     except:
-    #         self.logging(traceback.format_exc(), logging.ERROR)
-    #         error_message = traceback.format_exc()
-    #
-    #     # End of the module t est of the reward function
-    #
-    #     # Start of the execution test of the reward function
-    #     reward_mean, reward_std, success_rate = self.execute_reward_functions_parallel(self.previous_reward_function_path, state_dicts=sample_data_arr)
-    #     playtesting_result += '\n[Total Reward Analysis]\n'
-    #     playtesting_result += 'Average: {:.3f}\n'.format(reward_mean)
-    #     playtesting_result += 'Standard deviation: {:.3f}\n'.format(reward_std)
-    #     playtesting_result += 'Success Rate: {:.1f}%\n'.format(success_rate)
-    #
-    #     self.logging(playtesting_result, logging.DEBUG)
-    #
-    #     if generating_function_error is not None:
-    #         error_description = " The previous reward function has an error. Below is the error message. Please generate the reward function again with attention to error.\n" + generating_function_error
-    #     elif error_message is not None:
-    #         error_description = " The previous reward function has an error. Below is the error message. Please generate the reward function again with attention to error.\n" + error_message
-    #     else:
-    #         error_description = ""
-    #
-    #     self.second_user = file_to_string(path.join(self.file_path, "second_user.txt"))
-    #     self.second_user = self.second_user.format(
-    #         i='{i}',
-    #         previous_reward_function=self.previous_reward_function,
-    #         error_description=error_description,
-    #         playtesting_result=playtesting_result
-    #     )
-    #     messages = [
-    #         {"role": "system", "content": self.initial_system},
-    #         {"role": "user", "content": self.second_user}
-    #     ]
-    #
-    #     response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
-    #     self.logging(context, logging.INFO)
-    #     self.logging(response, logging.DEBUG)
-    #
-    #     os.makedirs(self.reward_function_path, exist_ok=True)
-    #     response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
-    #     with open(response_file_path, 'wb') as f:
-    #         pickle.dump(response, f)
-    #
-    #     context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
-    #     with open(context_file_path, 'wb') as f:
-    #         pickle.dump(context, f)
-    #
-    #     log_dict = {
-    #         'request': messages,
-    #         'response': response,
-    #     }
-    #
-    #     # Save reward function to .py
-    #     reward_file_path = path.join(self.reward_function_path, f"{basename}.py")
-    #     with open(reward_file_path, 'w') as f:
-    #         f.write(response)
-    #
-    #     # Save the log to .json file
-    #     log_file_path = path.join(self.reward_function_path, f"{basename}.json")
-    #     with open(log_file_path, 'w') as f:
-    #         json.dump(log_dict, f, indent=4)
-    #
-    #     return reward_file_path
 
     def parse_reward_function(self, reward_function_path: str) -> str:
         # Return the parsed reward function

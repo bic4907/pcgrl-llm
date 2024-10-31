@@ -12,11 +12,13 @@ from envs.feature import *
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
+from envs.utils import idx_dict_to_arr
+
+
 class BinaryTiles(IntEnum):
     BORDER = 0
     EMPTY = 1
     WALL = 2
-
 
 @struct.dataclass
 class BinaryState(ProblemState):
@@ -97,20 +99,21 @@ class BinaryProblem(Problem):
         return (get_path_coords_diam(flood_count=prob_state.flood_count, max_path_len=self.max_path_len),)
     
     def init_graphics(self):
-        self.graphics = [0] * (len(self.tile_enum) + 1)
-        self.graphics[BinaryTiles.EMPTY] = Image.open(
-                f"{__location__}/tile_ims/empty.png"
-            ).convert('RGBA')
-        self.graphics[BinaryTiles.WALL] = Image.open(
-                f"{__location__}/tile_ims/solid.png"
-            ).convert('RGBA')
-        self.graphics[BinaryTiles.BORDER] = Image.open(
-                f"{__location__}/tile_ims/solid.png"
-            ).convert('RGBA')
-        self.graphics[len(self.tile_enum)] = Image.open(f"{__location__}/tile_ims/path_g.png").convert(
-                'RGBA')
 
+        self.graphics = {
+            BinaryTiles.EMPTY: Image.open(
+                f"{__location__}/tile_ims/empty.png"
+            ).convert('RGBA'),
+            BinaryTiles.WALL: Image.open(
+                f"{__location__}/tile_ims/solid.png"
+            ).convert('RGBA'),
+            BinaryTiles.BORDER: Image.open(
+                f"{__location__}/tile_ims/solid.png"
+            ).convert('RGBA')
+        }
+        self.graphics = jnp.array(idx_dict_to_arr(self.graphics))
         super().init_graphics()
+
 
     def get_curr_stats(self, env_map: chex.Array):
         """Get relevant metrics from the current state of the environment."""

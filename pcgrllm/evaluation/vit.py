@@ -21,6 +21,10 @@ class ViTEvaluator(LevelEvaluator):
         self.model = AutoModelForImageClassification.from_pretrained(model_name).to(self.device)
 
     def run(self, iteration: Iteration, target_character: str, use_train: bool = False) -> EvaluationResult:
+        # if the target_chracater is not alphabet, return 0
+        if len(target_character) >= 2 or (not target_character.isalpha()):
+            return EvaluationResult(similarity=0, diversity=0, sample_size=0)
+
         target_character = target_character.upper()
 
         image_files = iteration.get_images(use_train)
