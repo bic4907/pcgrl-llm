@@ -1,8 +1,6 @@
 import jax.numpy as jnp
 from jax import jit
 
-
-
 def compute_reward(prev_array, unused3, curr_array, unused4) -> float:
     # Initialize reward
     reward = 0.0

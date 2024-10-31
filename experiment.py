@@ -78,7 +78,14 @@ class Experiment:
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
         self._current_feedback_path = None
-        self.previous_reward_function_path = None if not self.config.fewshot else path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', f'shape_{self.config.target_character}_delta.py')
+        if not self.config.fewshot:
+            previous_reward_fucntion_path = None
+        elif self.config.fewshot_type == 'base':
+            previous_reward_fucntion_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}.py')
+        else:
+            previous_reward_fucntion_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot',
+                                                      f'shape_{self.config.target_character.lower()}_{self.config.fewshot_type}.py')
+        self.previous_reward_function_path = previous_reward_fucntion_path
         self.previous_feedback_path = None
         self.max_iteration_feedback_path = None
 
@@ -152,7 +159,7 @@ class Experiment:
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
         if self.config.pe =='tot':
-            if self.previous_reward_function_path is None:
+            if self.previous_feedback_path is None:
                 current_feedback_path = None
             else:
                 current_feedback_path = path.abspath(self.previous_feedback_path)

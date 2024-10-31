@@ -314,13 +314,14 @@ class TrainLLMConfig(Config):
     bypass_reward_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
 
-    gpt_model: str = 'llama3-80b-instruct'
+    gpt_model: str = 'gpt-4o'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
     n_samples: int = 10
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
     fewshot: bool = False
+    fewshot_type: str = 'base' # 'base', 'delta', 'thick'
 
     branch_factor: Optional[int] = 2
 
