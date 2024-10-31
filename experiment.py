@@ -78,7 +78,8 @@ class Experiment:
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
         self._current_feedback_path = None
-        self.previous_reward_function_path = None
+        reward_filename = f'{basename(self.config.bypass_reward_path)}.py'
+        self.previous_reward_function_path = None if not self.config.fewshot else path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', reward_filename)
         self.previous_feedback_path = None
         self.max_iteration_feedback_path = None
 
@@ -322,7 +323,7 @@ class Experiment:
             'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
-            'reward_function': self.previous_reward_function_path,
+            'reward_function': self._current_reward_function_filename,
             'available_tiles': get_available_tiles(self.config.problem),
             'iteration': self._iteration,
         }
