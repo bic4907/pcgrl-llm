@@ -1,0 +1,25 @@
+### Step-by-Step Analysis
+
+1. **Common Problems in Generated Levels:**
+   - The generated levels do not consistently resemble the letter "A" as intended. Instead, they often contain a mix of wall (2) and empty (1) tiles that do not align with the target shape.
+   - Many levels have a significant number of empty tiles that do not contribute to the desired shape, leading to a low reward for matching the target.
+   - The generated levels often have small clusters of matching tiles rather than a coherent representation of the letter "A".
+
+2. **Identifying a Specific Problem:**
+   - The primary issue appears to be that the current reward function does not sufficiently incentivize the generation of larger, coherent shapes. The reward is based on the ratio of matching empty tiles to total target empty tiles, which may not encourage the agent to focus on creating a recognizable and larger representation of the letter "A". This could lead to sparse rewards, where the agent does not receive enough feedback to learn effectively.
+
+3. **Plan to Revise the Reward Function:**
+   - To address the issue of generating a recognizable letter "A", the reward function should be modified to provide a higher reward for larger clusters of matching tiles that form the shape of "A". This can be achieved by introducing a new component that rewards the agent for the size of the matching area, rather than just the ratio of matching tiles.
+
+### Recommendation to Revise the Reward Function
+
+**Changed Part of the Reward Function:**
+```python
+# Calculate the size of the matching area
+matching_area_size = jnp.sum(curr_array == 1)  # Count of matching empty tiles
+
+# Reward is now a combination of the ratio of matching tiles and the size of the matching area
+reward += (matching_tiles / total_target_empty) * 100 + (matching_area_size * 10)  # Adjust the multiplier as needed
+```
+
+This change encourages the agent to create larger, more coherent shapes that resemble the letter "A" by rewarding both the ratio of matching tiles and the overall size of the matching area.

@@ -312,7 +312,9 @@ class TrainLLMConfig(Config):
     n_generation_trials: int = 5
 
     bypass_reward_path: Optional[str] = None
+    bypass_train_path: Optional[str] = None
     bypass_feedback_path: Optional[str] = None
+    random_fitness: bool = False
 
     gpt_model: str = 'gpt-4o'
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model

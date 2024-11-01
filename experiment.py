@@ -1,3 +1,4 @@
+import random
 from distutils.command.config import config
 from os.path import basename, dirname
 from typing import Optional
@@ -222,41 +223,24 @@ class Experiment:
 
         return target_path
 
+    def bypass_train(self):
+        # copy the directory
 
-    def validate_reward_function(self):
-        config = copy.deepcopy(self.config)
+        target_path = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+        os.makedirs(target_path, exist_ok=True)
 
-        try:
-            result = run_validate(config)
-        except:
-            result = False
+        origin_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_train', self.config.bypass_train_path)
+        self.logging(f"Copying train to the experiment directory: {origin_path} -> {target_path}", logging.WARNING)
+        shutil.copytree(origin_path, target_path, dirs_exist_ok=True)
 
-        print_log(self.logger, f"Reward validation passed?: {result}", level=logging.INFO)
+        # replace the name of *.py file into 'reward_outer_{self._iteration}_inner_1.py'
+        reward_file = glob(path.join(target_path, '*.py'))[0]
+        new_reward_file = path.join(target_path, f"reward_outer_{self._iteration}_inner_1.py")
 
-        return result
+        self.logging(f"Renaming the reward function file: {reward_file} -> {new_reward_file}", logging.WARNING)
+        os.rename(reward_file, new_reward_file)
 
-    def append_reward_generation_log(self, result: str, trial_num: int, previous_reward_function: str,
-                                     current_reward_function: str) -> None:
-        # append dataframe
-        row = {
-            'Time': datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'),
-            'Iteration': self._iteration,
-            'InstanceUUID': platform.node(),
-            'Trial': trial_num,
-            'Result': result,
-            'PreviousFileName': previous_reward_function,
-            'CurrentFileName': current_reward_function,
-            'Academy.TotalStepCount': 0,
-            'Academy.EpisodeCount': 0
-        }
-
-        try:
-            df = pd.read_csv(self.reward_function_log_path)
-            df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
-        except FileNotFoundError:
-            df = pd.DataFrame([row])
-
-        df.to_csv(self.reward_function_log_path, index=False)
+        return target_path
 
     def train_pcgrl(self):
         """Runs the mlagents-learn command with the given parameters."""
@@ -311,6 +295,12 @@ class Experiment:
 
         return media_dir
 
+    def bypass_rollout(self, iteration_run_id) -> str:
+        config = copy.deepcopy(self.config)
+        config.exp_dir = path.join(config.exp_dir, 'iteration_' + str(iteration_run_id))
+        media_dir = path.join(config.exp_dir, 'inference')
+
+        return media_dir
 
     # 파일 분석
     def analyze_output(self, iteration_num: int) -> None:
@@ -348,7 +338,11 @@ class Experiment:
             evaluator = HeuristicEvaluator(logger=self.logger)
 
         iteration = Iteration.from_path(exp_dir)
-        result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
+
+        if not self.config.random_fitness:
+            result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
+        else:
+            result = EvaluationResult(similarity=random.random(), diversity=random.random(), sample_size=-1)
 
         # save to the iteration file
         result_path = path.join(exp_dir, 'evaluation.json')
@@ -437,16 +431,26 @@ class Experiment:
                     log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self._iteration)
                     self._stage = Stage.TrainPCGRL
 
-
-
             elif self._stage == Stage.TrainPCGRL:
                 # Run ML-Agents
-                self.train_pcgrl()
+                if self.config.bypass_train_path is not None:
+                    train_fn = self.bypass_train
+                else:
+                    train_fn = self.train_pcgrl
+
+                train_fn()
 
                 self._stage = Stage.RolloutPCGRL
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
-                output_dir = self.rollout_pcgrl(self._iteration)
+
+                if self.config.bypass_train_path is not None:
+                    rollout_pcgrl_fn = self.bypass_rollout
+                else:
+                    rollout_pcgrl_fn = self.rollout_pcgrl
+
+                output_dir = rollout_pcgrl_fn(self._iteration)
+
                 log_rollout_data(logger=self.logger, target_path=output_dir, iteration=self._iteration)
 
 
