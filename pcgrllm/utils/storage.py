@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 
 from pcgrllm.evaluation import EvaluationResult
+from pcgrllm.utils.graph import NodeInfo
 
 # Constants
 ITERATION_PREFIX: str = 'iteration_'
@@ -13,6 +14,7 @@ INFERENCE_DIR: str = 'inference'
 TRAIN_DIR: str = 'train'
 IMAGE_DIR: str = 'images'
 NUMPY_DIR: str = 'numpy'
+
 
 
 class ImageResource:
@@ -62,10 +64,16 @@ class Iteration:
         self.iterative_mode = True
 
     def __str__(self) -> str:
+        fitness = None
+
+        if self.get_evaluation():
+            fitness = self.get_evaluation().similarity
+
         return (
             f"Iteration {self.iteration_num}\n"
             f"\tImages: {len(self.get_images())} files\n"
-            f"\tNumpy Files: {len(self.get_numpy_files())} files"
+            f"\tNumpy Files: {len(self.get_numpy_files())} files\n"
+            f"\tFitness: {fitness}"
         )
 
     @staticmethod
@@ -100,6 +108,12 @@ class Iteration:
         numpy_paths = glob(join(self.get_numpy_dir(), '*.npy'))
         return [NumpyResource(path) for path in numpy_paths]
 
+    def get_reward_function_path(self) -> Optional[str]:
+        reward_path = join(self.root_path, f'reward_outer_{self.iteration_num}_inner_1.py')
+        if not isdir(reward_path):
+            return reward_path
+        return None
+
     def get_evaluation_dir(self) -> str:
         eval_path = join(self.root_path, 'evaluation.json')
 
@@ -118,11 +132,35 @@ class Iteration:
             return None
         return EvaluationResult.from_dict(eval_json)
 
-    def get_feedback(self) -> Optional[FeedbackResource]:
+    def get_feedback_path(self) -> Optional[str]:
         feedback_path = join(self.root_path, 'feedback.txt')
+        if not isdir(feedback_path):
+            return feedback_path
+        return None
+
+    def get_feedback(self) -> Optional[FeedbackResource]:
+        feedback_path = self.get_feedback_path()
         if not isdir(feedback_path):
             return FeedbackResource(feedback_path)
         return None
+
+    def get_node(self) -> Optional[NodeInfo]:
+        nodeinfo_path = join(self.root_path, 'node.json')
+
+        try:
+            nodeinfo_json = json.load(open(nodeinfo_path, 'r'))
+        except:
+            return None
+        return NodeInfo.from_dict(nodeinfo_json)
+
+    def set_node(self, node: NodeInfo) -> None:
+        nodeinfo_path = join(self.root_path, 'node.json')
+        with open(nodeinfo_path, 'w') as f:
+            json.dump(node.to_dict(), f)
+
+    @property
+    def node(self):
+        return self.get_node()
 
 class Storage:
     """Manages multiple iterations and their resources."""

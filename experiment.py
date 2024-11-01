@@ -1,5 +1,6 @@
 import random
 from distutils.command.config import config
+from glob import glob
 from os.path import basename, dirname
 from typing import Optional
 
@@ -30,11 +31,12 @@ from envs.pcgrl_env import get_prob_cls, ProbEnum, get_available_tiles
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
+from pcgrllm.utils.graph import GraphManager, NodeInfo
 
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
     log_evaluation_result
 from pcgrllm.utils.path_utils import init_config
-from pcgrllm.utils.storage import Iteration
+from pcgrllm.utils.storage import Iteration, Storage
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
 
 from pcgrllm.validate_reward import run_validate
@@ -74,14 +76,17 @@ class Experiment:
 
     def initialize(self):
         self._iteration = 1
-        self.max_score = 0
-        self.max_iteration = None
+
         self._stage = Stage.StartIteration
         self._current_reward_function_filename = None
         self._current_feedback_path = None
-        self.previous_reward_function_path = None if not self.config.fewshot else path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}_thick.py')
+        self.previous_reward_function_path = None
         self.previous_feedback_path = None
-        self.max_iteration_feedback_path = None
+
+        self.storage = Storage(self.config.exp_dir)
+        self.graph_manager = GraphManager(storage=self.storage, max_breadth=self.config.branch_factor)
+
+        self.load_state()
 
         self._copy_prompt()
 
@@ -152,16 +157,6 @@ class Experiment:
     def generate_reward_function(self):
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
-        if self.config.pe =='tot':
-            if self.previous_feedback_path is None:
-                current_feedback_path = None
-            else:
-                current_feedback_path = path.abspath(self.previous_feedback_path)
-        else:
-            if self._current_feedback_path is None:
-                current_feedback_path = None
-            else:
-                current_feedback_path = path.abspath(self._current_feedback_path)
 
         args_dict = {
             'shared_storage_path': self._experiment_path,
@@ -178,7 +173,7 @@ class Experiment:
             'target_character': self.config.target_character,
             'pe': self.config.pe,
             'branch_factor': self.config.branch_factor,
-            'feedback_path': current_feedback_path,
+            'feedback_path': self.previous_feedback_path,
             'map_width': self.config.map_width,
             'map_height': self.config.map_width,
             'feature': self.config.reward_feature,
@@ -350,16 +345,8 @@ class Experiment:
             json.dump(result.to_dict(), f)
 
         if self.config.pe == 'tot':
-            score = result.total
-            self.save_previous_reward()
-            if self.max_score < score:
-                self.max_score = score
-                self.max_iteration = self._iteration
-            if self._iteration % self.config.branch_factor == 0 or self._iteration >= self.config.total_iterations:
-                self.previous_reward_function_path = path.join(self.config.exp_dir, f'iteration_{self.max_iteration}',
-                                                               f"reward_outer_{self.max_iteration}_inner_1.py")
-                self.max_score = 0
-                self.max_iteration = None
+            self.logging(f"Node evaluation score: {result.similarity}", level=logging.INFO)
+            self.graph_manager.update(self.current_node, similarity=result.similarity)
 
         log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration)
 
@@ -367,11 +354,25 @@ class Experiment:
         return result
 
     def save_state(self):
-        # target variables: iteration, current_reward_function_filename
-        serialize_items = ['_stage', '_iteration', '_current_reward_function_filename']
+        """Saves all instance variables to a YAML file, excluding specified keys."""
+        exclude_keys = ['config', 'storage', 'graph_manager', 'logger']
 
-        with open(path.join(self._experiment_path, 'state.yaml'), 'w') as file:
-            yaml.dump({item: getattr(self, item) for item in serialize_items}, file)
+        # Filter out excluded keys
+        data_to_serialize = {key: value for key, value in self.__dict__.items() if key not in exclude_keys}
+
+        if 'current_node' in data_to_serialize:
+            data_to_serialize['current_node'] = data_to_serialize['current_node'].to_dict()
+
+        # Save to YAML
+        with open(path.join(self._experiment_path, 'state.json'), 'w') as file:
+            json.dump(data_to_serialize, file)
+
+    # def save_state(self):
+    #     # target variables: iteration, current_reward_function_filename
+    #     serialize_items = ['_stage', '_iteration', '_current_reward_function_filename']
+    #
+    #     with open(path.join(self._experiment_path, 'state.yaml'), 'w') as file:
+    #         yaml.dump({item: getattr(self, item) for item in serialize_items}, file)
 
     def save_previous_reward(self):
         with open(path.join(self.config.exp_dir, f"iteration_{self._iteration}", "previous_reward_function.json"), 'w') as file:
@@ -380,17 +381,23 @@ class Experiment:
     def save_best_reward(self):
         with open(path.join(self.config.exp_dir, "best_reward_function.json"), 'w') as file:
             yaml.dump({"best_reward_function": self.previous_reward_function_path}, file, indent=4)
+
     def load_state(self):
-        self.logging("Loading state from the previous experiment.")
+        json_path = path.join(self._experiment_path, 'state.json')
 
-        try:
-            with open(path.join(self._experiment_path, 'state.yaml'), 'r') as file:
-                state = yaml.safe_load(file)
+        if path.exists(json_path):
 
-                for key, value in state.items():
-                    setattr(self, key, value)
-        except FileNotFoundError:
-            self.logging("State file not found. Exiting.")
+            with open(json_path, 'r') as file:
+                state = json.load(file)
+
+            self.logging(f"Loading state from{json_path}:\n{state}", level=logging.INFO)
+
+
+            for key, value in state.items():
+                setattr(self, key, value)
+
+            if 'current_node' in state:
+                self.current_node = NodeInfo.from_dict(state['current_node'])
 
     def get_evaluation_result(self, iteration_num: int) -> Optional[EvaluationResult]:
         """Returns the evaluation result for the given iteration number."""
@@ -399,16 +406,29 @@ class Experiment:
 
     def run(self):
 
-        self.logging("Running experiment", level=logging.DEBUG)
+        self.logging("Running experiment", level=logging.INFO)
 
         start_wandb(config=self.config)
 
         while not self._stage is Stage.Done:
 
-            self.logging(f"Current stage: {self._stage}", level=logging.DEBUG)
+            self.logging(f"Current stage: {self._stage}", level=logging.INFO)
 
 
             if self._stage == Stage.StartIteration:
+
+                if self.config.pe == 'tot':
+                    self.current_node = self.graph_manager.expand_node(self._iteration)
+                    iteration = self.storage.get_iteration(self.current_node.parent_id)
+
+                    if iteration is not None:
+                        self.previous_reward_function_path = iteration.get_reward_function_path()
+                        self.previous_feedback_path = iteration.get_feedback_path()
+
+                if self.config.fewshot is True and self._iteration == 1:
+                    fewshot_reward = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}_thick.py')
+                    self.logging(f"Fewshot reward function: {fewshot_reward}")
+                    self.previous_reward_function_path = fewshot_reward
 
                 self._stage = Stage.RewardGeneration
 
@@ -420,8 +440,6 @@ class Experiment:
                     reward_generation_fn = self.generate_reward_function
 
                 self._current_reward_function_filename = reward_generation_fn()
-                if self.config.pe != 'tot':
-                    self.previous_reward_function_path = self._current_reward_function_filename
 
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.")
@@ -477,15 +495,15 @@ class Experiment:
 
                 log_feedback_data(logger=self.logger, target_path=path.join(dirname(self._current_feedback_path), 'feedback'), iteration=self._iteration)
 
-                if self.config.pe == 'tot':
-                    if self._iteration == self.max_iteration:
-                        self.max_iteration_feedback_path = self._current_feedback_path
-                    if self._iteration % self.config.branch_factor == 0:
-                        self.previous_feedback_path = self.max_iteration_feedback_path
-
                 self._stage = Stage.FinishIteration
 
             elif self._stage == Stage.FinishIteration:
+                self.previous_reward_function_path = self._current_reward_function_filename
+                self.previous_feedback_path = self._current_feedback_path
+
+                if self.config.pe == 'tot':
+                    self.storage.get_iteration(self._iteration).set_node(self.current_node)
+                    self.logging('Tree Status:\n' + self.graph_manager.print_tree(iteration_marker=self._iteration, best_marker=True), level=logging.INFO)
 
                 if self._iteration >= self.config.total_iterations:
                     self.save_best_reward()
