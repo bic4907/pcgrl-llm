@@ -442,9 +442,6 @@ class RewardGenerator:
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
-
-
-              _character=self._execution_config.target_character,
                 few_shot_code_string=sample_code,
                 reward_function_inputs=reward_function_inputs,
                 target_character=self.config['target_character'],
