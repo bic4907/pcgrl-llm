@@ -392,12 +392,15 @@ class Experiment:
 
             self.logging(f"Loading state from{json_path}:\n{state}", level=logging.INFO)
 
-
             for key, value in state.items():
                 setattr(self, key, value)
 
             if 'current_node' in state:
                 self.current_node = NodeInfo.from_dict(state['current_node'])
+
+        if self._stage == Stage.Done:
+            self._stage = Stage.FinishIteration
+            self.logging("The experiment has already finished, but check if there is any remaining work to do.", level=logging.INFO)
 
     def get_evaluation_result(self, iteration_num: int) -> Optional[EvaluationResult]:
         """Returns the evaluation result for the given iteration number."""
@@ -427,7 +430,7 @@ class Experiment:
 
                 if self.config.fewshot is True and self._iteration == 1:
                     fewshot_reward = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}_thick.py')
-                    self.logging(f"Fewshot reward function: {fewshot_reward}")
+                    self.logging(f"Fewshot reward function: {fewshot_reward}", level=logging.INFO)
                     self.previous_reward_function_path = fewshot_reward
 
                 self._stage = Stage.RewardGeneration
