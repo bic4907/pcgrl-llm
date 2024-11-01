@@ -89,7 +89,7 @@ def run_validate(config: TrainLLMConfig):
 
     # Final reward check
     rewards = np.array(rewards)
-    print_log(logger, f"Reward output shape: {rewards.shape}", level=logging.INFO)
+    print_log(logger, f"Reward output shape: {rewards.shape}", level=logging.DEBUG)
 
     # Check for invalid rewards (NaN or Inf)
     if np.isnan(rewards).any():
