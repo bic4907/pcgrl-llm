@@ -34,6 +34,9 @@ class EvaluationResult:
     def from_dict(data: dict):
         return EvaluationResult(**data)
 
+    def to_prompt(self):
+        return f"Similarity: {self.similarity}, Diversity: {self.diversity}"
+
 class LevelEvaluator:
     def __init__(self, logger: Logger = None):
         self.logger = logger

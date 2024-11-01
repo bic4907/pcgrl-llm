@@ -36,6 +36,7 @@ from pcgrllm.utils.graph import GraphManager, NodeInfo
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
     log_evaluation_result
 from pcgrllm.utils.path_utils import init_config
+from pcgrllm.utils.prompt import get_reward_score_paired_examples
 from pcgrllm.utils.storage import Iteration, Storage
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
 
@@ -158,6 +159,16 @@ class Experiment:
         """Generates a reward function using the reward generator script."""
         self.logging(f"Generating reward function for iteration {self._iteration}", level=logging.INFO)
 
+        # check if there is previous iteration,
+        prev_eval_result, auxiliary_prompt_path = None, None
+
+        if self.config.pe in ['got'] and self._iteration >= 2:
+            prev_eval_result = self.get_evaluation_result(self._iteration - 1).to_prompt()
+            self.auxiliary_iter_nums = self.graph_manager.get_best_iteration_nums(max_n=2, excludes=[self._iteration - 1])
+
+            auxiliary_prompt = get_reward_score_paired_examples(self.storage, self.auxiliary_iter_nums)
+            auxiliary_prompt_path = self.storage.set_auxiliary_prompt(self._iteration, auxiliary_prompt)
+
         args_dict = {
             'shared_storage_path': self._experiment_path,
             'postfix': f"reward_outer_{self._iteration}",
@@ -178,11 +189,12 @@ class Experiment:
             'map_height': self.config.map_width,
             'feature': self.config.reward_feature,
             'available_tiles': get_available_tiles(self.config.problem),
+            'prev_eval_result': prev_eval_result,
+            'auxiliary_prompt_path': auxiliary_prompt_path,
             'task': self.config.task,
         }
 
         self.logging(f"Reward generation arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
-
 
         # Start of the 'generate_reward.py'
         from pcgrllm.generate_reward import generate_reward
@@ -344,7 +356,7 @@ class Experiment:
         with open(result_path, 'w') as f:
             json.dump(result.to_dict(), f)
 
-        if self.config.pe == 'tot':
+        if self.config.pe == ['tot',' got']:
             self.logging(f"Node evaluation score: {result.similarity}", level=logging.INFO)
             self.graph_manager.update(self.current_node, similarity=result.similarity)
 
@@ -366,13 +378,6 @@ class Experiment:
         # Save to YAML
         with open(path.join(self._experiment_path, 'state.json'), 'w') as file:
             json.dump(data_to_serialize, file)
-
-    # def save_state(self):
-    #     # target variables: iteration, current_reward_function_filename
-    #     serialize_items = ['_stage', '_iteration', '_current_reward_function_filename']
-    #
-    #     with open(path.join(self._experiment_path, 'state.yaml'), 'w') as file:
-    #         yaml.dump({item: getattr(self, item) for item in serialize_items}, file)
 
     def save_previous_reward(self):
         with open(path.join(self.config.exp_dir, f"iteration_{self._iteration}", "previous_reward_function.json"), 'w') as file:
@@ -404,8 +409,8 @@ class Experiment:
 
     def get_evaluation_result(self, iteration_num: int) -> Optional[EvaluationResult]:
         """Returns the evaluation result for the given iteration number."""
-        iteration = Iteration(iteration_num, path.join(self._experiment_path, f'iteration_{iteration_num}'))
-        return iteration.get_evaluation_result()
+        iteration = self.storage.get_iteration(iteration_num)
+        return iteration.get_evaluation()
 
     def run(self):
 
@@ -420,7 +425,7 @@ class Experiment:
 
             if self._stage == Stage.StartIteration:
 
-                if self.config.pe == 'tot':
+                if self.config.pe in ['tot', 'got']:
                     self.current_node = self.graph_manager.expand_node(self._iteration)
                     iteration = self.storage.get_iteration(self.current_node.parent_id)
 
@@ -504,7 +509,7 @@ class Experiment:
                 self.previous_reward_function_path = self._current_reward_function_filename
                 self.previous_feedback_path = self._current_feedback_path
 
-                if self.config.pe == 'tot':
+                if self.config.pe in ['tot', 'got']:
                     self.storage.get_iteration(self._iteration).set_node(self.current_node)
                     self.logging('Tree Status:\n' + self.graph_manager.print_tree(iteration_marker=self._iteration, best_marker=True), level=logging.INFO)
 

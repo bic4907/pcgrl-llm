@@ -1,4 +1,5 @@
 import json
+import os
 from os.path import abspath, join, basename, isdir
 from glob import glob
 from typing import List, Optional
@@ -62,6 +63,8 @@ class Iteration:
         self.iteration_num: int = iteration_num
         self.root_path: str = root_path
         self.iterative_mode = True
+
+        self.reward_function_path = self.get_reward_function_path()
 
     def __str__(self) -> str:
         fitness = None
@@ -162,14 +165,20 @@ class Iteration:
     def node(self):
         return self.get_node()
 
+
+
 class Storage:
     """Manages multiple iterations and their resources."""
     def __init__(self, path: str) -> None:
         self.root_path: str = abspath(path)
+        self.reward_functions_ws_path = join(self.root_path, 'reward_functions')
 
     def __str__(self) -> str:
         iteration_details = "\n".join(str(iteration) for iteration in self.get_iterations())
         return f"(Storage: {self.root_path})\n{iteration_details}"
+
+    def get_reward_functions_ws_path(self, iteration_num: int) -> str:
+        return join(self.reward_functions_ws_path, f'reward_outer_{iteration_num}_inner_1')
 
     def get_iterations(self) -> List[Iteration]:
         iteration_nums = self._get_iteration_nums()
@@ -189,6 +198,32 @@ class Storage:
         if isdir(iteration_path):
             return Iteration(iteration_num, iteration_path)
         return None
+
+    def set_auxiliary_prompt(self, iteration_num: int, prompt: str) -> str:
+        # check if dir exists
+        reward_functions_ws_path = self.get_reward_functions_ws_path(iteration_num)
+
+        if not isdir(reward_functions_ws_path):
+            os.makedirs(reward_functions_ws_path, exist_ok=True)
+
+        aux_prompt_path = join(reward_functions_ws_path, 'auxiliary_prompt.txt')
+        with open(aux_prompt_path, 'w') as f:
+            f.write(prompt)
+        return aux_prompt_path
+
+    def get_auxiliary_prompt_path(self, iteration_num: int) -> Optional[str]:
+        aux_prompt_path = join(self.get_reward_functions_ws_path(iteration_num), 'auxiliary_prompt.txt')
+        if not isdir(aux_prompt_path):
+            return aux_prompt_path
+        return None
+
+    def get_auxiliary_prompt(self, iteration_num: int) -> str:
+        aux_prompt_path = self.get_auxiliary_prompt_path()
+        if not isdir(aux_prompt_path):
+            with open(aux_prompt_path, 'r') as f:
+                return f.read()
+        return ""
+
 
 
 def get_first_file(resource_list: List[ImageResource]) -> Optional[str]:

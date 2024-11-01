@@ -1,0 +1,12 @@
+{cot_prompt}
+
+Previous reward score:
+{eval_result}
+
+---
+
+Review the reward functions and evaluation results from previous successful iterations provided above. For your current task, prioritize elements that maximize similarity to the previous outcomes. Once you've achieved a satisfactory level of similarity, incorporate aspects that increase diversity to enhance the overall evaluation.
+Refer to both the reward function and the evaluation score to identify effective elements that contributed to high scores. Integrate these insights selectively to align your current approach with the best-performing strategies.
+{auxiliary_prompt}
+
+---
