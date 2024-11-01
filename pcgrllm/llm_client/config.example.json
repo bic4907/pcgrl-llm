@@ -21,6 +21,14 @@
     "api_host": "https://api.openai.com/v1",
     "api_key": ""
   },
+  "gpt-4o-multi": {
+    "full-model-name": "gpt-4o-2024-08-06",
+    "api_host": "https://api.openai.com/v1",
+    "api_key": [
+      "first_key",
+      "second_key"
+    ]
+  },
   "gpt-4o-mini": {
     "full-model-name": "gpt-4o-mini",
     "api_host": "https://api.openai.com/v1",
