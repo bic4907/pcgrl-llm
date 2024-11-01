@@ -56,7 +56,6 @@ class GraphManager:
         if len(self.storage.get_iterations()) == 0:
             node = NodeInfo(node_id=1, parent_id=0, iteration=iteration_num)
             node.update()
-            print('updating')
             return node
 
         expandable_nodes = []
