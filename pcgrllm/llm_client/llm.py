@@ -1,4 +1,5 @@
 import os
+import random
 import time
 import json
 import copy
@@ -67,7 +68,12 @@ class UnifiedLLMClient:
                    temperature=0):
         model_config = self.config[model]
         api_host = model_config["api_host"]
-        api_key = model_config["api_key"]
+
+        if type(model_config['api_key']) == list:
+            api_key = random.sample(model_config['api_key'], 1)[0]
+        else:
+            api_key = model_config["api_key"]
+
         full_model_name = model_config["full-model-name"]
         extra_body = model_config.get("extra_body", {})
 
