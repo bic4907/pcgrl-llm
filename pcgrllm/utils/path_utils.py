@@ -40,13 +40,24 @@ def get_exp_group(config):
             'pe': config.pe,
             'it': config.total_iterations,
             'fit': config.fitness_evaluator,
-            'exp': config.exp_name
+            'exp': config.exp_name,
         }
 
         # key와 value를 '_'로 구분하여 join
         exp_group = os.path.join(
             '_'.join([f'{key}-{value}' for key, value in config_dict.items()])
         )
+
+        flags_dict = {
+            'fewshot': 'fs',
+        }
+        # Append suffixes for enabled flags
+
+
+        for flag, suffix in flags_dict.items():
+            if getattr(config, flag, False):  # Check if the flag exists and is True
+                exp_group += f'_{suffix}'
+
     elif config.env_name == 'PlayPCGRL':
         exp_group = os.path.join(
             'saves',
