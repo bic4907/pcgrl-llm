@@ -88,6 +88,7 @@ class Config:
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
     wandb_resume: str = 'allow'
+    evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
 
     exp_group: Optional[str] = None
 
@@ -95,7 +96,6 @@ class Config:
     _img_dir: Optional[str] = None
     _numpy_dir: Optional[str] = None
     current_iteration: int = 0
-    fitness_evaluator: str = 'vit'
 
 
     ###########################################################################
@@ -139,7 +139,6 @@ class TrainConfig(Config):
     reward_function_path: Optional[str] = None
 
     agents: int = 1
-    evaluator: str = 'vit' # 'vit', 'hr'
     target_character: str = 'A'
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     total_iterations: int = 1

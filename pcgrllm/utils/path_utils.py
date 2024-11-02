@@ -39,7 +39,7 @@ def get_exp_group(config):
         config_dict = {
             'pe': config.pe,
             'it': config.total_iterations,
-            'fit': config.fitness_evaluator,
+            'fit': config.evaluator,
             'exp': config.exp_name,
         }
 
