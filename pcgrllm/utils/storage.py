@@ -158,6 +158,12 @@ class Iteration:
         with open(nodeinfo_path, 'w') as f:
             json.dump(node.to_dict(), f)
 
+    def set_evaluation_context(self, context: dict) -> None:
+        eval_path = join(self.root_path, 'evaluation.context.json')
+
+        with open(eval_path, 'w') as f:
+            json.dump(context, f)
+
     @property
     def node(self):
         return self.get_node()

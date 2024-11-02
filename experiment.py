@@ -30,6 +30,7 @@ from conf.config import TrainConfig
 from envs.pcgrl_env import get_prob_cls, ProbEnum, get_available_tiles
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
+from pcgrllm.evaluation.llm_evaluator import LLMEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
 from pcgrllm.utils.graph import GraphManager, NodeInfo
 
@@ -331,6 +332,9 @@ class Experiment:
             evaluator = ViTEvaluator(logger=self.logger)
         elif self.config.evaluator == 'hr':
             evaluator = HeuristicEvaluator(logger=self.logger)
+        elif self.config.evaluator == 'llm':
+            evaluator = LLMEvaluator(logger=self.logger, gpt_model=self.config.gpt_model, seed=self.config.seed,
+                                     n_generation_trials=self.config.n_generation_trials)
 
         iteration = Iteration.from_path(exp_dir)
 
