@@ -107,17 +107,22 @@ def log_feedback_data(logger, target_path: str, iteration: int):
     # Log the count of json and text files using logger
     logger.info(f"Logged {len(json_files)} json files and {len(text_files)} text files to wandb for feedback.")
 
-def log_evaluation_result(logger, result: EvaluationResult, iteration: int):
+def log_evaluation_result(logger, result: EvaluationResult, iteration: int, evaluator_type: str):
     if wandb.run is None: return None
 
     result_dict = result.to_dict()
 
     for key, value in result_dict.items():
+        if evaluator_type:
+            log_key = f'Evaluation/{evaluator_type}/{key}'
+        else:
+            log_key = f'Evaluation/{key}'
+
+
         wandb.log({
-            f'Evaluation/{key}': value,
+            f'{log_key}': value,
             f'Evaluation/llm_iteration': iteration
         })
-
 
     # Log the evaluation result using logger
     logger.info(f"Logged evaluation result to wandb for iteration {iteration}.")

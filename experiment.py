@@ -352,9 +352,26 @@ class Experiment:
             self.logging(f"Node evaluation score: {result.similarity}", level=logging.INFO)
             self.graph_manager.update(self.current_node, similarity=result.similarity)
 
-        log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration)
+        self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
 
-        self.logging(result, level=logging.INFO)
+        if self.config.evaluator == 'vit':
+            log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
+        else:
+            log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=self.config.evaluator)
+
+            # Get the evaluation result
+            vit_evaluator = ViTEvaluator(logger=self.logger)
+            vit_result = vit_evaluator.run(iteration=iteration, target_character=self.config.target_character)
+
+            # Save the evaluation result to the iteration file
+            result_path = path.join(exp_dir, 'evaluation.vit.json')
+            with open(result_path, 'w') as f:
+                json.dump(vit_result.to_dict(), f)
+
+            # Log the evaluation result
+            log_evaluation_result(logger=self.logger, result=vit_result, iteration=self._iteration, evaluator_type=None)
+            self.logging(f"ViT Result: {vit_result}", level=logging.INFO)
+
         return result
 
     def save_state(self):

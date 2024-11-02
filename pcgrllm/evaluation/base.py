@@ -26,8 +26,7 @@ class EvaluationResult:
         return {
             'similarity': self.similarity,
             'diversity': self.diversity,
-            'sample_size': self.sample_size,
-            'total': self.total
+            'sample_size': self.sample_size
         }
 
     @staticmethod
