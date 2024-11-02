@@ -65,6 +65,10 @@ class RewardGenerator:
         self.reference_csv = config.get('reference_csv', 'random_dataset.txt')
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
         self.file_path = path.join(self.shared_storage_path, 'prompt')
+
+        self.prev_eval_result = config.get('prev_eval_result', None)
+        self.auxiliary_prompt_path = config.get('auxiliary_prompt_path', None)
+
         self.example_path = path.join(self.shared_storage_path, 'example')
         if self.reference_csv == 'random_dataset.txt':
             self.reference_csv = path.join(self.example_path, self.reference_csv)
@@ -562,22 +566,23 @@ class RewardGenerator:
     def get_pe_prompt(self, pe: str):
         # files in the PE directory
 
-        if self.pe == 'io':
+        if pe == 'io':
             pe_file = path.join(self.file_path, PE_DIR, 'io.txt')
-        elif self.pe == 'cot':
+        elif pe == 'cot':
             pe_file = path.join(self.file_path, PE_DIR, 'cot.txt')
-        elif self.pe == 'cotsc':
+        elif pe == 'cotsc':
             pe_file = path.join(self.file_path, PE_DIR, 'cot.txt')
-        elif self.pe == 'tot':
+        elif pe == 'tot':
             pe_file = path.join(self.file_path, PE_DIR, 'cot.txt')
-        elif self.pe == 'got':
-            pe_file = path.join(self.file_path, PE_DIR, 'cot.txt')
+        elif pe == 'got':
+            pe_file = path.join(self.file_path, PE_DIR, 'got.txt')
         else:
             warnings.warn(f"Unknown PE type: {pe}. Using the default PE file.")
             pe_file = path.join(self.file_path, PE_DIR, 'io.txt')
 
         pe_template = file_to_string(pe_file)
-        if self.pe == 'tot':
+
+        if pe == 'tot':
             current_iteration = int((self.iteration_num - 1) // self.branch_factor + 1)
             total_iterations = int((self.config['total_iterations'] - 1) // self.branch_factor + 1)
             iteration_perc_str = "{:.1f}%".format(current_iteration / total_iterations * 100)
@@ -586,6 +591,20 @@ class RewardGenerator:
                 max_iteration_num=total_iterations,
                 perc_iteration=iteration_perc_str
             )
+        elif pe == 'got':
+            cot_prompt = self.get_pe_prompt(pe='cot')
+
+            if self.auxiliary_prompt_path is None:
+                auxiliary_prompt = "- No auxiliary prompt is provided."
+            else:
+                auxiliary_prompt = read_file(self.auxiliary_prompt_path)
+
+            pe_template = pe_template.format(
+                cot_prompt=cot_prompt,
+                eval_result=self.prev_eval_result,
+                auxiliary_prompt=auxiliary_prompt,
+            )
+
         else:
             iteration_perc_str = "{:.1f}%".format(self.config['iteration_num'] / self.config['total_iterations'] * 100)
             pe_template = pe_template.format(

@@ -4,14 +4,15 @@ from queue import Queue
 
 class NodeInfo:
     """Represents a node information."""
-    def __init__(self, node_id: int, parent_id: int, iteration: int) -> None:
+    def __init__(self, node_id: int, parent_id: int, iteration: int, refer_ids: list = list()) -> None:
         self.node_id: int = node_id
         self.parent_id: int = parent_id
         self.iteration: int = iteration
+        self.refer_ids: List[int] = refer_ids
 
     def __str__(self) -> str:
         return (
-            f"NodeInfo(node_id={self.node_id}, parent_id={self.parent_id}, iteration={self.iteration})"
+            f"NodeInfo(node_id={self.node_id}, parent_id={self.parent_id}, iteration={self.iteration}, refer_ids={self.refer_ids})"
         )
 
 
@@ -20,7 +21,8 @@ class NodeInfo:
         return {
             'node_id': self.node_id,
             'parent_id': self.parent_id,
-            'iteration': self.iteration
+            'iteration': self.iteration,
+            'refer_ids': self.refer_ids
         }
 
     def update(self, **kwargs) -> None:
@@ -143,3 +145,18 @@ class GraphManager:
         if iteration:
             return iteration.node
         return None
+
+    from typing import List
+
+    def get_best_iteration_nums(self, max_n: int, excludes: list = list()) -> List[int]:
+        """Returns the best n iterations excluding the ones in the excludes list."""
+        iterations = self.storage.get_iterations()
+        iterations = [iteration for iteration in iterations if iteration.iteration_num not in excludes]
+
+        # Sort iterations based on similarity in descending order
+        best_iterations = sorted(iterations, key=lambda x: x.get_evaluation().similarity, reverse=True)
+
+        # Get the top n iterations, or all available iterations if there are fewer than n
+        best_iteration_nums = [iteration.iteration_num for iteration in best_iterations[:min(max_n, len(best_iterations))]]
+
+        return best_iteration_nums
