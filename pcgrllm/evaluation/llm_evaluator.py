@@ -60,7 +60,6 @@ class LLMEvaluator(LevelEvaluator):
                     try:
                         parsed_response = json.loads(match)
 
-                        # TODO the context json to the response
                         iteration.set_evaluation_context(context.to_json())
 
                         return EvaluationResult(similarity=parsed_response.get('similarity'),
