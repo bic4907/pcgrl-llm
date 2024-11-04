@@ -309,11 +309,7 @@ def load_sweep_hypers(cfg: SweepConfig):
 
 def run_evaluation(config: Config, logger) -> Optional[EvaluationResult]:
 
-    if config.evaluator == 'vit':
-        evaluator = ViTEvaluator(logger=logger)
-    elif config.evaluator == 'hr':
-        evaluator = HeuristicEvaluator(logger=logger)
-
+    evaluator = ViTEvaluator(logger=logger)
     iteration = Iteration.from_path(config.exp_dir)
 
     # if exp_dir includes 'iteration', then it is a path to the iteration directory
