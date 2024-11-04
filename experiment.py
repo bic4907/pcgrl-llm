@@ -51,7 +51,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="orbax")
 warnings.filterwarnings("ignore", category=FutureWarning, module="jax")
 
 # Configure logging
-log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+log_level = os.getenv('LOG_LEVEL', 'DEBUG').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
 logging.basicConfig(level=getattr(logging, log_level, logging.INFO))
 
 
@@ -471,7 +471,7 @@ class Experiment:
                 self._current_reward_function_filename = reward_generation_fn()
 
                 if self._current_reward_function_filename is False:
-                    self.exit("Reward function generation failed. Exiting.")
+                    self.exit("Reward function generation failed. Exiting.", code=1)
                 else:
 
                     reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
@@ -548,6 +548,9 @@ class Experiment:
 
     def exit(self, message: str, code: int = 1):
         self.logging(message, level=logging.ERROR)
+
+        if code != 0:
+            raise SystemExit(message)
         exit(code)
 
     def _setup_logger(self):

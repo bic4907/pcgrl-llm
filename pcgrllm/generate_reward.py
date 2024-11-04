@@ -17,6 +17,7 @@ from os.path import abspath, basename
 import logging
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
+from transformers.models.esm.openfold_utils import permute_final_dims
 
 from conf.config import TrainLLMConfig, TrainConfig, Config
 from envs.probs.binary import BinaryTiles
@@ -341,7 +342,7 @@ class RewardGenerator:
     def _get_array_feature(self):
         prompt = self.get_feature_prompt('array')
 
-        level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
+        # level_shape_str = f"({self.config['map_height']}, {self.config['map_width']})"
 
         available_tiles = set(self.available_tiles) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
 
@@ -350,7 +351,7 @@ class RewardGenerator:
 
         # Format the prompt with values
         return prompt.format(
-            array_shape=level_shape_str,
+            # array_shape=level_shape_str,
             tile_enum=tile_enum
         )
 
@@ -484,11 +485,17 @@ class RewardGenerator:
             ```
             """.format(sample_reward_code=self.previous_reward_function)
 
+            # if the every first iteration, use the io prompt
+            if self.iteration_num == 1:
+                pe_prompt = self.get_pe_prompt('io')
+            else:
+                pe_prompt = self.get_pe_prompt(self.pe)
+
             initial_user = initial_user.format(
                 target_character=self.config['target_character'],
                 few_shot_code_string=sample_code,
                 reward_function_inputs=reward_function_inputs,
-                thought_tips=self.get_pe_prompt(self.pe),
+                thought_tips=pe_prompt,
             )
 
 

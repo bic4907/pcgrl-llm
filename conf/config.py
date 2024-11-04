@@ -87,7 +87,7 @@ class Config:
     # Wandb
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
-    wandb_resume: str = 'allow'
+    wandb_resume: str = 'auto'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
 
     exp_group: Optional[str] = None

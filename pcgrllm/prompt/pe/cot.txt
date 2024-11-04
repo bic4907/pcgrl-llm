@@ -1,6 +1,4 @@
-You have to generate the reward function step-by-step in several iterations.
-The reward function is revised trial-and-error and could get feedback on end of each iteration.
-In the early stage, starts with a very simple reward function and dense reward function;
-After the complete content is generated well, then you can try to make the reward function more complex to enhance diversity.
+Reward function is improved by getting feedback on end of each iteration.
+The reward generation should be completed by the end of the iteration.
 
 Current Iteration: {curr_iteration_num} / Max Iteration: {max_iteration_num} ({perc_iteration})
