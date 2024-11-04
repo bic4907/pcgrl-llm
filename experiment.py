@@ -84,6 +84,7 @@ class Experiment:
         self._current_feedback_path = None
         self.previous_reward_function_path = None
         self.previous_feedback_path = None
+        self.auxiliary_iter_nums = list()
 
         self.storage = Storage(self.config.exp_dir)
         self.graph_manager = GraphManager(storage=self.storage, max_breadth=self.config.branch_factor)
@@ -360,9 +361,9 @@ class Experiment:
         with open(result_path, 'w') as f:
             json.dump(result.to_dict(), f)
 
-        if self.config.pe == ['tot',' got']:
+        if self.config.pe in ['tot', 'got']:
             self.logging(f"Node evaluation score: {result.similarity}", level=logging.INFO)
-            self.graph_manager.update(self.current_node, similarity=result.similarity)
+            self.graph_manager.update(self.current_node, similarity=result.similarity, refer_ids=self.auxiliary_iter_nums)
 
         self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
 
