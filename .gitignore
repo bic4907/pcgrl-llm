@@ -17,3 +17,4 @@ user_defined_freezies/*.npy
 wandb
 .DS_Store
 wandb_cache
+wandb_output_*
