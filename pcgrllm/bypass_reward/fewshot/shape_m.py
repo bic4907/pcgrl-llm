@@ -9,11 +9,11 @@ def compute_reward(prev_array, unused3, curr_array, unused4) -> float:
     target_m = jnp.ones((height, width)) * 2  # Start with all walls
 
     # Create the "M" pattern
-    mid_point = width // 2
+
     for i in range(height):
         target_m = target_m.at[i, 0].set(1)  # Left vertical line
         target_m = target_m.at[i, width - 1].set(1)  # Right vertical line
-        if i <= height // 2:
+        if i <= height:
             target_m = target_m.at[i, i].set(1)  # Left diagonal
             target_m = target_m.at[i, width - 1 - i].set(1)  # Right diagonal
 

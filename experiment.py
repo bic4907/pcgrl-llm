@@ -456,7 +456,7 @@ class Experiment:
                         self.previous_feedback_path = iteration.get_feedback_path()
 
                 if self.config.fewshot is True and self._iteration == 1:
-                    fewshot_reward = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}_thick.py')
+                    fewshot_reward = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}.py')
                     self.logging(f"Fewshot reward function: {fewshot_reward}", level=logging.INFO)
                     self.previous_reward_function_path = fewshot_reward
 

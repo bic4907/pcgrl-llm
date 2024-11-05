@@ -14,8 +14,8 @@ def compute_reward(prev_array, unused3, curr_array, unused4) -> float:
 
     # Add the top and middle horizontal lines
     for j in range(width):
-        target_f = target_f.at[0, j].set(1)  # Top horizontal line
-        if j < width // 2:  # Middle horizontal line (halfway)
+        target_f = target_f.at[1, j].set(1)  # Top horizontal line
+        if j < width // 4:  # Middle horizontal line (halfway)
             target_f = target_f.at[height // 2, j].set(1)
 
     # Calculate the reward based on similarity to the target "F"
