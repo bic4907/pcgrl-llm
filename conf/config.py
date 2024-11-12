@@ -325,6 +325,9 @@ class TrainLLMConfig(Config):
 
     branch_factor: Optional[int] = 2
 
+    n_codegen_trials: int = 1
+    n_codefix_trials: int = 5
+
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
 cs.store(name="ma_config", node=MultiAgentConfig)

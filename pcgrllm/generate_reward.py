@@ -43,6 +43,7 @@ PE_DIR = 'pe'
 FEATURE_DIR = 'feature'
 TASK_DIR = 'task'
 
+
 class RewardGenerator:
     def __init__(self, config: dict):
         self.config = config
@@ -54,16 +55,19 @@ class RewardGenerator:
         self.gpt_model = config.get('gpt_model', 'gpt-3.5-turbo')
         self.gpt_max_token = config.get('gpt_max_token', 1024)
         self.verbose = config.get('verbose', False)
-        self.n_inner = config.get('n_inner', 3)
+        self.n_inner = 1  # Legacy
 
         self.current_inner = config.get('current_inner', 1)
 
         self.n_outer = config.get('n_outer', 3)
         self._current_trial = 0
-        self.trial_count = config.get('trial_count', 3)
+
+        self.n_codegen_trials = config.get('n_codegen_trials', 1)
+        self.n_codefix_trials = config.get('n_codefix_trials', 3)
+
         self.iteration_num = config.get('iteration_num', 1)
         self.branch_factor = config.get('branch_factor', None)
-        self.reference_csv = config.get('reference_csv', 'random_dataset.txt')
+
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
         self.file_path = path.join(self.shared_storage_path, 'prompt')
 
@@ -71,11 +75,9 @@ class RewardGenerator:
         self.auxiliary_prompt_path = config.get('auxiliary_prompt_path', None)
 
         self.example_path = path.join(self.shared_storage_path, 'example')
-        if self.reference_csv == 'random_dataset.txt':
-            self.reference_csv = path.join(self.example_path, self.reference_csv)
         self.current_state_path = path.abspath(path.join(self.shared_storage_path, 'example', 'testState.json'))
         self.reward_function_path = path.join(self.shared_storage_path, self.reward_functions_dir,
-                                         (str(self.postfix) + '_inner_' + str(self.n_inner)))
+                                              (str(self.postfix) + '_inner_' + str(self.n_inner)))
         self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
         self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
 
@@ -101,7 +103,6 @@ class RewardGenerator:
         # previous 나중에 변경하기
         default_reward = path.join(self.file_path, "compute_reward_example.py")
 
-
         self.previous_reward_function_path = config.get('previous_reward_function', None)
         if self.previous_reward_function_path is None:
             self.previous_reward_function_path = default_reward
@@ -109,34 +110,35 @@ class RewardGenerator:
 
         os.makedirs(self.reward_function_path, exist_ok=True)
 
-
         self.initial_reward_function = config.get('initial_reward_function', None)
 
         if self.initial_reward_function is not None:
             self._prepare_initial_reward_function()
 
-
         self.logging(f'Reward generation arguments:\n{pprint.pformat(config, indent=4)}', logging.INFO)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
 
-
     def logging(self, message, level=logging.DEBUG):
         info_dict = {
             'outer_loop': self.iteration_num if hasattr(self, 'iteration_num') else -1,
-            'inner_loop': self.current_inner,
+            # 'innen_innerr_loop': self.current_inner,
             'n_inner': self.n_inner,
-            'trial': self._current_trial if hasattr(self, '_current_trial') else -1,  # Assuming self._current_trial is a class attribute
-            'trial_count': self.trial_count if hasattr(self, 'trial_count') else -1,
+            'codegen_total': self.n_codegen_trials,
+            'codegen_trial': self._curr_codegen_trial if hasattr(self, '_curr_codegen_trial') else -1,
+            'fix_total': self.n_codefix_trials,
+            'fix_trial': self._curr_codefix_trial if hasattr(self, '_curr_codefix_trial') else -1,
         }
 
         # Define the prefix format
-        prefix = '[iter: {outer_loop}, self-alignment: {inner_loop} / {n_inner}, trial: {trial} / {trial_count}]'.format(**info_dict)
+        prefix = '[iter: {outer_loop}, codegen: {codegen_trial}/{codegen_total}, fixing: {fix_trial}/{fix_total}]'.format(
+            **info_dict)
 
         # Split the message by line breaks and log each line with the prefix
         message = str(message)
         for line in message.splitlines():
             formatted_message = f'{prefix} {line}'
+            logger.setLevel(logging.DEBUG)
             logger.log(level, formatted_message)
 
     def _prepare_initial_reward_function(self):
@@ -149,11 +151,9 @@ class RewardGenerator:
 
         self.generating_function_path = initial_reward_function_path
         self.previous_reward_function = file_to_string(self.generating_function_path)
-        self.logging(f"Copied the initial reward function to the reward function path: {self.initial_reward_function} -> {initial_reward_function_path}", logging.INFO)
-
-
-
-
+        self.logging(
+            f"Copied the initial reward function to the reward function path: {self.initial_reward_function} -> {initial_reward_function_path}",
+            logging.INFO)
 
     def start_chat(self, model, messages, max_tokens, log_dict=None, log_key='first_user', passthrough_response=None,
                    verbose=False, seed=42, n_response=1):
@@ -168,7 +168,8 @@ class RewardGenerator:
                     temperature = 0.5
                 else:
                     temperature = 0
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response, temperature=temperature)
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response,
+                                              temperature=temperature)
                 if n_response != 1:
                     generated_responses = [response[0] for response in responses]
                     generated_contexts = [response[1] for response in responses]
@@ -199,9 +200,16 @@ class RewardGenerator:
 
     def run(self):
 
-        while self.current_inner <= self.n_inner:
-            reward_function_name = f"{self.postfix}_inner_{self.current_inner}"
-            is_success = False
+        is_success = False
+
+        reward_function_name = f"{self.postfix}_inner_{self.current_inner}"
+
+        for codegen_trial in range(1, self.n_codegen_trials + 1):
+            self._curr_codegen_trial = codegen_trial
+
+            fn_codegen_name = f"{reward_function_name}_trial_{codegen_trial}"
+            fn_codegen_dir = path.join(self.reward_function_path, fn_codegen_name)
+            os.makedirs(fn_codegen_dir, exist_ok=True)
 
             generating_function_path = None
             generating_function_error = None
@@ -216,40 +224,37 @@ class RewardGenerator:
 
             self.logging(f"Generating reward function: {generating_function_path}", logging.DEBUG)
 
-            for i_trial in range(1, self.trial_count + 1):
+            # 여기서 수정 하는것만 짜자
 
-                self._current_trial = i_trial
-                basename = f"{reward_function_name}_trial_{i_trial}"
+            for codefix_trial in range(0, self.n_codefix_trials + 1):
+                self._curr_codefix_trial = codefix_trial
 
-                self.logging(f"Generating reward function: {basename}", logging.INFO)
+                fn_codefix_name = f"{fn_codegen_name}_fix_{codefix_trial}"
 
-                if self.current_inner == 1 and self.iteration_num == 1:
-                    self.logging(f'Calling the zero-shot generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path = self.first_user_response(basename=basename,
-                                                                        generating_function_path=generating_function_path,
-                                                                        generating_function_error=generating_function_error,
-                                                                        trial=i_trial)
-                    self.logging(f'Called the first_user_response function')
-                else:
-                    self.logging(f'Calling the inner-loop generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
-                    generating_function_path = self.first_user_response(basename=basename,
-                                                                        generating_function_path=generating_function_path,
-                                                                        generating_function_error=generating_function_error,
-                                                                        trial=i_trial)
-                    # TODO implement second_user_function with the feedback prompts
-                    self.logging(f'Called the second_user_response function')
+                self.logging(f"Generating reward function: {fn_codegen_name}", logging.INFO)
 
+                self.logging(
+                    f'Calling the zero-shot generation function. (len(error): {len(generating_function_error) if generating_function_error else 0})')
+                generating_function_path = self.first_user_response(base_name=fn_codefix_name,
+                                                                    base_directory=fn_codegen_dir,
+                                                                    generating_function_path=generating_function_path,
+                                                                    generating_function_error=generating_function_error,
+                                                                    trial=codegen_trial)
+                self.logging(f'Called the first_user_response function')
+
+                # copy file generating_function_path to fn_codegen_name.py
+                shutil.copy(generating_function_path, path.join(self.reward_function_path, f"{fn_codegen_name}.py"))
 
                 error_message = None
 
                 try:
                     self.logging(f"Parsing the reward function: {generating_function_path}", logging.DEBUG)
+
                     reward_function = self.parse_reward_function(generating_function_path)
 
                     # Overwrite the reward function
                     with open(generating_function_path, 'w') as f:
                         f.write(reward_function)
-
 
                     if hasattr(self, '_execution_config'):
                         self.logging(f"Validating the reward function: {generating_function_path}", logging.DEBUG)
@@ -265,29 +270,33 @@ class RewardGenerator:
                     error_message = str(e)
                     is_success = False
 
-
                 if is_success:
                     self.previous_reward_function = file_to_string(generating_function_path)
                     self.previous_reward_function_path = generating_function_path
+
+                    # copy to reward file
+
                     break
                 else:
                     generating_function_error = error_message
 
-            if not is_success:
-                self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
-                return False
+            if is_success:
+                break
+            else:
+                self.logging(f"Failed to generate the reward function: {generating_function_path}", logging.WARNING)
 
-            self.current_inner += 1
+        if is_success:
+            reward_function_string = file_to_string(generating_function_path)
+            reward_function_file_path = path.join(self.reward_function_path, f"{reward_function_name}.py")
 
-        # Save the reward function to the file
+            with open(reward_function_file_path, 'w') as f:
+                self.logging(f"Saving the reward function to the file: {reward_function_file_path}", logging.INFO)
+                f.write(reward_function_string)
 
-        reward_function_string = file_to_string(generating_function_path)
-        reward_function_file_path = path.join(self.reward_function_path, f"{reward_function_name}.py")
-        with open(reward_function_file_path, 'w') as f:
-            self.logging(f"Saving the reward function to the file: {reward_function_file_path}", logging.INFO)
-            f.write(reward_function_string)
-
-        return reward_function_file_path
+            return reward_function_file_path
+        else:
+            self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
+            return False
 
     def response_cluster(self, responses, n_clusters=2):
         # set environment variable for
@@ -361,7 +370,6 @@ class RewardGenerator:
         prompt = self.get_feature_prompt('stats')
         return prompt
 
-
     def get_initial_user(self):
         initial_user = copy.deepcopy(self.initial_user)
 
@@ -375,20 +383,23 @@ class RewardGenerator:
 
         return initial_user
 
-    def save_data(self, response: str, context: list, messages: list, basename: str = 'reward', branch: int=None):
+    def save_data(self, response: str, context: list, messages: list,
+                  base_directory: str = '',
+                  base_name: str = 'reward', branch: int = None):
 
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
-        if branch is None:
-            file_name = f"{basename}"
-        else:
-            file_name = f"{basename}_branch_{branch}"
 
-        response_file_path = path.join(self.reward_function_path, f"{file_name}.response.pkl")
+        if branch is None:
+            file_name = f"{base_name}"
+        else:
+            file_name = f"{base_name}_branch_{branch}"
+
+        response_file_path = path.join(base_directory, f"{base_name}.response.pkl")
         with open(response_file_path, 'wb') as f:
             pickle.dump(response, f)
 
-        context_file_path = path.join(self.reward_function_path, f"{file_name}.context.pkl")
+        context_file_path = path.join(base_directory, f"{base_name}.context.pkl")
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
 
@@ -400,19 +411,23 @@ class RewardGenerator:
         }
 
         # Save reward function to .py
-        reward_file_path = path.join(self.reward_function_path, f"{file_name}.py")
+        reward_file_path = path.join(base_directory, f"{file_name}.py")
         with open(reward_file_path, 'w') as f:
             f.write(parsed_reward_function)
 
         # Save the log to .json file
-        log_file_path = path.join(self.reward_function_path, f"{file_name}.json")
+        log_file_path = path.join(base_directory, f"{file_name}.json")
         with open(log_file_path, 'w') as f:
             json.dump(log_dict, f, indent=4)
 
         return reward_file_path
 
-
-    def first_user_response(self, basename: str = 'reward', generating_function_path: str = None, generating_function_error: str = None, trial=1):
+    def first_user_response(self,
+                            base_name: str = 'reward',
+                            base_directory: str = None,
+                            generating_function_path: str = None,
+                            generating_function_error: str = None,
+                            trial=1):
 
         initial_system = self.initial_system.format(
             i='{i}',
@@ -426,13 +441,9 @@ class RewardGenerator:
 
         initial_user = self.get_initial_user()
 
-
         reward_function_inputs = self.get_input_prompt()
 
-
         if generating_function_error:
-
-
             reward_code = file_to_string(generating_function_path)
 
             sample_code = """
@@ -443,7 +454,7 @@ class RewardGenerator:
             ```
             Error Message:
             {error_message}
-            
+
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
@@ -454,7 +465,7 @@ class RewardGenerator:
             )
 
 
-        elif self.config['feedback_path'] is not None: # Feedback available
+        elif self.config['feedback_path'] is not None:  # Feedback available
 
             reward_code = file_to_string(generating_function_path)
 
@@ -464,7 +475,7 @@ class RewardGenerator:
                ```python
                {reward_code_string}
                ```
-               
+
                ### Feedback:
                {feedback}
                 Please update the reward function based on the feedback and generate the reward function again.
@@ -498,7 +509,6 @@ class RewardGenerator:
                 thought_tips=pe_prompt,
             )
 
-
         # 피드백 받는 부분 작성 필요함
 
         messages = [
@@ -509,17 +519,18 @@ class RewardGenerator:
         self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
         if self.pe == 'cotsc':
-            responses, contexts, index = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial, n_response=5)
+            responses, contexts, index = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial,
+                                                         n_response=5)
 
             for i, (response, context) in enumerate(zip(responses, contexts)):
                 self.logging(context, logging.INFO)
                 self.logging(response, logging.DEBUG)
 
-                response_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.response.pkl")
+                response_file_path = path.join(base_directory, f"{base_name}_branch_{i}.response.pkl")
                 with open(response_file_path, 'wb') as f:
                     pickle.dump(response, f)
 
-                context_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.context.pkl")
+                context_file_path = path.join(base_directory, f"{base_name}_branch_{i}.context.pkl")
                 with open(context_file_path, 'wb') as f:
                     pickle.dump(context, f)
 
@@ -531,16 +542,20 @@ class RewardGenerator:
                 parsed_reward_function = parse_reward_function(response)
 
                 # Save reward function to .py
-                reward_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.py")
+                reward_file_path = path.join(base_directory, f"{base_name}_branch_{i}.py")
                 with open(reward_file_path, 'w') as f:
                     f.write(parsed_reward_function)
 
                 # Save the log to .json file
-                log_file_path = path.join(self.reward_function_path, f"{basename}_branch_{i}.json")
+                log_file_path = path.join(base_directory, f"{base_name}_branch_{i}.json")
                 with open(log_file_path, 'w') as f:
                     json.dump(log_dict, f, indent=4)
 
-                self.save_data(response=response, context=context, messages=messages, branch=i)
+                self.save_data(response=response,
+                               context=context,
+                               base_directory=base_directory,
+                               base_name=base_name,
+                               messages=messages, branch=i)
 
             log_dict = {
                 'selected_branch': f'branch_{index}'
@@ -554,19 +569,22 @@ class RewardGenerator:
         else:
             response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
 
-            
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
 
-        response_file_path = path.join(self.reward_function_path, f"{basename}.response.pkl")
+        response_file_path = path.join(base_directory, f"{base_name}.response.pkl")
         with open(response_file_path, 'wb') as f:
             pickle.dump(response, f)
 
-        context_file_path = path.join(self.reward_function_path, f"{basename}.context.pkl")
+        context_file_path = path.join(base_directory, f"{base_name}.context.pkl")
         with open(context_file_path, 'wb') as f:
             pickle.dump(context, f)
 
-        reward_file_path = self.save_data(response=response, context=context, messages=messages)
+        reward_file_path = self.save_data(response=response,
+                                          context=context,
+                                          base_directory=base_directory,
+                                          base_name=base_name,
+                                          messages=messages)
 
         return reward_file_path
 
@@ -667,26 +685,28 @@ class RewardGenerator:
 
         return result
 
+
 def generate_reward(config: Config, generate_args: dict):
     reward_generator = RewardGenerator(generate_args)
     reward_generator.set_execution_config(config)
     return reward_generator.run()
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--api_key', type=str, default=None)
-    parser.add_argument('--shared_storage_path', type=str, default='.')
+    parser.add_argument('--shared_storage_path', type=str, default=abspath('.'))
     parser.add_argument('--postfix', type=str, default=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     parser.add_argument('--reward_functions_dir', type=str, default='RewardFunctions')
-    parser.add_argument('--gpt_model', type=str, default='llama3-70b-instruct')
+    parser.add_argument('--gpt_model', type=str, default='gpt-4o-mini')
     parser.add_argument('--gpt_max_token', type=int, default=4096)
     parser.add_argument('--verbose', default=False, action='store_true')
     parser.add_argument('--current_inner', type=int, default=1)
-    parser.add_argument('--n_inner', type=int, default=1)
-    parser.add_argument('--n_outer', type=int, default=1)
-    parser.add_argument('--reference_csv', type=str, default='random_dataset.txt')
+    parser.add_argument('--task', type=str, default='alphabet')
+    parser.add_argument('--available_tiles', type=list, default=list())
     parser.add_argument('--arbitrary_dataset', type=str, default='./example/random_dataset.txt')
-    parser.add_argument('--trial_count', type=int, default=10)
+    parser.add_argument('--n_codegen_trials', type=int, default=2)
+    parser.add_argument('--n_codefix_trials', type=int, default=2)
     parser.add_argument('--iteration_num', type=int, default=1)
     parser.add_argument('--previous_reward_function', type=str, default=None)
     parser.add_argument('--map_width', type=int, default=16)
@@ -702,4 +722,7 @@ if __name__ == "__main__":
 
     args = vars(args)
     reward_generator = RewardGenerator(args)
+
+    reward_generator.set_execution_config(TrainLLMConfig())
+
     reward_generator.run()
