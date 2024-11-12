@@ -21,6 +21,6 @@ def get_reward_score_paired_examples(storage: 'Storage', best_iteration_nums: li
             # Format each example with a clear header for distinction
             reward_score += f"[Reference {idx}]:\n"
             reward_score += f"Reward Function:\n```\n{reward_prompt}\n```\n"
-            reward_score += f"** Score: {score_prompt} **\n\n"
+            # reward_score += f"** Score: {score_prompt} **\n\n"
 
     return reward_score

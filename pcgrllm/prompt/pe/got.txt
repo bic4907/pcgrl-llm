@@ -1,8 +1,5 @@
 {cot_prompt}
 
-Previous reward score:
-{eval_result}
-
 ---
 
 Review the reward functions and evaluation results from previous iterations and identify the key insights which produces high score result.
