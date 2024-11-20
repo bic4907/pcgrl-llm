@@ -103,6 +103,9 @@ class Config:
     available_tiles: List[int] = field(default_factory=lambda: [])
     task: str = "alphabet"
 
+    randomize_start_pos: bool = False
+
+
 @dataclass
 class EvoMapConfig(Config):
     n_generations: int = 100_000
