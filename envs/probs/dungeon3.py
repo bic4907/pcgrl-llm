@@ -1,8 +1,8 @@
+import random
 from enum import IntEnum
 import math
 import os
 from functools import partial
-from typing import Optional
 
 import chex
 from flax import struct
@@ -12,14 +12,15 @@ from PIL import Image
 import numpy as np
 
 from envs.pathfinding import FloodPath, FloodPathState, FloodRegions, FloodRegionsState, calc_diameter, calc_n_regions, calc_path_length, get_max_n_regions, get_max_path_length, get_max_path_length_static, get_path_coords
-from envs.probs.problem import Problem, ProblemState, draw_path, get_max_loss, get_reward, gen_init_map
+from envs.probs.dungeon2 import Dungeon2Metrics
+from envs.probs.problem import Problem, ProblemState, draw_path, get_max_loss, get_reward, gen_init_map, MapData
 from envs.utils import idx_dict_to_arr, Tiles
 
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
 
-class DungeonTiles(IntEnum):
+class Dungeon3Tiles(IntEnum):
     BORDER = 0
     EMPTY = 1
     WALL = 2
@@ -31,76 +32,55 @@ class DungeonTiles(IntEnum):
     DOOR = 8
 
 
-class DungeonMetrics(IntEnum):
+class Dungeon3Metrics(IntEnum):
     N_REGIONS = 0
-    N_ENEMIES = 1
-    N_PLAYERS = 2
-    N_KEYS = 3
-    N_DOORS = 4
-    PATH_LENGTH = 5
-    NEAREST_ENEMY = 6
+
 
 
 @struct.dataclass
-class DungeonState(ProblemState):
-    player_key_flood_count: Optional[chex.Array] = None
-    key_door_flood_count: Optional[chex.Array] = None
-    player_enemy_flood_count: Optional[chex.Array] = None
-    enemy_xy: Optional[chex.Array] = None
-    k_xy: Optional[chex.Array] = None
-    d_xy: Optional[chex.Array] = None
+class Dungeon3State(ProblemState):
+    pass
+
+class Dungeon3Problem(Problem):
+    tile_enum = Dungeon3Tiles
+    metrics_enum = Dungeon3Metrics
+
+    ctrl_threshes = np.zeros(len(Dungeon3Metrics))
+    ctrl_threshes[Dungeon3Metrics.N_REGIONS] = 2
+
+    ctrl_metrics_mask = np.zeros(len(Dungeon3Metrics))
+
+    randomize_start_position: bool = False
 
 
-class DungeonProblem(Problem):
-    tile_enum = DungeonTiles
-    metrics_enum = DungeonMetrics
-    ctrl_threshes = np.zeros(len(DungeonMetrics))
-
-    # tile_probs = [0.0] * len(tile_enum)
     tile_probs = {
-        DungeonTiles.BORDER: 0.0,
-        DungeonTiles.EMPTY: 0.58,
-        DungeonTiles.WALL: 0.3,
-        DungeonTiles.PLAYER: 0.02,
-        DungeonTiles.KEY: 0.02,
-        DungeonTiles.DOOR: 0.02,
-        DungeonTiles.BAT: 0.02,
-        DungeonTiles.SCORPION: 0.02,
-        DungeonTiles.SPIDER: 0.02,
+        Dungeon3Tiles.BORDER: 0.0,
+        Dungeon3Tiles.EMPTY: 0.58,
+        Dungeon3Tiles.WALL: 0.3,
+        Dungeon3Tiles.PLAYER: 0.00, # Don't place this block on initialization
+        Dungeon3Tiles.KEY: 0.02,
+        Dungeon3Tiles.DOOR: 0.00,  # Don't place this block on initialization
+        Dungeon3Tiles.BAT: 0.02,
+        Dungeon3Tiles.SCORPION: 0.02,
+        Dungeon3Tiles.SPIDER: 0.02,
     }
     tile_probs = tuple(idx_dict_to_arr(tile_probs))
 
-    tile_nums = [0 for _ in range(len(tile_enum))]
-    tile_nums[DungeonTiles.PLAYER] = 1
-    tile_nums[DungeonTiles.DOOR] = 1
-    tile_nums[DungeonTiles.KEY] = 1
-    tile_nums = tuple(tile_nums)
-
     stat_weights = {
-        DungeonMetrics.N_REGIONS: 5,
-        DungeonMetrics.N_PLAYERS: 3,
-        DungeonMetrics.N_ENEMIES: 3,
-        DungeonMetrics.N_KEYS: 3,
-        DungeonMetrics.N_DOORS: 3,
-        DungeonMetrics.NEAREST_ENEMY: 2,
-        DungeonMetrics.PATH_LENGTH: 1,
+        Dungeon3Metrics.N_REGIONS: 1,
     }
     stat_weights = idx_dict_to_arr(stat_weights)
 
-    stat_trgs = {
-        DungeonMetrics.N_REGIONS: 1,
-        DungeonMetrics.N_PLAYERS: 1,
-        DungeonMetrics.N_KEYS: 1,
-        DungeonMetrics.N_DOORS: 1,
-        # DungeonMetrics.N_ENEMIES: (2, 5),
-        DungeonMetrics.N_ENEMIES: 3.5,
-        DungeonMetrics.PATH_LENGTH: 'max',
-        DungeonMetrics.NEAREST_ENEMY: (2, np.inf),
-    }
+    tile_nums = [0 for _ in range(len(tile_enum))]
+    tile_nums[Dungeon3Tiles.PLAYER] = 1
+    tile_nums[Dungeon3Tiles.DOOR] = 1
+    tile_nums[Dungeon3Tiles.KEY] = 1
+    tile_nums = tuple(tile_nums)
 
-    passable_tiles = jnp.array([DungeonTiles.EMPTY, DungeonTiles.KEY])
-                                # DungeonTiles.SCORPION, DungeonTiles.SPIDER,
-                                # DungeonTiles.BAT])
+    # Passible tiles 등록하기
+    passable_tiles = jnp.array([Dungeon3Tiles.EMPTY, Dungeon3Tiles.KEY,
+                                ])
+
 
     def __init__(self, map_shape, ctrl_metrics, pinpoints):
         self.flood_path_net = FloodPath()
@@ -110,26 +90,11 @@ class DungeonProblem(Problem):
         self.max_path_len = get_max_path_length_static(map_shape)
         self.n_tiles = math.prod(map_shape)
 
-        # Note that we implement target intervals by using target floats
-        # and thresholds (i.e. allowable margins of error around the target
-        # resulting in equivalent reward). To implement an unbounded range (e.g.
-        # [0, inf]), we use some large upper bound on the metric value as target.
         stat_trgs = {
-            DungeonMetrics.N_REGIONS: 1,
-            DungeonMetrics.N_PLAYERS: 1,
-            DungeonMetrics.N_KEYS: 1,
-            DungeonMetrics.N_DOORS: 1,
-            # DungeonMetrics.N_ENEMIES: (2, 5),
-            DungeonMetrics.N_ENEMIES: 3.5,
-            DungeonMetrics.PATH_LENGTH: np.inf,
-            # DungeonMetrics.NEAREST_ENEMY: (2, np.inf),
-
-            # FIXME: This should be max_path_len
-            DungeonMetrics.NEAREST_ENEMY: self.n_tiles,
+            Dungeon3Metrics.N_REGIONS: 1,
         }
         self.stat_trgs = idx_dict_to_arr(stat_trgs)
-        self.ctrl_threshes[DungeonMetrics.N_ENEMIES] = 3
-        self.ctrl_threshes[DungeonMetrics.NEAREST_ENEMY] = self.n_tiles - 2
+        self.ctrl_threshes[Dungeon2Metrics.N_REGIONS] = 1
 
         super().__init__(map_shape=map_shape, ctrl_metrics=ctrl_metrics, pinpoints=pinpoints)
 
@@ -139,107 +104,74 @@ class DungeonProblem(Problem):
 
 
         init_map = gen_init_map(rng, self.tile_enum, self.map_shape, self.tile_probs,
-                            randomize_map_shape=randomize_map_shape, empty_start=empty_start, tile_nums=self.tile_nums,
-                            pinpoints=pinpoints)
+                                randomize_map_shape=randomize_map_shape,
+                                empty_start=empty_start,
+                                tile_nums=self.tile_nums,
+                                pinpoints=pinpoints)
 
-        # TODO Randomize하게 start point와 end point를 배치하는 작업이 필요함
-        # randomize_startend_point로 randomize 할지 말지 정하기
+        org_map = init_map.env_map
+        map_size_x, map_size_y = org_map.shape  # 맵의 크기 추출
 
-        # TODO start and end point의 블럭은 배치할 수 없도록 설정
+        def random_positions(key):
+            player_pos = jax.random.randint(key, (2,), 1, jnp.array([map_size_x // 2, map_size_y // 2]) - 1)
+            door_pos = jax.random.randint(key, (2,), jnp.array([map_size_x // 2, map_size_y // 2]),
+                                      jnp.array([map_size_x, map_size_y]) - 1)
+            return player_pos, door_pos
 
+        def fixed_positions():
+            return jnp.array([1, 1]), jnp.array([map_size_x - 2, map_size_y - 2])
 
-        return init_map
+        player_pos, door_pos = jax.lax.cond(
+            self.randomize_start_position,
+            lambda _: random_positions(rng),
+            lambda _: fixed_positions(),
+            operand=None,
+        )
+
+        # 플레이어와 문 배치
+        org_map = org_map.at[player_pos[0], player_pos[1]].set(Dungeon3Tiles.PLAYER)
+        org_map = org_map.at[door_pos[0], door_pos[1]].set(Dungeon3Tiles.DOOR)
+
+        # 주변을 EMPTY SPACE로 채우기 위한 보조 함수
+        def set_empty_around(pos, map_array):
+            x, y = pos
+            for dx in [-1, 0, 1]:
+                for dy in [-1, 0, 1]:
+                    nx, ny = x + dx, y + dy
+                    map_array = jax.lax.cond(
+                        (0 <= nx) & (nx < map_size_x) & (0 <= ny) & (ny < map_size_y) & (
+                                    map_array[nx, ny] != Dungeon3Tiles.PLAYER) & (
+                                    map_array[nx, ny] != Dungeon3Tiles.DOOR),
+                        lambda arr: arr.at[nx, ny].set(Dungeon3Tiles.EMPTY),
+                        lambda arr: arr,
+                        map_array,
+                    )
+            return map_array
+
+        # 플레이어와 문 주변 EMPTY SPACE로 채우기
+        org_map = set_empty_around(player_pos, org_map)
+        org_map = set_empty_around(door_pos, org_map)
+
+        # 새 맵 데이터 반환
+        new_init_map = MapData(org_map, init_map.actual_map_shape)
+
+        return new_init_map
 
     def get_metric_bounds(self, map_shape):
-        bounds = [None] * len(DungeonMetrics)
-        bounds[DungeonMetrics.PATH_LENGTH] = [0, self.max_path_len * 2]
-        bounds[DungeonMetrics.N_PLAYERS] = [0, self.n_tiles]
-        bounds[DungeonMetrics.N_KEYS] = [0, self.n_tiles]
-        bounds[DungeonMetrics.N_DOORS] = [0, self.n_tiles]
-        bounds[DungeonMetrics.N_ENEMIES] = [0, self.n_tiles]
-        bounds[DungeonMetrics.N_REGIONS] = [0, self.n_tiles]
-        bounds[DungeonMetrics.NEAREST_ENEMY] = [0, self.max_path_len]
-        return jnp.array(bounds)
+        bounds = [None] * len(Dungeon3Metrics)
+        bounds[Dungeon3Metrics.N_REGIONS] = [0, self.max_path_len * 2]
+        bounds = jnp.array(bounds, dtype=jnp.float32)
+        return bounds
 
-    def get_path_coords(self, env_map: chex.Array, prob_state: ProblemState):
-        """Return a list of tile coords, starting somewhere (assumed in the flood) and following the water level upward."""
-        # k_xy = jnp.argwhere(env_map == DungeonTiles.KEY, size=1, fill_value=-1)[0]
-        # d_xy = jnp.argwhere(env_map == DungeonTiles.DOOR, size=1, fill_value=-1)[0]
-        k_xy = prob_state.k_xy
-        d_xy = prob_state.d_xy
-        e_xy = prob_state.enemy_xy
-        pk_flood_count = prob_state.player_key_flood_count
-        kd_flood_count = prob_state.key_door_flood_count
-        pe_flood_count = prob_state.player_enemy_flood_count
-        pk_coords = get_path_coords(pk_flood_count, max_path_len=self.max_path_len, coord1=k_xy)
-        kd_coords = get_path_coords(kd_flood_count, max_path_len=self.max_path_len, coord1=d_xy)
-        pe_coords = get_path_coords(pe_flood_count, max_path_len=self.max_path_len, coord1=e_xy) 
-        return (pk_coords, kd_coords, pe_coords)
+    def get_path_coords(self, env_map: chex.Array, prob_state: Dungeon3State):
+        return tuple()
 
     def get_curr_stats(self, env_map: chex.Array):
-        n_players = jnp.sum(env_map == DungeonTiles.PLAYER)
-        n_doors = jnp.sum(env_map == DungeonTiles.DOOR)
-        n_keys = jnp.sum(env_map == DungeonTiles.KEY)
-        n_enemies = jnp.sum(
-            (env_map == DungeonTiles.BAT) | (env_map == DungeonTiles.SCORPION) | (env_map == DungeonTiles.SPIDER))
-        n_regions, _ = calc_n_regions(self.flood_regions_net, env_map, self.passable_tiles)
-        is_playable: bool = (n_players == 1) & (n_doors == 1) & (n_keys == 1) & (5 >= n_enemies) & (n_enemies >= 2) & (n_regions == 1)
+        stats = jnp.zeros(len(Dungeon3Metrics))
+        stats = stats.at[Dungeon3Metrics.N_REGIONS].set(0)
 
-        # Get path from player to key and from key to door
-        pk_path_length, pk_flood_count, k_xy = jax.lax.cond(
-            is_playable,
-            lambda: calc_path_length(
-                flood_path_net=self.flood_path_net, 
-                env_map=env_map, 
-                passable_tiles=self.passable_tiles, 
-                src=DungeonTiles.PLAYER, trg=DungeonTiles.KEY),
-            lambda: (0.0, jnp.zeros(env_map.shape, dtype=jnp.float32), jnp.full(2, dtype=jnp.int32, fill_value=-1))
-        )
-        kd_passable_tiles = jnp.concatenate((self.passable_tiles, jnp.array([DungeonTiles.DOOR])))
-        kd_path_length, kd_flood_count, d_xy = jax.lax.cond(
-            is_playable,
-            lambda: calc_path_length(
-                flood_path_net=self.flood_path_net, 
-                env_map=env_map, 
-                passable_tiles=kd_passable_tiles, 
-                src=DungeonTiles.KEY, trg=DungeonTiles.DOOR),
-            lambda: (0.0, jnp.zeros(env_map.shape, dtype=jnp.float32), jnp.full(2, dtype=jnp.int32, fill_value=-1))
-        )
-        path_length = pk_path_length + kd_path_length
-
-        # Encode all enemies as bat tiles to make pathfinding simpler
-        env_map_uni_enemy = jnp.where(
-                ((env_map == DungeonTiles.BAT) | (env_map == DungeonTiles.SCORPION) | (env_map == DungeonTiles.SPIDER)) > 0,
-            DungeonTiles.BAT, env_map)
-
-        # Get path length from player to nearest enemy
-        pe_passable_tiles = jnp.concatenate((self.passable_tiles, jnp.array([DungeonTiles.BAT])))
-        pe_path_length, pe_flood_count, e_xy = jax.lax.cond(
-            is_playable,
-            lambda: calc_path_length(
-                flood_path_net=self.flood_path_net, 
-                env_map=env_map_uni_enemy, 
-                passable_tiles=pe_passable_tiles, 
-                src=DungeonTiles.PLAYER, trg=DungeonTiles.BAT),
-            lambda: (0.0, jnp.zeros(env_map.shape, dtype=jnp.float32), jnp.full(2, dtype=jnp.int32, fill_value=-1))
-        )
-
-        stats = jnp.zeros(len(DungeonMetrics))
-        stats = stats.at[DungeonMetrics.PATH_LENGTH].set(path_length)
-        stats = stats.at[DungeonMetrics.N_ENEMIES].set(n_enemies)
-        stats = stats.at[DungeonMetrics.N_KEYS].set(n_keys)
-        stats = stats.at[DungeonMetrics.NEAREST_ENEMY].set(pe_path_length)
-        stats = stats.at[DungeonMetrics.N_REGIONS].set(n_regions)
-        stats = stats.at[DungeonMetrics.N_PLAYERS].set(n_players)
-        stats = stats.at[DungeonMetrics.N_DOORS].set(n_doors)
-        state = DungeonState(
+        state = Dungeon3State(
             stats=stats,
-            player_key_flood_count=pk_flood_count,
-            key_door_flood_count=kd_flood_count,
-            player_enemy_flood_count=pe_flood_count,
-            enemy_xy=e_xy,
-            k_xy=k_xy,
-            d_xy=d_xy,
             ctrl_trgs=None,
         )
         return state
@@ -247,37 +179,37 @@ class DungeonProblem(Problem):
     def init_graphics(self):
 
         self.graphics = {
-            DungeonTiles.EMPTY: Image.open(
+            Dungeon3Tiles.EMPTY: Image.open(
                 f"{__location__}/tile_ims/empty.png"
             ).convert('RGBA'),
-            DungeonTiles.WALL: Image.open(
+            Dungeon3Tiles.WALL: Image.open(
                 f"{__location__}/tile_ims/solid.png"
             ).convert('RGBA'),
-            DungeonTiles.BORDER: Image.open(
+            Dungeon3Tiles.BORDER: Image.open(
                 f"{__location__}/tile_ims/solid.png"
             ).convert('RGBA'),
-            DungeonTiles.KEY: Image.open(
+            Dungeon3Tiles.KEY: Image.open(
                 f"{__location__}/tile_ims/key.png"
             ).convert('RGBA'),
-            DungeonTiles.DOOR: Image.open(
+            Dungeon3Tiles.DOOR: Image.open(
                 f"{__location__}/tile_ims/door.png"
             ).convert('RGBA'),
-            DungeonTiles.PLAYER: Image.open(
+            Dungeon3Tiles.PLAYER: Image.open(
                 f"{__location__}/tile_ims/player.png"
             ).convert('RGBA'),
-            DungeonTiles.BAT: Image.open(
+            Dungeon3Tiles.BAT: Image.open(
                 f"{__location__}/tile_ims/bat.png"
             ).convert('RGBA'),
-            DungeonTiles.SCORPION: Image.open(
+            Dungeon3Tiles.SCORPION: Image.open(
                 f"{__location__}/tile_ims/scorpion.png"
             ).convert('RGBA'),
-            DungeonTiles.SPIDER: Image.open(
+            Dungeon3Tiles.SPIDER: Image.open(
                 f"{__location__}/tile_ims/spider.png"
             ).convert('RGBA'),
-            len(DungeonTiles): Image.open(f"{__location__}/tile_ims/path_g.png").convert(
+            len(Dungeon3Tiles): Image.open(f"{__location__}/tile_ims/path_g.png").convert(
                 'RGBA'
             ),
-            len(DungeonTiles) + 1: Image.open(f"{__location__}/tile_ims/path_purple.png").convert(
+            len(Dungeon3Tiles) + 1: Image.open(f"{__location__}/tile_ims/path_purple.png").convert(
                 'RGBA'
             )
         }
@@ -285,14 +217,6 @@ class DungeonProblem(Problem):
         super().init_graphics()
 
     def draw_path(self, lvl_img,env_map, border_size, path_coords_tpl, tile_size):
-        assert len(path_coords_tpl) == 3
-        lvl_img = draw_path(prob=self, lvl_img=lvl_img, env_map=env_map, border_size=border_size,
-                            path_coords=path_coords_tpl[0], tile_size=tile_size,
-                            im_idx=-2)
-        lvl_img = draw_path(prob=self, lvl_img=lvl_img, env_map=env_map, border_size=border_size,
-                            path_coords=path_coords_tpl[1], tile_size=tile_size,
-                            im_idx=-2)
-        lvl_img = draw_path(prob=self, lvl_img=lvl_img, env_map=env_map, border_size=border_size,
-                            path_coords=path_coords_tpl[2], tile_size=tile_size)
         return lvl_img
+
 

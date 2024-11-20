@@ -2,7 +2,7 @@ from enum import IntEnum
 from functools import partial
 import math
 from typing import Optional
-
+import os
 import chex
 from flax import struct
 import jax
@@ -189,11 +189,13 @@ class Problem:
     def init_graphics(self):
         self.graphics = jnp.array([np.array(g) for g in self.graphics])
         # Load TTF font (Replace 'path/to/font.ttf' with the actual path)
-        self.render_font = font = ImageFont.truetype("./fonts/AcPlus_IBM_VGA_9x16-2x.ttf", 20)
+
+        current_dir = os.path.dirname(__file__)  # Get the directory of the current file
+        font_path = os.path.abspath(os.path.join(current_dir, "..", "..", "fonts", "AcPlus_IBM_VGA_9x16-2x.ttf"))
+        self.render_font = ImageFont.truetype(font_path, 20)
 
         ascii_chars_to_ints = {}
         self.ascii_chars_to_ims = {}
-
         self.render_font_shape = (16, 9)
 
         # Loop over a range of ASCII characters (here, printable ASCII characters from 32 to 126)
@@ -223,14 +225,19 @@ class Problem:
     def gen_rand_ctrl_trgs(self, rng, actual_map_shape):
         metric_bounds = self.get_metric_bounds(actual_map_shape)
         # Randomly sample some control targets
+        ctrl_trgs = gen_ctrl_trgs(metric_bounds, rng)
+        # change to float32
+        ctrl_trgs = jnp.array(ctrl_trgs, dtype=jnp.float32)
+
         ctrl_trgs =  jnp.where(
             self.ctrl_metrics_mask,
-            gen_ctrl_trgs(metric_bounds, rng),
+            ctrl_trgs,
             self.stat_trgs,
         )
         return ctrl_trgs
 
     def reset(self, env_map: chex.Array, rng, queued_state, actual_map_shape):
+
         ctrl_trgs = jax.lax.select(
             queued_state.has_queued_ctrl_trgs,
             queued_state.ctrl_trgs,
