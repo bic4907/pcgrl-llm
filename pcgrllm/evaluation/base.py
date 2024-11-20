@@ -3,11 +3,21 @@ from logging import Logger
 
 
 class EvaluationResult:
+    # Alphabet generation task
     similarity: float = 0
     diversity: float = 0
     sample_size: int = 0
     similarity_weight: float = 0.5
     diversity_weight: float = 0.5
+
+    # Scenario generation task
+    playability: float = 0      # If the player can reach to the door
+    path_length: float = 0      # The path length from the player to the door
+    solvability: float = 0      # if the player can reach the door with the key
+    n_solutions: float = 0      # Number of solutions the player can reach the door
+    loss_solutions: float = 0   # Loss of between the target and the current solution count
+    acc_imp_tiles: float = 0        # (reachable of important tiles <-> prompt)
+    exist_imp_tiles: float = 0      # (existence of important tiles <-> prompt)
 
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
