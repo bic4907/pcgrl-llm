@@ -1,21 +1,12 @@
-import copy
-import os
-
-import cv2
 import pygame
 import hydra
-import imageio
 import jax
 from jax import numpy as jnp
 import numpy as np
 import sys
 from conf.config import EnjoyConfig
-from envs.pcgrl_env import PCGRLEnv, render_stats, gen_dummy_queued_state
-from envs.probs.problem import get_loss
-from eval import get_eval_name, init_config_for_eval
-from purejaxrl.experimental.s5.wrappers import LossLogWrapper
-from train import init_checkpointer
-from utils import get_exp_dir, init_network, gymnax_pcgrl_make, init_config
+from eval import init_config_for_eval
+from utils import gymnax_pcgrl_make, init_config
 
 
 @hydra.main(version_base=None, config_path='../conf', config_name='enjoy_pcgrl')
@@ -26,7 +17,6 @@ def main_enjoy(enjoy_config: EnjoyConfig):
     enjoy_config = init_config_for_eval(enjoy_config)
     env, env_params = gymnax_pcgrl_make(enjoy_config.env_name, config=enjoy_config)
     env.prob.init_graphics()
-
 
     rng = jax.random.PRNGKey(enjoy_config.eval_seed)
     obs, env_state = env.reset(rng)

@@ -139,6 +139,7 @@ class Problem:
     stat_trgs: chex.Array
     ctrl_threshes: chex.Array = None
     queued_ctrl_trgs: chex.Array = None
+    unavailable_tiles: list = list() # no
 
     def __init__(self, map_shape, ctrl_metrics, pinpoints):
         self.map_shape = map_shape
@@ -182,10 +183,6 @@ class Problem:
 
     def get_stats(self, env_map: chex.Array, prob_state: ProblemState):
         raise NotImplementedError
-
-    # def queue_ctrl_trgs(self, queued_state, ctrl_trgs):
-    #     queued_state = queued_state.replace(queued_ctrl_trgs=ctrl_trgs, has_queued_ctrl_trgs=True)
-    #     return queued_state
 
     def init_graphics(self):
         self.graphics = jnp.array([np.array(g) for g in self.graphics])

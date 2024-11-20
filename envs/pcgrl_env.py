@@ -219,8 +219,13 @@ class PCGRLEnv(Environment):
 
         self.tile_enum = self.prob.tile_enum
         self.tile_probs = self.prob.tile_probs
+        self.unavailable_tiles = self.prob.unavailable_tiles
+
+        # remove unavailable tiles from tile_enum
+        # self.action_mapping = get_available_tile_mapping(self.tile_enum, self.unavailable_tiles)
+
         rng = jax.random.PRNGKey(0)  # Dummy random key
-        map_data = self.prob.gen_init_map(rng, randomize_map_shape=self.randomize_map_shape, 
+        map_data = self.prob.gen_init_map(rng, randomize_map_shape=self.randomize_map_shape,
                                          empty_start=self.empty_start, pinpoints=self.pinpoints)
         env_map, actual_map_shape = map_data.env_map, map_data.actual_map_shape
 
@@ -232,6 +237,7 @@ class PCGRLEnv(Environment):
                                             act_shape=act_shape,
                                             max_board_scans=env_params.max_board_scans,
                                             pinpoints=self.pinpoints,
+                                            unavailable_tiles=self.unavailable_tiles,
                                             tile_nums=self.prob.tile_nums,
             )
         elif representation == RepEnum.NCA:
@@ -240,7 +246,8 @@ class PCGRLEnv(Environment):
                                          act_shape=act_shape,
                                          max_board_scans=env_params.max_board_scans,
                                         pinpoints=self.pinpoints,
-                                        tile_nums=self.prob.tile_nums,
+                                         unavailable_tiles=self.unavailable_tiles,
+                                         tile_nums=self.prob.tile_nums,
             )
         elif representation == RepEnum.WIDE:
             self.rep = WideRepresentation(env_map=env_map, rf_shape=rf_shape,
@@ -248,6 +255,7 @@ class PCGRLEnv(Environment):
                                           act_shape=act_shape,
                                           max_board_scans=env_params.max_board_scans,
                                           pinpoints=self.pinpoints,
+                                          unavailable_tiles=self.unavailable_tiles,
                                           tile_nums=self.prob.tile_nums,
             )
         elif representation == RepEnum.TURTLE:
@@ -309,8 +317,7 @@ class PCGRLEnv(Environment):
             queued_state.frz_map,
             gen_static_tiles(rng, self.static_tile_prob, self.n_freezies, self.map_shape),
         )
-        # Always freeze the border (in particular when using it to crop the map to some smaller size with
-        # randomize_map_shape)
+
         frz_map = frz_map | jnp.where(env_map == Tiles.BORDER, True, False)
 
         if self.pinpoints:
