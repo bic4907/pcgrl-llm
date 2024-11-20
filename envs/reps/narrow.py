@@ -50,18 +50,16 @@ def gen_agent_coords(frz_map: chex.Array, tile_enum: Tiles,
 
 class NarrowRepresentation(Representation):
     def __init__(self, env_map: chex.Array, rf_shape: Tuple[int, int],
-                 act_shape: Tuple[int, int], tile_enum: Tiles, max_board_scans: int, pinpoints: bool, tile_nums: Tuple[int]
+                 act_shape: Tuple[int, int], tile_enum: Tiles, max_board_scans: int, pinpoints: bool, tile_nums: Tuple[int], unavailable_tiles: list
                  ):
         super().__init__(tile_enum=tile_enum, rf_shape=rf_shape,
-                         act_shape=act_shape, pinpoints=pinpoints, tile_nums=tile_nums)
+                         act_shape=act_shape, pinpoints=pinpoints, tile_nums=tile_nums, unavailable_tiles=unavailable_tiles)
         self.rf_shape = np.array(rf_shape)
         self.rf_off = int(max(np.ceil(self.rf_shape - 1) / 2))
         self.max_steps = np.uint32(np.prod(env_map.shape) * max_board_scans)
         self.num_tiles = len(tile_enum)
         self.builds = jnp.array(self.editable_tile_enum)
 
-        # agent_coords, self.n_valid_agent_coords = gen_agent_coords(
-        #     env_map, tile_enum, act_shape)
         self.act_shape = act_shape
 
     def step(self, env_map: chex.Array, action: int,

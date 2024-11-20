@@ -241,6 +241,7 @@ def get_env_params_from_config(config: Config):
         ctrl_metrics=ctrl_metrics,
         change_pct=config.change_pct,
         randomize_map_shape=config.randomize_map_shape,
+        randomize_start_pos=config.randomize_start_pos,
         empty_start=config.empty_start,
         pinpoints=config.pinpoints,
         multiagent=config.multiagent or config.n_agents > 1,

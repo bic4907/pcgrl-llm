@@ -20,10 +20,10 @@ class WideRepresentationState(RepresentationState):
 class WideRepresentation(Representation):
     def __init__(self, env_map: chex.Array, rf_shape: Tuple[int, int],
                  act_shape: Tuple[int, int], tile_enum: Tiles,
-                 max_board_scans: float, pinpoints: bool, tile_nums: Tuple[int],
+                 max_board_scans: float, pinpoints: bool, tile_nums: Tuple[int], unavailable_tiles: list
                  ):
         super().__init__(tile_enum=tile_enum, rf_shape=rf_shape,
-                         act_shape=act_shape, pinpoints=pinpoints, tile_nums=tile_nums
+                         act_shape=act_shape, pinpoints=pinpoints, tile_nums=tile_nums, unavailable_tiles=unavailable_tiles
                          )
         self.rf_shape = np.array(env_map.shape)
         self.rf_off = int(max(np.ceil(self.rf_shape - 1) / 2))
