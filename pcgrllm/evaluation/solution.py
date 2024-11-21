@@ -42,6 +42,9 @@ class SolutionEvaluator(LevelEvaluator):
         results = []
         for numpy_file in numpy_files:
             level = numpy_file.load()
+
+            print(level)
+
             result = self.eval_level(level, target_character)
             results.append(result)
 

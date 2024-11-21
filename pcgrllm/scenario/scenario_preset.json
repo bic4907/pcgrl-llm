@@ -1,77 +1,26 @@
 {
-    "base_prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are {monsters}, and the number of possible solutions is {solution_count}.",
+    "base_prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: {monsters}.The players can figure out all of monsters when they play the level several times.",
     "scenarios": {
         "1": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, and the number of possible solutions is 1.",
+            "prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: BAT.The players can figure out all of monsters when they play the level several times.",
             "important_tiles": [
                 "BAT"
-            ],
-            "n_solutions": 1
+            ]
         },
         "2": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, and the number of possible solutions is 2.",
+            "prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: BAT, SCORPION.The players can figure out all of monsters when they play the level several times.",
             "important_tiles": [
-                "BAT"
-            ],
-            "n_solutions": 2
+                "BAT",
+                "SCORPION"
+            ]
         },
         "3": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, and the number of possible solutions is 3.",
-            "important_tiles": [
-                "BAT"
-            ],
-            "n_solutions": 3
-        },
-        "4": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, SCORPION, and the number of possible solutions is 1.",
-            "important_tiles": [
-                "BAT",
-                "SCORPION"
-            ],
-            "n_solutions": 1
-        },
-        "5": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, SCORPION, and the number of possible solutions is 2.",
-            "important_tiles": [
-                "BAT",
-                "SCORPION"
-            ],
-            "n_solutions": 2
-        },
-        "6": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, SCORPION, and the number of possible solutions is 3.",
-            "important_tiles": [
-                "BAT",
-                "SCORPION"
-            ],
-            "n_solutions": 3
-        },
-        "7": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, SCORPION, SPIDER, and the number of possible solutions is 1.",
+            "prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: BAT, SCORPION, SPIDER.The players can figure out all of monsters when they play the level several times.",
             "important_tiles": [
                 "BAT",
                 "SCORPION",
                 "SPIDER"
-            ],
-            "n_solutions": 1
-        },
-        "8": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, SCORPION, SPIDER, and the number of possible solutions is 2.",
-            "important_tiles": [
-                "BAT",
-                "SCORPION",
-                "SPIDER"
-            ],
-            "n_solutions": 2
-        },
-        "9": {
-            "prompt": "The player needs to obtain the Key and escape through the Door. Monsters that the player may encounter in the middle are BAT, SCORPION, SPIDER, and the number of possible solutions is 3.",
-            "important_tiles": [
-                "BAT",
-                "SCORPION",
-                "SPIDER"
-            ],
-            "n_solutions": 3
+            ]
         }
     }
 }
