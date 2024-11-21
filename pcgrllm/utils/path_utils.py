@@ -36,12 +36,18 @@ def is_default_hiddims(config: Config):
 
 def get_exp_group(config):
     if config.env_name == 'PCGRL':
+
+        # task
         config_dict = {
             'pe': config.pe,
             'it': config.total_iterations,
             'fit': config.evaluator,
             'exp': config.exp_name,
         }
+
+        if config.task != 'alphabet':
+            task = config.task[:3]
+            config_dict['t'] = task
 
         # key와 value를 '_'로 구분하여 join
         exp_group = os.path.join(
