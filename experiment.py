@@ -31,7 +31,9 @@ from envs.pcgrl_env import get_prob_cls, ProbEnum, get_available_tiles
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 from pcgrllm.evaluation.llm_evaluator import LLMEvaluator
+from pcgrllm.evaluation.solution import SolutionEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
+from pcgrllm.scenario_preset import Scenario, ScenarioPreset
 from pcgrllm.utils.graph import GraphManager, NodeInfo
 
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
@@ -92,6 +94,7 @@ class Experiment:
         self.load_state()
 
         self._copy_prompt()
+        self._copy_scenario()
 
     @property
     def _experiment_path(self):
@@ -134,6 +137,22 @@ class Experiment:
             self.logging(f"Prompt directory already exists: {dest_dir}")
             pass
 
+    def _copy_scenario(self):
+        """Copies the scenario log file to the experiment directory."""
+
+        self.logging("Copying scenario directory to the experiment directory", level=logging.INFO)
+
+        source_dir = path.join(path.dirname(__file__), 'pcgrllm', 'scenario')
+        dest_dir = path.join(self._experiment_path, 'scenario')
+
+        self.logging(f"Copying scenario directory to the experiment directory: {source_dir} -> {dest_dir}")
+
+        try:
+            shutil.copytree(source_dir, dest_dir)
+        except FileExistsError:
+            self.logging(f"Scenario directory already exists: {dest_dir}")
+            pass
+
     @property
     def reward_functions_dir(self):
         return path.join(self._experiment_path, 'reward_functions')
@@ -171,6 +190,18 @@ class Experiment:
             auxiliary_prompt = get_reward_score_paired_examples(self.storage, self.auxiliary_iter_nums)
             auxiliary_prompt_path = self.storage.set_auxiliary_prompt(self._iteration, auxiliary_prompt)
 
+        target_character = self.config.target_character
+
+        if self.config.task == 'scenario':
+
+            # if the self.config.target_character is numberic value, then use the scenario prompt
+
+            # the target_character is basically a string, try to convert it to int and check if it is a number
+            if self.config.target_character.isnumeric():
+                scenario_preset = ScenarioPreset()
+                scenario_preset = scenario_preset.scenarios.get(target_character, None)
+                target_character = scenario_preset.prompt if scenario_preset is not None else target_character
+
         args_dict = {
             'shared_storage_path': self._experiment_path,
             'postfix': f"reward_outer_{self._iteration}",
@@ -183,7 +214,7 @@ class Experiment:
             'total_iterations': self.config.total_iterations,
             'n_inner': 1,
             'iteration_num': self._iteration,
-            'target_character': self.config.target_character,
+            'target_character': target_character,
             'pe': self.config.pe,
             'branch_factor': self.config.branch_factor,
             'feedback_path': self.previous_feedback_path,
@@ -346,7 +377,10 @@ class Experiment:
         if self.config.evaluator == 'vit':
             evaluator = ViTEvaluator(logger=self.logger)
         elif self.config.evaluator == 'hr':
-            evaluator = HeuristicEvaluator(logger=self.logger)
+            if self.config.task == 'scenario':
+                evaluator = SolutionEvaluator(logger=self.logger, scenario_num=self.config.target_character)
+            elif self.config.task == 'alphabet':
+                evaluator = HeuristicEvaluator(logger=self.logger)
         elif self.config.evaluator == 'llm':
             evaluator = LLMEvaluator(logger=self.logger, gpt_model=self.config.gpt_model, seed=self.config.seed,
                                      n_generation_trials=self.config.n_generation_trials)
@@ -580,6 +614,7 @@ class Experiment:
 
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrllm')
 def main(config: TrainConfig):
+    # if the problem is scenario, set the problem to dungeon3
     init_config(config)
 
     experiment = Experiment(config)
