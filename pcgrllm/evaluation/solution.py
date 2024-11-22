@@ -4,6 +4,7 @@ import numpy as np
 from os.path import dirname, join, basename
 from typing import Tuple
 from pcgrllm.evaluation.base import *
+from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.utils.storage import Iteration
 
 
@@ -12,9 +13,7 @@ class SolutionEvaluator(LevelEvaluator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-    def eval_level(self, level: np.ndarray, target_character: str) -> Tuple[float, float]:
-
-
+    def eval_level(self, level: np.ndarray, scenario_num: str) -> Tuple[float, float]:
         '''
         # Scenario generation task
         playability: float = 0  # If the player can reach to the door
@@ -26,6 +25,13 @@ class SolutionEvaluator(LevelEvaluator):
         exist_imp_tiles: float = 0  # (existence of important tiles <-> prompt)
         '''
 
+
+        scenario = ScenarioPreset().scenarios[scenario_num]
+
+
+        # TODO Check whether there is important tile in the level.
+
+
         return EvaluationResult(playability=0,
                                 path_length=0,
                                 solvability=0,
@@ -35,7 +41,7 @@ class SolutionEvaluator(LevelEvaluator):
                                 exist_imp_tiles=0,
                                 sample_size=1)
 
-    def run(self, iteration: Iteration, target_character: str, visualize: bool = False) -> EvaluationResult:
+    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False) -> EvaluationResult:
         numpy_files = iteration.get_numpy_files()
 
         # run evaluation with each numpy file
@@ -43,14 +49,9 @@ class SolutionEvaluator(LevelEvaluator):
         for numpy_file in numpy_files:
             level = numpy_file.load()
 
-            print(level)
-
-            result = self.eval_level(level, target_character)
+            result = self.eval_level(level, scenario_num=scenario_num)
             results.append(result)
 
-            # if visualize:
-            #     cv2.imshow('Level', level)
-            #     cv2.waitKey(0)
 
         # Calculate the average of the results
         playability = np.mean([result.playability for result in results])
@@ -89,5 +90,6 @@ if __name__ == '__main__':
     iteration = Iteration.from_path(path=example_path)
 
     # Run the evaluator with visualization enabled/disabled
-    result = evaluator.run(iteration=iteration, target_character='A', visualize=True)
+    result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True)
+
     print(result)
