@@ -34,6 +34,7 @@ from pcgrllm.evaluation.llm_evaluator import LLMEvaluator
 from pcgrllm.evaluation.solution import SolutionEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
 from pcgrllm.scenario_preset import Scenario, ScenarioPreset
+from pcgrllm.task import TaskType
 from pcgrllm.utils.graph import GraphManager, NodeInfo
 
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
@@ -371,26 +372,19 @@ class Experiment:
         return feedback_path
 
     def run_evaluation(self):
-
         exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+        iteration = self.storage.get_iteration(self._iteration)
 
-        if self.config.evaluator == 'vit':
-            evaluator = ViTEvaluator(logger=self.logger)
-        elif self.config.evaluator == 'hr':
-            if self.config.task == 'scenario':
-                evaluator = SolutionEvaluator(logger=self.logger, scenario_num=self.config.target_character)
-            elif self.config.task == 'alphabet':
-                evaluator = HeuristicEvaluator(logger=self.logger)
-        elif self.config.evaluator == 'llm':
-            evaluator = LLMEvaluator(logger=self.logger, gpt_model=self.config.gpt_model, seed=self.config.seed,
-                                     n_generation_trials=self.config.n_generation_trials)
-
-        iteration = Iteration.from_path(exp_dir)
-
-        if not self.config.random_fitness:
-            result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
+        if self.config.task == TaskType.Alphabet:
+            result = self._run_alphabet_evaluation(iteration=iteration, target_character=self.config.target_character)
+        elif self.config.task == TaskType.Scenario:
+            result = self._run_scenario_evaluation(iteration=iteration, scenario_num=self.config.target_character)
         else:
-            result = EvaluationResult(similarity=random.random(), diversity=random.random(), sample_size=-1)
+            raise ValueError(f"Invalid task type: {self.config.task}")
+
+        # Write the fitness to the file
+        if self.config.random_fitness:
+            result = EvaluationResult(task=self.task).sample() # TODO Check before running experiment
 
         # save to the iteration file
         result_path = path.join(exp_dir, 'evaluation.json')
@@ -398,10 +392,25 @@ class Experiment:
             json.dump(result.to_dict(), f)
 
         if self.config.pe in ['tot', 'got']:
-            self.logging(f"Node evaluation score: {result.similarity}", level=logging.INFO)
-            self.graph_manager.update(self.current_node, similarity=result.similarity, refer_ids=self.auxiliary_iter_nums)
+            self.logging(f"Node evaluation score: {result.total}", level=logging.INFO)
+            self.graph_manager.update(self.current_node, fitness=result.total, refer_ids=self.auxiliary_iter_nums)
 
-        self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
+
+    def _run_alphabet_evaluation(self, iteration: Iteration, target_character: str) -> EvaluationResult:
+        exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+
+        if self.config.evaluator == 'vit':
+            evaluator = ViTEvaluator(task=self.config.task, logger=self.logger)
+        elif self.config.evaluator == 'hr':
+            evaluator = HeuristicEvaluator(task=self.config.task, logger=self.logger)
+        elif self.config.evaluator == 'llm':
+            evaluator = LLMEvaluator(task=self.config.task, logger=self.logger,
+                                     gpt_model=self.config.gpt_model, seed=self.config.seed,
+                                     n_generation_trials=self.config.n_generation_trials)
+        else:
+            raise ValueError(f"Invalid evaluator type: {self.config.evaluator}")
+
+        result = evaluator.run(iteration=iteration, target_character=target_character)
 
         if self.config.evaluator == 'vit':
             log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
@@ -420,6 +429,20 @@ class Experiment:
             # Log the evaluation result
             log_evaluation_result(logger=self.logger, result=vit_result, iteration=self._iteration, evaluator_type=None)
             self.logging(f"ViT Result: {vit_result}", level=logging.INFO)
+
+        return result
+
+    def _run_scenario_evaluation(self, iteration: Iteration, scenario_num: str) -> EvaluationResult:
+
+        if self.config.evaluator == 'hr':
+            evaluator = SolutionEvaluator(task=self.config.task, logger=self.logger)
+            result = evaluator.run(iteration=iteration, scenario_num=scenario_num)
+        else:
+            raise ValueError(f"Invalid evaluator type: {self.config.evaluator}")
+
+        self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
+
+        log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
 
         return result
 
@@ -525,6 +548,7 @@ class Experiment:
                 train_fn()
 
                 self._stage = Stage.RolloutPCGRL
+
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
 

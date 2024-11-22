@@ -59,10 +59,10 @@ class ViTEvaluator(LevelEvaluator):
                 diversity = 0
 
             # return similarity, diversity
-            return EvaluationResult(similarity=similarity, diversity=diversity, sample_size=total_trials)
+            return EvaluationResult(task=self.task, similarity=similarity, diversity=diversity, sample_size=total_trials)
         else:
             print("No valid images found in the source folder.")
-            return EvaluationResult(similarity=float('-inf'), diversity=float('-inf'), sample_size=0)
+            return EvaluationResult(task=self.task, similarity=float('-inf'), diversity=float('-inf'), sample_size=0)
 
     def predict(self, file_path: str):
         image = Image.open(file_path).convert("RGBA")

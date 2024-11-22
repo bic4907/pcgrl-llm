@@ -1,14 +1,23 @@
 import logging
+import random
 from logging import Logger
 
 
+from pcgrllm.task import TaskType
+
+
+
+
 class EvaluationResult:
+
+    # Common
+    task: TaskType
+    sample_size: int = 0
+
     # Alphabet generation task
     similarity: float = 0
     diversity: float = 0
-    sample_size: int = 0
-    similarity_weight: float = 0.5
-    diversity_weight: float = 0.5
+    attr_alphabet = ['similarity', 'diversity']
 
     # Scenario generation task
     playability: float = 0      # If the player can reach to the door
@@ -18,26 +27,55 @@ class EvaluationResult:
     loss_solutions: float = 0   # Loss of between the target and the current solution count
     acc_imp_tiles: float = 0        # (reachable of important tiles <-> prompt)
     exist_imp_tiles: float = 0      # (existence of important tiles <-> prompt)
+    attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'acc_imp_tiles', 'exist_imp_tiles']
 
-    def __init__(self, **kwargs):
+    def __init__(self, task: TaskType, **kwargs):
+
+        self.task = task
+
         for key, value in kwargs.items():
             if key != 'total':  # Skip 'total' to avoid AttributeError
                 setattr(self, key, value)
 
+
     @property
     def total(self):
-        return (self.similarity_weight * self.similarity +
-                self.diversity_weight * self.diversity)
+        if self.task == TaskType.Alphabet:
+            return self.similarity
+        elif self.task == TaskType.Scenario:
+            return self.playability
+
 
     def __str__(self):
         return f"EvaluationResult(similarity={self.similarity}, diversity={self.diversity}, sample_size={self.sample_size})"
 
     def to_dict(self):
-        return {
-            'similarity': self.similarity,
-            'diversity': self.diversity,
-            'sample_size': self.sample_size
-        }
+
+        if self.task == TaskType.Alphabet:
+
+            result_dict = {
+                'similarity': self.similarity,
+                'diversity': self.diversity,
+            }
+        elif self.task == TaskType.Scenario:
+            result_dict = {
+                'playability': self.playability,
+                'path_length': self.path_length,
+                'solvability': self.solvability,
+                'n_solutions': self.n_solutions,
+                'loss_solutions': self.loss_solutions,
+                'acc_imp_tiles': self.acc_imp_tiles,
+                'exist_imp_tiles': self.exist_imp_tiles,
+            }
+        else:
+            raise ValueError(f"Invalid task type: {self.task}")
+
+        # Add common attributes
+        result_dict['task'] = self.task
+        result_dict['sample_size'] = self.sample_size
+
+        return result_dict
+
 
     @staticmethod
     def from_dict(data: dict):
@@ -46,8 +84,19 @@ class EvaluationResult:
     def to_prompt(self):
         return f"Similarity: {self.similarity}, Diversity: {self.diversity}"
 
+    def sample(self) -> 'EvaluationResult':
+        result = EvaluationResult(self.task)
+
+        for key, value in __dict__.items():
+            if key not in ['sample_size', 'total', 'task']:
+                setattr(result, key, random.random())
+
+        return result
+
+
 class LevelEvaluator:
-    def __init__(self, logger: Logger = None):
+    def __init__(self, task: TaskType, logger: Logger = None):
+        self.task = task
         self.logger = logger
 
     def run(self):

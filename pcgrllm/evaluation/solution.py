@@ -1,5 +1,3 @@
-
-import cv2
 import numpy as np
 from os.path import dirname, join, basename
 from typing import Tuple
@@ -32,14 +30,16 @@ class SolutionEvaluator(LevelEvaluator):
         # TODO Check whether there is important tile in the level.
 
 
-        return EvaluationResult(playability=0,
-                                path_length=0,
-                                solvability=0,
-                                n_solutions=0,
-                                loss_solutions=0,
-                                acc_imp_tiles=0,
-                                exist_imp_tiles=0,
-                                sample_size=1)
+        return EvaluationResult(
+            task=self.task,
+            playability=0,
+            path_length=0,
+            solvability=0,
+            n_solutions=0,
+            loss_solutions=0,
+            acc_imp_tiles=0,
+            exist_imp_tiles=0,
+            sample_size=1)
 
     def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False) -> EvaluationResult:
         numpy_files = iteration.get_numpy_files()
@@ -52,7 +52,6 @@ class SolutionEvaluator(LevelEvaluator):
             result = self.eval_level(level, scenario_num=scenario_num)
             results.append(result)
 
-
         # Calculate the average of the results
         playability = np.mean([result.playability for result in results])
         path_length = np.mean([result.path_length for result in results])
@@ -63,14 +62,16 @@ class SolutionEvaluator(LevelEvaluator):
         exist_imp_tiles = np.mean([result.exist_imp_tiles for result in results])
         sample_size = len(results)
 
-        return EvaluationResult(playability=playability,
-                                path_length=path_length,
-                                solvability=solvability,
-                                n_solutions=n_solutions,
-                                loss_solutions=loss_solutions,
-                                acc_imp_tiles=acc_imp_tiles,
-                                exist_imp_tiles=exist_imp_tiles,
-                                sample_size=sample_size)
+        return EvaluationResult(
+            task=self.task,
+            playability=playability,
+            path_length=path_length,
+            solvability=solvability,
+            n_solutions=n_solutions,
+            loss_solutions=loss_solutions,
+            acc_imp_tiles=acc_imp_tiles,
+            exist_imp_tiles=exist_imp_tiles,
+            sample_size=sample_size)
 
 
 

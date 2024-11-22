@@ -70,7 +70,7 @@ class Iteration:
         fitness = None
 
         if self.get_evaluation():
-            fitness = self.get_evaluation().similarity
+            fitness = self.get_evaluation().fitness
 
         return (
             f"Iteration {self.iteration_num}\n"

@@ -62,7 +62,9 @@ class LLMEvaluator(LevelEvaluator):
 
                         iteration.set_evaluation_context(context.to_json())
 
-                        return EvaluationResult(similarity=parsed_response.get('similarity'),
+                        return EvaluationResult(
+                                                task=self.task,
+                                                similarity=parsed_response.get('similarity'),
                                                 diversity=parsed_response.get('diversity'),
                                                 sample_size=len(numpy_files))
                     except Exception as e:

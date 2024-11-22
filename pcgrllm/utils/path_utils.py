@@ -13,8 +13,7 @@ from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, Rep
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
 from models import ActorCritic, ActorCriticPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, \
     NCA, SeqNCA
-
-
+from pcgrllm.task import TaskType
 
 log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
 logger = logging.getLogger(basename(__file__))
@@ -118,6 +117,12 @@ def init_config(config: Config):
     if config.task == 'scenario' and config.problem != 'dungeon3':
         config.problem = 'dungeon3'
         logger.log(logging.INFO, f"Changing config.problem to dungeon3 for scenario task")
+
+    # Validate if the evaluator is supported
+    if config.task == TaskType.Alphabet and config.evaluator not in {'llm', 'hr', 'vit'}:
+        raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")
+    elif config.task == TaskType.Scenario and config.evaluator not in {'hr'}:
+        raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")
 
     if config.representation in set({'wide', 'nca'}):
         # TODO: Technically, maybe arf/vrf size should affect kernel widths in (we're assuming here) the NCA model?
