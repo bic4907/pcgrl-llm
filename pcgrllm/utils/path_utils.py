@@ -1,19 +1,24 @@
 import json
 import os
-
+import logging
 import gymnax
 import jax
 import numpy as np
 import yaml
+from os.path import basename
 
 from conf.config import Config, EvoMapConfig, SweepConfig, TrainConfig
 from envs.candy import Candy, CandyParams
 from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, RepEnum, get_prob_cls
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
-from envs.probs.binary import BinaryProblem
-from envs.probs.problem import Problem
-from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, \
+from models import ActorCritic, ActorCriticPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, \
     NCA, SeqNCA
+
+
+
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+logger = logging.getLogger(basename(__file__))
+logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
 def get_exp_dir_evo_map(config: EvoMapConfig):
@@ -108,6 +113,11 @@ def get_exp_dir(config):
 
 def init_config(config: Config):
     config.n_gpus = jax.local_device_count()
+
+    # problem
+    if config.task == 'scenario' and config.problem != 'dungeon3':
+        config.problem = 'dungeon3'
+        logger.log(logging.INFO, f"Changing config.problem to dungeon3 for scenario task")
 
     if config.representation in set({'wide', 'nca'}):
         # TODO: Technically, maybe arf/vrf size should affect kernel widths in (we're assuming here) the NCA model?
