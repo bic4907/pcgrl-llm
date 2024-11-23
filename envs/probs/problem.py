@@ -72,6 +72,7 @@ def gen_ctrl_trgs(metric_bounds, rng):
 class MapData:
     env_map: chex.Array
     actual_map_shape: chex.Array
+    static_map: chex.Array
 
 
 @partial(jax.jit, static_argnames=("tile_enum", "map_shape", "tile_probs", "randomize_map_shape", "empty_start", 
@@ -124,7 +125,7 @@ def gen_init_map(rng, tile_enum, map_shape, tile_probs, randomize_map_shape=Fals
         for tile_idx in tile_idxs:
             (rng, init_map), _ = add_num_tiles((rng, init_map), tile_idx)
 
-    return MapData(init_map, actual_map_shape)
+    return MapData(init_map, actual_map_shape, init_map != tile_enum.BORDER)
 
 class Placeholder(IntEnum):
     pass

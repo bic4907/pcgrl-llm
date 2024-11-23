@@ -226,7 +226,7 @@ class Experiment:
             'available_tiles': get_available_tiles(self.config.problem),
             'prev_eval_result': prev_eval_result,
             'auxiliary_prompt_path': auxiliary_prompt_path,
-            'n_codegen_trials': self.config.n_generation_trials,
+            'n_codegen_trials': self.config.n_codegen_trials,
             'n_codefix_trials': self.config.n_codefix_trials,
             'task': self.config.task,
         }

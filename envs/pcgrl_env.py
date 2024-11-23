@@ -16,6 +16,7 @@ from envs.env import Environment
 from envs.probs.binary import BinaryMetrics, BinaryProblem
 from envs.probs.dungeon import DungeonProblem
 from envs.probs.dungeon2 import Dungeon2Problem
+from envs.probs.dungeon3 import Dungeon3Problem
 from envs.probs.maze import MazeProblem
 from envs.probs.maze_play import MazePlayProblem
 from envs.probs.problem import MapData, Problem, ProblemState
@@ -35,12 +36,14 @@ class ProbEnum(IntEnum):
     DUNGEON = 2
     MAZE_PLAY = 3
     DUNGEON2 = 4
+    DUNGEON3 = 5
 
 PROB_CLASSES = {
     ProbEnum.BINARY: BinaryProblem,
     ProbEnum.MAZE: MazeProblem,
     ProbEnum.DUNGEON: DungeonProblem,
     ProbEnum.DUNGEON2: Dungeon2Problem,
+    ProbEnum.DUNGEON3: Dungeon3Problem,
     ProbEnum.MAZE_PLAY: MazePlayProblem,
 }
 
@@ -205,8 +208,13 @@ class PCGRLEnv(Environment):
         self.pinpoints = env_params.pinpoints
 
         prob_cls = PROB_CLASSES[problem]
+
+        env_params_dict = dict()
+        if problem == ProbEnum.DUNGEON3:
+            env_params_dict['randomize_start_pos'] = env_params.randomize_map_shape
+
         self.prob: Problem = prob_cls(map_shape=map_shape, ctrl_metrics=env_params.ctrl_metrics,
-                                      pinpoints=self.pinpoints)
+                                      pinpoints=self.pinpoints, **env_params_dict)
 
         self.tile_enum = self.prob.tile_enum
         self.tile_probs = self.prob.tile_probs
@@ -293,7 +301,7 @@ class PCGRLEnv(Environment):
     @partial(jax.jit, static_argnames=('self',))
     def reset_env(self, rng, env_params: PCGRLEnvParams, queued_state: QueuedState) \
             -> Tuple[chex.Array, PCGRLEnvState]:
-        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape))
+        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=queued_state.map != 0)
         map_data = jax.lax.cond(
             queued_state.has_queued_map,
             lambda: queued_map_data,
