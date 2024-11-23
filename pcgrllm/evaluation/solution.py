@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 from os.path import dirname, join, basename
 from typing import Tuple
@@ -41,37 +43,53 @@ class SolutionEvaluator(LevelEvaluator):
             exist_imp_tiles=0,
             sample_size=1)
 
-    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False) -> EvaluationResult:
-        numpy_files = iteration.get_numpy_files()
+    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False) -> EvaluationResult:
 
-        # run evaluation with each numpy file
-        results = []
-        for numpy_file in numpy_files:
-            level = numpy_file.load()
-
-            result = self.eval_level(level, scenario_num=scenario_num)
-            results.append(result)
-
-        # Calculate the average of the results
-        playability = np.mean([result.playability for result in results])
-        path_length = np.mean([result.path_length for result in results])
-        solvability = np.mean([result.solvability for result in results])
-        n_solutions = np.mean([result.n_solutions for result in results])
-        loss_solutions = np.mean([result.loss_solutions for result in results])
-        acc_imp_tiles = np.mean([result.acc_imp_tiles for result in results])
-        exist_imp_tiles = np.mean([result.exist_imp_tiles for result in results])
-        sample_size = len(results)
 
         return EvaluationResult(
             task=self.task,
-            playability=playability,
-            path_length=path_length,
-            solvability=solvability,
-            n_solutions=n_solutions,
-            loss_solutions=loss_solutions,
-            acc_imp_tiles=acc_imp_tiles,
-            exist_imp_tiles=exist_imp_tiles,
-            sample_size=sample_size)
+            playability=random.random(),
+            path_length=random.random(),
+            solvability=random.random(),
+            n_solutions=random.random(),
+            loss_solutions=random.random(),
+            acc_imp_tiles=random.random(),
+            exist_imp_tiles=random.random(),
+            sample_size=random.random())
+
+        #
+        # numpy_files = iteration.get_numpy_files() # 여기 use_train을 활용하여야 함
+        #
+        #
+        #
+        # # run evaluation with each numpy file
+        # results = []
+        # for numpy_file in numpy_files:
+        #     level = numpy_file.load()
+        #
+        #     result = self.eval_level(level, scenario_num=scenario_num)
+        #     results.append(result)
+        #
+        # # Calculate the average of the results
+        # playability = np.mean([result.playability for result in results])
+        # path_length = np.mean([result.path_length for result in results])
+        # solvability = np.mean([result.solvability for result in results])
+        # n_solutions = np.mean([result.n_solutions for result in results])
+        # loss_solutions = np.mean([result.loss_solutions for result in results])
+        # acc_imp_tiles = np.mean([result.acc_imp_tiles for result in results])
+        # exist_imp_tiles = np.mean([result.exist_imp_tiles for result in results])
+        # sample_size = len(results)
+        #
+        # return EvaluationResult(
+        #     task=self.task,
+        #     playability=playability,
+        #     path_length=path_length,
+        #     solvability=solvability,
+        #     n_solutions=n_solutions,
+        #     loss_solutions=loss_solutions,
+        #     acc_imp_tiles=acc_imp_tiles,
+        #     exist_imp_tiles=exist_imp_tiles,
+        #     sample_size=sample_size)
 
 
 

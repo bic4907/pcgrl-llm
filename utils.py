@@ -19,8 +19,11 @@ from marl.model import ActorRNN, ActorCategorical
 from marl.wrappers.baselines import MultiAgentWrapper
 from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, NCA, SeqNCA
 from pcgrllm.evaluation import EvaluationResult
+from pcgrllm.evaluation.base import LevelEvaluator
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
+from pcgrllm.evaluation.solution import SolutionEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
+from pcgrllm.task import TaskType
 from pcgrllm.utils.storage import Iteration
 
 
@@ -307,9 +310,8 @@ def load_sweep_hypers(cfg: SweepConfig):
     return hypers, eval_hypers
 
 
-def run_evaluation(config: Config, logger) -> Optional[EvaluationResult]:
+def run_evaluation(config: Config, evaluator: LevelEvaluator) -> Optional[EvaluationResult]:
 
-    evaluator = ViTEvaluator(logger=logger)
     iteration = Iteration.from_path(config.exp_dir)
 
     # if exp_dir includes 'iteration', then it is a path to the iteration directory
@@ -318,7 +320,13 @@ def run_evaluation(config: Config, logger) -> Optional[EvaluationResult]:
     else:
         iteration.iterative_mode = False
 
-    result = evaluator.run(iteration=iteration, target_character=config.target_character, use_train=True)
+    evaluator_params = dict()
+    if config.task == TaskType.Alphabet:
+        evaluator_params['target_character'] = config.target_character
+    elif config.task == TaskType.Scenario:
+        evaluator_params['scenario_num'] = config.target_character
+
+    result = evaluator.run(iteration=iteration, use_train=True, **evaluator_params)
 
     return result
 
@@ -433,16 +441,40 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
         # evaluate
         if config is not None:
-            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-            # run eval only the target_chracter is in the alphabet
-            if config.target_character in alphabet:
-                result = run_evaluation(config, logger)
+            if config.task == TaskType.Alphabet:
+
+                alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                evaluator = ViTEvaluator(logger=logger, task=config.task)
+
+                # run eval only the target_chracter is in the alphabet
+                if config.target_character in alphabet:
+                    result = run_evaluation(config, evaluator)
+
+                    if logger is not None:
+                        if wandb.run is not None:
+                            key_name = f"Iteration_{config.current_iteration}/train/similarity" if config.current_iteration > 0 else "Train/similarity"
+                            wandb.log({key_name: result.similarity, 'train/step': t})
+                        logger.info(f"global step={t}; similarity={result.similarity:.4f}")
+                    else:
+                        print(f"global step={t}; similarity={result.similarity:.4f}")
+
+            elif config.task == TaskType.Scenario:
+
+                evaluator = SolutionEvaluator(logger=logger, task=config.task)
+                result = run_evaluation(config, evaluator)
+
                 if logger is not None:
                     if wandb.run is not None:
-                        key_name = f"Iteration_{config.current_iteration}/train/similarity" if config.current_iteration > 0 else "Train/similarity"
-                        wandb.log({key_name: result.similarity, 'train/step': t})
-                    logger.info(f"global step={t}; similarity={result.similarity:.4f}")
+                        result_dict = result.to_dict()
+
+                        for key, value in result_dict.items():
+                            if key == 'task': continue
+
+                            key_name = f"Iteration_{config.current_iteration}/train/{key}" if config.current_iteration > 0 else f"Train/{key}"
+                            wandb.log({key_name: value, 'train/step': t})
+
+                    logger.info(f"global step={t}; similarity={str(result.to_dict())}")
                 else:
                     print(f"global step={t}; similarity={result.similarity:.4f}")
 
