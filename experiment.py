@@ -43,6 +43,7 @@ from pcgrllm.utils.path_utils import init_config
 from pcgrllm.utils.prompt import get_reward_score_paired_examples
 from pcgrllm.utils.storage import Iteration, Storage
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
+from pcgrllm.generate_feedback import generate_feedback
 
 from pcgrllm.validate_reward import run_validate
 from pcgrllm.stage import Stage
@@ -348,16 +349,22 @@ class Experiment:
     # 파일 분석
     def analyze_output(self, iteration_num: int) -> None:
 
-        from pcgrllm.generate_feedback import generate_feedback
+        if self.config.task == TaskType.Alphabet:
+            condition_prompt = f'Make a level looks like "{self.config.target_character}"'
+        elif self.config.task == TaskType.Scenario:
+            condition_prompt = ScenarioPreset().scenarios.get(self.config.target_character)
+        else:
+            raise ValueError(f"Invalid task type: {self.config.task}")
 
         args_dict = {
             'exp_path': self.config.exp_dir,
-            'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
+            'condition_prompt': condition_prompt,
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
             'reward_function': self._current_reward_function_filename,
             'available_tiles': get_available_tiles(self.config.problem),
             'iteration': self._iteration,
+            'task': self.config.task
         }
 
         feedback = generate_feedback(self.config, args_dict)
