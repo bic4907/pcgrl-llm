@@ -227,11 +227,12 @@ class Problem:
         ctrl_trgs =  jnp.where(
             self.ctrl_metrics_mask,
             gen_ctrl_trgs(metric_bounds, rng),
-            self.stat_trgs,
+            self.stat_trgs.astype(jnp.float32),
         )
         return ctrl_trgs
 
     def reset(self, env_map: chex.Array, rng, queued_state, actual_map_shape):
+
         ctrl_trgs = jax.lax.select(
             queued_state.has_queued_ctrl_trgs,
             queued_state.ctrl_trgs,

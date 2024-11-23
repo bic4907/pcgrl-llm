@@ -81,6 +81,7 @@ docker_command="docker run --rm -it
     --gpus all
     -e CUDA_VISIBLE_DEVICES=$available_gpu
     --name \"$container_name\"
+    -u $(id -u):$(id -g)
     $docker_image
     python $python_file $param_str"
 
