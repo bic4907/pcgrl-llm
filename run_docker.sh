@@ -63,13 +63,36 @@ echo "  Used Memory: ${selected_gpu_used_mem}MiB" | tee -a "$log_file"
 echo "  Free Memory: ${selected_gpu_free_mem}MiB" | tee -a "$log_file"
 
 
+# 제외할 인자 목록
+exclude_args=("wandb_key" "wandb_project" "n_envs" "overwrite")
+
+# 컨테이너 이름 초기화
 container_name="pcgrllm"
 
-# 입력받은 인자를 기반으로 컨테이너 이름에 추가
+# 제외할 인자 목록
+exclude_args=("wandb_key" "wandb_project" "n_envs" "overwrite")
+
+# 컨테이너 이름 초기화
+container_name="pcgrllm"
+
 for arg in "$@"; do
-    # '='를 '-'로, '.'를 '_'로 대체
-    sanitized_arg=$(echo "$arg" | sed 's/=/-/g; s/\./_/g')
-    container_name="${container_name}_${sanitized_arg}"
+    # 인자의 이름과 값을 '='로 분리
+    key=$(echo "$arg" | cut -d '=' -f 1)
+
+    # 제외할 인자가 아닌 경우에만 처리
+    exclude=false
+    for exclude_arg in "${exclude_args[@]}"; do
+        if [[ "$key" == "$exclude_arg" ]]; then
+            exclude=true
+            break
+        fi
+    done
+
+    if [[ "$exclude" == false ]]; then
+        # '='를 '-'로, '.'를 '_'로 대체
+        sanitized_arg=$(echo "$arg" | sed 's/=/-/g; s/\./_/g')
+        container_name="${container_name}_${sanitized_arg}"
+    fi
 done
 
 echo "Container Name: $container_name"
@@ -80,6 +103,7 @@ docker_command="docker run --rm -it
     -w /workspace
     --gpus all
     -e CUDA_VISIBLE_DEVICES=$available_gpu
+    -e HF_HOME=/workspace/cache/huggingface
     --name \"$container_name\"
     -u $(id -u):$(id -g)
     $docker_image
