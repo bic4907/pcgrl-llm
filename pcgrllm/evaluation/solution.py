@@ -1,13 +1,28 @@
-import random
-
+import jax
 import numpy as np
+import jax.numpy as jnp
 from os.path import dirname, join, basename
 from typing import Tuple
+
+from envs.pathfinding import calc_path_from_a_to_b
+from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from pcgrllm.evaluation.base import *
 from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.utils.storage import Iteration
 
+NOT_EXISTS = jnp.array([-1, -1])
 
+TILE_MAP_STR_ENUM = {
+    "BORDER": Dungeon3Tiles.BORDER,
+    "EMPTY": Dungeon3Tiles.EMPTY,
+    "WALL": Dungeon3Tiles.WALL,
+    "PLAYER": Dungeon3Tiles.PLAYER,
+    "BAT": Dungeon3Tiles.BAT,
+    "SCORPION": Dungeon3Tiles.SCORPION,
+    "SPIDER": Dungeon3Tiles.SPIDER,
+    "KEY": Dungeon3Tiles.KEY,
+    "DOOR": Dungeon3Tiles.DOOR,
+}
 
 class SolutionEvaluator(LevelEvaluator):
     def __init__(self, **kwargs):
@@ -24,89 +39,125 @@ class SolutionEvaluator(LevelEvaluator):
         acc_imp_tiles: float = 0  # (reachable of important tiles <-> prompt)
         exist_imp_tiles: float = 0  # (existence of important tiles <-> prompt)
         '''
+        # if level shape is not 2d, raise error
+        if len(level.shape) != 2:
+            raise ValueError(f"The level must be 2D array. Got {len(level.shape)}D array.")
+
+        passable_tiles = Dungeon3Problem.passable_tiles
+        imp_tiles = ScenarioPreset().scenarios[scenario_num].important_tiles
 
 
-        scenario = ScenarioPreset().scenarios[scenario_num]
+        p_xy = jnp.argwhere(level == Dungeon3Tiles.PLAYER, size=1, fill_value=-1)[0]
+        t_xy = jnp.argwhere(level == Dungeon3Tiles.DOOR, size=1, fill_value=-1)[0]
+        k_xy = jnp.argwhere(level == Dungeon3Tiles.KEY, size=1, fill_value=-1)[0]
 
+        p_t_length, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, t_xy)
+        p_t_connected = jnp.where(p_t_length > 0, 1, 0)
 
-        # TODO Check whether there is important tile in the level.
+        if (k_xy != NOT_EXISTS).all():
+            p_k_length, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, k_xy)
+        else:
+            p_k_length = -1
 
+        p_k_connected = jnp.where(p_k_length > 0, 1, 0)
+        is_solavable = jnp.where(jnp.logical_and(p_t_connected, p_k_connected), 1, 0)
+
+        n_exist_imp_tiles = 0
+        n_acc_imp_tiles = 0
+
+        for imp_tile in imp_tiles:
+            tile_num = TILE_MAP_STR_ENUM[imp_tile]
+
+            _xy = jnp.argwhere(level == tile_num, size=1, fill_value=-1)[0]
+            print(_xy)
+            if (_xy != NOT_EXISTS).all():
+                n_exist_imp_tiles += 1
+
+                _dist, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, _xy)
+
+                if _dist > 0:
+                    n_acc_imp_tiles += 1
+
+        # check if the player and door is connected
+        playability = p_t_connected
+        path_length = p_t_length
+        solvability = is_solavable
+        n_solutions = 0
+        loss_solutions = len(imp_tiles) - n_solutions
+        acc_imp_tiles = n_acc_imp_tiles / len(imp_tiles)
+        exist_imp_tiles = n_exist_imp_tiles / len(imp_tiles)
 
         return EvaluationResult(
             task=self.task,
-            playability=0,
-            path_length=0,
-            solvability=0,
-            n_solutions=0,
-            loss_solutions=0,
-            acc_imp_tiles=0,
-            exist_imp_tiles=0,
+            playability=playability,
+            path_length=path_length,
+            solvability=solvability,
+            n_solutions=n_solutions,
+            loss_solutions=loss_solutions,
+            acc_imp_perc=acc_imp_tiles,
+            exist_imp_perc=exist_imp_tiles,
             sample_size=1)
 
-    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False) -> EvaluationResult:
 
+    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False) -> EvaluationResult:
+        numpy_files = iteration.get_numpy_files()
+
+        results = []
+        for numpy_file in numpy_files:
+            level = numpy_file.load()
+
+            result = self.eval_level(level, scenario_num=scenario_num)
+            results.append(result)
+
+
+        # Calculate the average of the results
+        playability = np.mean([result.playability for result in results])
+        path_length = np.mean([result.path_length for result in results])
+        solvability = np.mean([result.solvability for result in results])
+        n_solutions = np.mean([result.n_solutions for result in results])
+        loss_solutions = np.mean([result.loss_solutions for result in results])
+        acc_imp_tiles = np.mean([result.acc_imp_perc for result in results])
+        exist_imp_tiles = np.mean([result.exist_imp_perc for result in results])
+        sample_size = len(results)
 
         return EvaluationResult(
             task=self.task,
-            playability=random.random(),
-            path_length=random.random(),
-            solvability=random.random(),
-            n_solutions=random.random(),
-            loss_solutions=random.random(),
-            acc_imp_tiles=random.random(),
-            exist_imp_tiles=random.random(),
-            sample_size=random.random())
+            playability=playability,
+            path_length=path_length,
+            solvability=solvability,
+            n_solutions=n_solutions,
+            loss_solutions=loss_solutions,
+            acc_imp_tiles=acc_imp_tiles,
+            exist_imp_tiles=exist_imp_tiles,
+            sample_size=sample_size)
 
-        #
-        # numpy_files = iteration.get_numpy_files() # 여기 use_train을 활용하여야 함
-        #
-        #
-        #
-        # # run evaluation with each numpy file
-        # results = []
-        # for numpy_file in numpy_files:
-        #     level = numpy_file.load()
-        #
-        #     result = self.eval_level(level, scenario_num=scenario_num)
-        #     results.append(result)
-        #
-        # # Calculate the average of the results
-        # playability = np.mean([result.playability for result in results])
-        # path_length = np.mean([result.path_length for result in results])
-        # solvability = np.mean([result.solvability for result in results])
-        # n_solutions = np.mean([result.n_solutions for result in results])
-        # loss_solutions = np.mean([result.loss_solutions for result in results])
-        # acc_imp_tiles = np.mean([result.acc_imp_tiles for result in results])
-        # exist_imp_tiles = np.mean([result.exist_imp_tiles for result in results])
-        # sample_size = len(results)
-        #
-        # return EvaluationResult(
-        #     task=self.task,
-        #     playability=playability,
-        #     path_length=path_length,
-        #     solvability=solvability,
-        #     n_solutions=n_solutions,
-        #     loss_solutions=loss_solutions,
-        #     acc_imp_tiles=acc_imp_tiles,
-        #     exist_imp_tiles=exist_imp_tiles,
-        #     sample_size=sample_size)
-
+# Example
 
 
 if __name__ == '__main__':
     # Initialize logger
+    from debug.scenario_levels import AllLevels
+
     logger = logging.getLogger(basename(__file__))
     logger.setLevel(logging.DEBUG)
 
-    evaluator = SolutionEvaluator(logger=logger)
+    evaluator = SolutionEvaluator(logger=logger, task=TaskType.Scenario)
 
 
     base_path = join(dirname(__file__), 'example')
     # Define the path for the iteration folder
-    example_path = join(base_path, 'A', 'iteration_1')
+    example_path = join(base_path, 'scenario_1', 'iteration_1')
 
     # Load the iteration
     iteration = Iteration.from_path(path=example_path)
+
+    # remove numpy files in the directory
+    import os
+    os.system(f"rm -rf {iteration.get_numpy_dir()}/*")
+
+    # save the alllevels into the numpy dir
+    for idx, level in enumerate(AllLevels[:]):
+        np.save(join(iteration.get_numpy_dir(), f"level_{idx}.npy"), level)
 
     # Run the evaluator with visualization enabled/disabled
     result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True)

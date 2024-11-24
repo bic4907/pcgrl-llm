@@ -25,9 +25,9 @@ class EvaluationResult:
     solvability: float = 0      # if the player can reach the door with the key
     n_solutions: float = 0      # Number of solutions the player can reach the door
     loss_solutions: float = 0   # Loss of between the target and the current solution count
-    acc_imp_tiles: float = 0        # (reachable of important tiles <-> prompt)
-    exist_imp_tiles: float = 0      # (existence of important tiles <-> prompt)
-    attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'acc_imp_tiles', 'exist_imp_tiles']
+    acc_imp_perc: float = 0        # (reachable of important tiles <-> prompt)
+    exist_imp_perc: float = 0      # (existence of important tiles <-> prompt)
+    attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'acc_imp_perc', 'exist_imp_perc']
 
     def __init__(self, task: TaskType, **kwargs):
 
@@ -47,7 +47,9 @@ class EvaluationResult:
 
 
     def __str__(self):
-        return f"EvaluationResult(similarity={self.similarity}, diversity={self.diversity}, sample_size={self.sample_size})"
+        result_dict = self.to_dict()
+        result_dict = ', '.join([f"{key}={value}" for key, value in result_dict.items()])
+        return f"EvaluationResult({result_dict})"
 
     def to_dict(self):
 

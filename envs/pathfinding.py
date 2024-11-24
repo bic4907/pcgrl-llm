@@ -382,9 +382,15 @@ def calc_diameter(flood_regions_net: FloodRegions, flood_path_net: FloodPath, en
     return path_length, flood_path_state, n_regions, flood_regions_state
 
 
-def calc_path_from_a_to_b(flood_path_net: FloodPath, env_map: chex.Array,
+def calc_path_from_a_to_b(env_map: chex.Array,
                           passable_tiles: chex.Array,
-                          src: chex.Array, trg: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
+                          src: chex.Array, trg: chex.Array,
+                          flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
+
+    if flood_path_net is None:
+        flood_path_net = FloodPath()
+        flood_path_net.init_params(env_map.shape)
+
     occupied_map = (env_map[..., None] != passable_tiles).all(-1).astype(jnp.float32)
 
     src_x, src_y = src
@@ -409,4 +415,6 @@ def calc_path_from_a_to_b(flood_path_net: FloodPath, env_map: chex.Array,
             (flood_state.flood_count == 0), jnp.inf, flood_state.flood_count).min(),
         0)
 
-    return path_length, flood_state.flood_count, flood_state.nearest_trg_xy
+    return path_length, flood_state, flood_path_net
+
+
