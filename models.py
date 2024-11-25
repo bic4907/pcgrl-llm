@@ -11,6 +11,10 @@ import jax.numpy as jnp
 
 from envs.pcgrl_env import PCGRLObs
 
+try:
+    import distrax
+except:
+    pass
 
 def crop_rf(x, rf_size):
     mid_x = x.shape[1] // 2
@@ -373,7 +377,10 @@ class ActorCriticPCGRL(nn.Module):
         # val = val.reshape((n_gpu, n_envs))
         # act = act.reshape((n_gpu, n_envs, self.n_agents, *self.act_shape, -1))
 
-        import distrax
+        try:
+            import distrax
+        except:
+            pass
         pi = distrax.Categorical(logits=act)
 
         return pi, val
