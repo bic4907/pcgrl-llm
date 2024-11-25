@@ -279,6 +279,7 @@ class PCGRLEnv(Environment):
                                                 act_shape=act_shape, map_shape=map_shape,
                                                 pinpoints=self.pinpoints,
                                                 tile_nums=self.prob.tile_nums,
+                                                unavailable_tiles=self.unavailable_tiles,
                                                 max_board_scans=env_params.max_board_scans,
                                                 )
         elif representation == RepEnum.PLAYER:
@@ -435,7 +436,7 @@ class PCGRLEnv(Environment):
         n_dims = len(action_shape)
         act_window_shape = action_shape[:-1]
         n_tile_types = action_shape[-1]
-        return jax.random.randint(rng, act_window_shape, 0, n_tile_types)[None, ...]
+        return jax.random.randint(rng, act_window_shape, 0, self.rep.action_space.n)[None, ...]
 
 
 def gen_dummy_queued_state(env):
