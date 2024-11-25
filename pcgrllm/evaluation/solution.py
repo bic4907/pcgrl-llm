@@ -69,7 +69,6 @@ class SolutionEvaluator(LevelEvaluator):
             tile_num = TILE_MAP_STR_ENUM[imp_tile]
 
             _xy = jnp.argwhere(level == tile_num, size=1, fill_value=-1)[0]
-            print(_xy)
             if (_xy != NOT_EXISTS).all():
                 n_exist_imp_tiles += 1
 
@@ -161,5 +160,3 @@ if __name__ == '__main__':
 
     # Run the evaluator with visualization enabled/disabled
     result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True)
-
-    print(result)
