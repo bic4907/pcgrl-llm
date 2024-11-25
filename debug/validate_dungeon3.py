@@ -7,23 +7,20 @@ import sys
 import matplotlib.pyplot as plt
 import io
 
-from conf import config
 from conf.config import TrainConfig
-from eval import init_config_for_eval
 from pcgrllm.validate_reward import read_file
 from purejaxrl.experimental.s5.wrappers import LLMRewardWrapper
 from utils import gymnax_pcgrl_make, init_config
 
 
-@hydra.main(version_base=None, config_path='../conf', config_name='enjoy_pcgrl')
-def main_enjoy(enjoy_config: TrainConfig):
+def validate_dungeon3(enjoy_config: TrainConfig, episode_count: int = 1):
     enjoy_config = init_config(enjoy_config)
 
-    enjoy_config.problem = 'binary'
+    enjoy_config.problem = 'dungeon3'
     enjoy_config.max_board_scans = 1
     # enjoy_config.representation = 'mazes'
 
-    enjoy_config = init_config_for_eval(enjoy_config)
+    # enjoy_config = init_config_for_eval(enjoy_config)
     env, env_params = gymnax_pcgrl_make(enjoy_config.env_name, config=enjoy_config)
     env.prob.init_graphics()
 
@@ -38,7 +35,7 @@ def main_enjoy(enjoy_config: TrainConfig):
 
         env.set_reward_fn(reward_fn)
 
-    rng = jax.random.PRNGKey(enjoy_config.eval_seed)
+    rng = jax.random.PRNGKey(enjoy_config.seed)
     obs, env_state = env.reset(rng)
     frame = env.render(env_state)  # Assuming env.render returns an RGB array
     frame_height, frame_width = frame.shape[:2]
@@ -59,7 +56,7 @@ def main_enjoy(enjoy_config: TrainConfig):
     # Define graph dimensions in pixels
     graph_width, graph_height = screen_width // 2, screen_height // 3
 
-    for episode in range(100):
+    for episode in range(episode_count):
         obs, env_state = env.reset(rng)
 
         done = False
@@ -142,4 +139,5 @@ def main_enjoy(enjoy_config: TrainConfig):
 
 
 if __name__ == '__main__':
-    main_enjoy()
+    validate_dungeon3(init_config(TrainConfig()))
+    validate_dungeon3()
