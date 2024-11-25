@@ -99,7 +99,7 @@ class SolutionEvaluator(LevelEvaluator):
 
 
     def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False) -> EvaluationResult:
-        numpy_files = iteration.get_numpy_files()
+        numpy_files = iteration.get_numpy_files(use_train)
 
         results = []
         for numpy_file in numpy_files:

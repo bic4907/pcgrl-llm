@@ -82,7 +82,10 @@ class Iteration:
     @staticmethod
     def from_path(path: str) -> Optional['Iteration']:
         """Creates an Iteration object from the given path."""
-        iteration_num = int(basename(path).split('_')[-1])
+        try:
+            iteration_num = int(basename(path).split('_')[-1])
+        except:
+            iteration_num = None
         return Iteration(iteration_num, path)
 
     def get_path(self) -> str:
@@ -100,15 +103,18 @@ class Iteration:
         else:
             return join(self.get_inference_dir(), IMAGE_DIR)
 
-    def get_numpy_dir(self) -> str:
-        return join(self.get_inference_dir(), NUMPY_DIR)
+    def get_numpy_dir(self, train: bool = False) -> str:
+        if train:
+            return join(self.get_train_dir(), NUMPY_DIR)
+        else:
+            return join(self.get_inference_dir(), NUMPY_DIR)
 
     def get_images(self, train: bool = False) -> List[ImageResource]:
         image_paths = glob(join(self.get_image_dir(train), '*.png'))
         return [ImageResource(path) for path in image_paths]
 
-    def get_numpy_files(self) -> List[NumpyResource]:
-        numpy_paths = glob(join(self.get_numpy_dir(), '*.npy'))
+    def get_numpy_files(self, train: bool = False) -> List[NumpyResource]:
+        numpy_paths = glob(join(self.get_numpy_dir(train), '*.npy'))
         return [NumpyResource(path) for path in numpy_paths]
 
     def get_reward_function_path(self) -> Optional[str]:

@@ -312,6 +312,7 @@ def load_sweep_hypers(cfg: SweepConfig):
 
 def run_evaluation(config: Config, evaluator: LevelEvaluator) -> Optional[EvaluationResult]:
 
+
     iteration = Iteration.from_path(config.exp_dir)
 
     # if exp_dir includes 'iteration', then it is a path to the iteration directory
@@ -384,13 +385,21 @@ def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_p
 
         frames = jax.vmap(env.render)(first_env_state)
 
-        return frames
+        # pass states to save them as "npy" files
+        return frames, states
 
     # JIT compile the simulation function for better performance
     return jax.jit(sim_render_episode)
 
-def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str = None, t: int = 0,
-                    max_steps: int = 0, logger=None, metric=None, config: Config = None):
+def render_callback(frames,
+                    states,
+                    video_dir: str = None,
+                    image_dir: str = None,
+                    numpy_dir: str = None,
+                    t: int = 0,
+                    logger=None,
+                    config: Config = None):
+
     fps = 60  # 초당 프레임 수
 
 
@@ -417,6 +426,46 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
             wandb.log({key_name: wandb.Video(video_path, fps=fps, format="gif"), 'train/step': t})
 
+    if numpy_dir is None:
+        warnings.warn("numpy_dir is not set. Skipping image numpy.")
+    else:
+        if not os.path.exists(numpy_dir):
+            os.makedirs(numpy_dir, exist_ok=True)
+
+        levels = states.env_state.env_map[-1, :10, ...]
+
+        # save with level_0.npy, level_1.npy, ...
+        for idx, level in enumerate(levels):
+            numpy_path = os.path.join(numpy_dir, f"level_{t}_{idx}.npy")
+            np.save(numpy_path, level)
+
+        if logger is not None:
+            logger.info(f"Saved {len(levels)} npy files to {numpy_dir}/level_{t}_*.npy")
+        else:
+            print(f"Saved {len(levels)} npy files to {numpy_dir}/level_{t}_*.npy")
+
+        # evaluate
+        if config is not None:
+            if config.task == TaskType.Scenario:
+
+                evaluator = SolutionEvaluator(logger=logger, task=config.task)
+                result = run_evaluation(config, evaluator)
+
+                if logger is not None:
+                    if wandb.run is not None:
+                        result_dict = result.to_dict()
+
+                        for key, value in result_dict.items():
+                            if key == 'task': continue
+
+                            key_name = f"Iteration_{config.current_iteration}/train/{key}" if config.current_iteration > 0 else f"Train/{key}"
+                            wandb.log({key_name: value, 'train/step': t})
+
+                    logger.info(f"global step={t}; {str(result.to_dict())}")
+                else:
+                    print(f"global step={t}; {str(result.to_dict())}")
+
+
     # 마지막 프레임을 PNG로 저장
     if image_dir is None:
         warnings.warn("image_dir is not set. Skipping image save.")
@@ -438,7 +487,6 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
             wandb.log({key_name: wandb.Image(image_path), 'train/step': t})
 
-
         # evaluate
         if config is not None:
 
@@ -458,25 +506,3 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
                         logger.info(f"global step={t}; similarity={result.similarity:.4f}")
                     else:
                         print(f"global step={t}; similarity={result.similarity:.4f}")
-
-            elif config.task == TaskType.Scenario:
-
-                evaluator = SolutionEvaluator(logger=logger, task=config.task)
-                result = run_evaluation(config, evaluator)
-
-                if logger is not None:
-                    if wandb.run is not None:
-                        result_dict = result.to_dict()
-
-                        for key, value in result_dict.items():
-                            if key == 'task': continue
-
-                            key_name = f"Iteration_{config.current_iteration}/train/{key}" if config.current_iteration > 0 else f"Train/{key}"
-                            wandb.log({key_name: value, 'train/step': t})
-
-                    logger.info(f"global step={t}; similarity={str(result.to_dict())}")
-                else:
-                    print(f"global step={t}; similarity={result.similarity:.4f}")
-
-
-

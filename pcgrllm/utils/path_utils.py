@@ -13,6 +13,7 @@ from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, Rep
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
 from models import ActorCritic, ActorCriticPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, \
     NCA, SeqNCA
+from pcgrllm.scenario_preset import Scenario, ScenarioPreset
 from pcgrllm.task import TaskType
 
 log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
@@ -148,6 +149,7 @@ def init_config(config: Config):
 
     config._vid_dir = os.path.join(config.exp_dir, 'videos')
     config._img_dir = os.path.join(config.exp_dir, 'images')
+    config._numpy_dir = os.path.join(config.exp_dir, 'numpy')
 
     if config.model == 'seqnca':
         config.hidden_dims = config.hidden_dims[:1]
@@ -157,6 +159,14 @@ def init_config(config: Config):
         if config.total_iterations >= 2:
             print("Total iterations must be less than 2 for IO PE. Did you forget to change the 'pe=' argument?")
             exit(0)
+
+    if config.task == 'scenario':
+        try:
+            ScenarioPreset().scenarios[config.target_character]
+        except:
+            print(f"Could not find scenario with condition: {config.target_character}")
+            exit(0)
+
 
     return config
 
