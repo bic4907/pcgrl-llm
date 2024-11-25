@@ -2,8 +2,7 @@ import math
 from timeit import default_timer as timer
 from typing import Sequence, Tuple
 
-import chex
-import distrax
+
 from flax.linen.initializers import constant, orthogonal
 import numpy as np
 import flax.linen as nn
@@ -374,6 +373,7 @@ class ActorCriticPCGRL(nn.Module):
         # val = val.reshape((n_gpu, n_envs))
         # act = act.reshape((n_gpu, n_envs, self.n_agents, *self.act_shape, -1))
 
+        import distrax
         pi = distrax.Categorical(logits=act)
 
         return pi, val
@@ -388,6 +388,8 @@ class ActorCriticPlayPCGRL(nn.Module):
         map_obs = x.map_obs
         flat_obs = x.flat_obs
         act, val = self.subnet(map_obs, flat_obs)
+
+        import distrax
         pi = distrax.Categorical(logits=act)
         return pi, val
 
@@ -411,6 +413,7 @@ if __name__ == '__main__':
         rng, _rng = jax.random.split(rng)
         data = jax.random.normal(rng, (4, 256, 2))
         print('data', data)
+        import distrax
         dist = distrax.Categorical(data)
         sample = dist.sample(seed=rng)
         print('sample', sample)
