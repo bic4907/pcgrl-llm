@@ -3,41 +3,40 @@ import datetime
 import os, re, ast, sys, time, argparse, json, pickle
 import pprint
 import shutil
-import multiprocessing
 import traceback
 import warnings
 from copy import deepcopy
-import random
 
-import pandas as pd
 import numpy as np
-from os import path
-import tempfile
+
 from os.path import abspath, basename
 import logging
 from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
-from transformers.models.esm.openfold_utils import permute_final_dims
 
-from conf.config import TrainLLMConfig, TrainConfig, Config
+
+from conf.config import TrainLLMConfig, Config
 from envs.probs.binary import BinaryTiles
-from envs.probs.dungeon import DungeonTiles
+
 from envs.probs.dungeon2 import Dungeon2Tiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
+from pcgrllm.utils.path_utils import init_config
 from pcgrllm.validate_reward import run_validate, read_file
 
 logging.getLogger('openai').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
-
+logging.getLogger('jax').setLevel(logging.WARNING)
 
 from pcgrllm.llm_client.llm import ChatContext, UnifiedLLMClient
 from pcgrllm.llm_client.utils import *
 
 # Configure logging
 log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+# set logging level to DEBUG
+logging.basicConfig(level=getattr(logging, log_level, logging.DEBUG))
 logger = logging.getLogger(basename(__file__))
-logger.setLevel(getattr(logging, log_level, logging.INFO))
+logger.setLevel(getattr(logging, log_level, logging.DEBUG))
 
 PE_DIR = 'pe'
 FEATURE_DIR = 'feature'
@@ -698,15 +697,15 @@ if __name__ == "__main__":
     parser.add_argument('--shared_storage_path', type=str, default=abspath('.'))
     parser.add_argument('--postfix', type=str, default=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     parser.add_argument('--reward_functions_dir', type=str, default='RewardFunctions')
-    parser.add_argument('--gpt_model', type=str, default='gpt-4o-mini')
+    parser.add_argument('--gpt_model', type=str, default='gpt-4o')
     parser.add_argument('--gpt_max_token', type=int, default=4096)
     parser.add_argument('--verbose', default=False, action='store_true')
     parser.add_argument('--current_inner', type=int, default=1)
     parser.add_argument('--task', type=str, default='alphabet')
     parser.add_argument('--available_tiles', type=list, default=list())
     parser.add_argument('--arbitrary_dataset', type=str, default='./example/random_dataset.txt')
-    parser.add_argument('--n_codegen_trials', type=int, default=2)
-    parser.add_argument('--n_codefix_trials', type=int, default=2)
+    parser.add_argument('--n_codegen_trials', type=int, default=1)
+    parser.add_argument('--n_codefix_trials', type=int, default=5)
     parser.add_argument('--iteration_num', type=int, default=1)
     parser.add_argument('--previous_reward_function', type=str, default=None)
     parser.add_argument('--map_width', type=int, default=16)
@@ -721,8 +720,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     args = vars(args)
-    reward_generator = RewardGenerator(args)
 
-    reward_generator.set_execution_config(TrainLLMConfig())
+    train_config = TrainLLMConfig()
+    init_config(train_config)
+
+    reward_generator = RewardGenerator(args)
+    reward_generator.set_execution_config(train_config)
 
     reward_generator.run()
