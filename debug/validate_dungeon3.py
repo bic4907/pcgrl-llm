@@ -12,7 +12,10 @@ from utils import gymnax_pcgrl_make, init_config
 @hydra.main(version_base=None, config_path='../conf', config_name='enjoy_pcgrl')
 def main_enjoy(enjoy_config: EnjoyConfig):
     enjoy_config = init_config(enjoy_config)
+
     enjoy_config.problem = 'dungeon3'
+    enjoy_config.max_board_scans = 1
+    enjoy_config.representation = 'turtle'
 
     enjoy_config = init_config_for_eval(enjoy_config)
     env, env_params = gymnax_pcgrl_make(enjoy_config.env_name, config=enjoy_config)
