@@ -209,6 +209,7 @@ class MultiAgentConfig(TrainConfig):
     _exp_dir: Optional[str] = None
     _ckpt_dir: Optional[str] = None
     _vid_dir: Optional[str] = None
+    _numpy_dir: Optional[str] = None
     ###########################################################################
 
 @dataclass

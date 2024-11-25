@@ -159,8 +159,8 @@ def make_train(config, restored_ckpt, checkpoint_manager):
         # INIT RENDER
         jit_sim_render_episode = make_sim_render_episode_single(config, network, env, env_params, runner_state)
         render_frames = jit_sim_render_episode(runner_state.train_state.params)
-        _render_callback = partial(render_callback, video_dir=config._vid_dir, image_dir=config._img_dir,
-                                   max_steps=env.max_steps, env=env_r, logger=logger, config=config)
+        _render_callback = partial(render_callback, video_dir=config._vid_dir, image_dir=config._img_dir, numpy_dir=config._numpy_dir,
+                                   logger=logger, config=config)
         if restored_ckpt is not None:
             steps_prev_complete = restored_ckpt['steps_prev_complete']
             runner_state = restored_ckpt['runner_state']
@@ -418,7 +418,7 @@ def make_train(config, restored_ckpt, checkpoint_manager):
                 do_render,
             )
 
-            frames = jax.lax.cond(
+            frames, rendered_states = jax.lax.cond(
                 do_render,
                 partial(jit_sim_render_episode, runner_state.train_state.params),
                 lambda: render_frames,
@@ -427,7 +427,7 @@ def make_train(config, restored_ckpt, checkpoint_manager):
 
             jax.lax.cond(
                 do_render,
-                partial(jax.experimental.io_callback, _render_callback, None, frames=frames, t=t),
+                partial(jax.experimental.io_callback, _render_callback, None, frames=frames, t=t, states=rendered_states),
                 lambda: None,
             )
 
@@ -604,6 +604,10 @@ def main_chunk(config, rng, exp_dir):
 
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrl')
 def main(config: TrainLLMConfig):
+    # if the task is scenario, change evaluator to hr
+    if config.task == "scenario":
+        config.evaluator = "hr"
+
     if config.initialize is None or config.initialize:
         config = init_config(config)
 

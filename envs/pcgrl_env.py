@@ -43,6 +43,7 @@ PROB_CLASSES = {
     ProbEnum.MAZE: MazeProblem,
     ProbEnum.DUNGEON: DungeonProblem,
     ProbEnum.DUNGEON2: Dungeon2Problem,
+    ProbEnum.DUNGEON3: Dungeon3Problem,
     ProbEnum.MAZE_PLAY: MazePlayProblem,
     ProbEnum.DUNGEON3: Dungeon3Problem,
 }
@@ -303,7 +304,8 @@ class PCGRLEnv(Environment):
     @partial(jax.jit, static_argnames=('self',))
     def reset_env(self, rng, env_params: PCGRLEnvParams, queued_state: QueuedState) \
             -> Tuple[chex.Array, PCGRLEnvState]:
-        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=jnp.zeros(self.map_shape, dtype=bool))
+
+        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=queued_state.map == 0)
 
         map_data = jax.lax.cond(
             queued_state.has_queued_map,

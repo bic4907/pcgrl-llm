@@ -228,5 +228,3 @@ class Dungeon3Problem(Problem):
 
     def draw_path(self, lvl_img,env_map, border_size, path_coords_tpl, tile_size):
         return lvl_img
-
-

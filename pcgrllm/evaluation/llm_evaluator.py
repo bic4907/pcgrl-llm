@@ -19,7 +19,7 @@ class LLMEvaluator(LevelEvaluator):
         self.n_generation_trials = n_generation_trials
         self.seed = seed
 
-    def run(self, iteration: Iteration, target_character: str, use_train: bool = False) -> EvaluationResult:
+    def run(self, iteration: Iteration, target_character: str, use_train: bool = False, step_filter=None) -> EvaluationResult:
         # if the target_character is not alphabet, return 0
         if len(target_character) >= 2 or (not target_character.isalpha()):
             return EvaluationResult(similarity=0, diversity=0, sample_size=0)
@@ -28,7 +28,7 @@ class LLMEvaluator(LevelEvaluator):
             self.logging("LLM evaluator is only for inference. Use ViT evaluator for training.")
             exit(1)
 
-        numpy_files = iteration.get_numpy_files()
+        numpy_files = iteration.get_numpy_files(step_filter=step_filter)
         numpy_str = ''
         for idx, numpy_file in enumerate(numpy_files):
             numpy_data = numpy_file.load()
@@ -62,7 +62,9 @@ class LLMEvaluator(LevelEvaluator):
 
                         iteration.set_evaluation_context(context.to_json())
 
-                        return EvaluationResult(similarity=parsed_response.get('similarity'),
+                        return EvaluationResult(
+                                                task=self.task,
+                                                similarity=parsed_response.get('similarity'),
                                                 diversity=parsed_response.get('diversity'),
                                                 sample_size=len(numpy_files))
                     except Exception as e:

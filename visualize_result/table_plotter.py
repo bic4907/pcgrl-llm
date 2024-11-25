@@ -42,7 +42,20 @@ def print_result_table(df: pd.DataFrame, category_columns: list = ['pe', 'evalua
 
     # Define custom order for 'pe' column and sort by it
     custom_order = ['io', 'cot', 'tot', 'got']
-    grouped_result = grouped_result.reindex(custom_order, level='pe')
+
+    # consider tot-(postfix), got-(postfix) in sorting
+    # depareated: grouped_result = grouped_result.reindex(custom_order, level=0)
+    # Define custom sorting function for custom_order with postfix consideration
+    def custom_sort_function(index_value):
+        base_value = index_value.split('-')[0]  # Remove postfix
+        base_priority = custom_order.index(base_value) if base_value in custom_order else len(custom_order)
+        return (base_priority, index_value)  # Sort by base priority and original value for postfix ordering
+
+    # Reindex with custom sorting
+    sorted_index = sorted(grouped_result.index, key=custom_sort_function)
+
+    # Apply sorted index to the DataFrame
+    grouped_result = grouped_result.loc[sorted_index]
 
     # Style the DataFrame for cleaner display in Jupyter with center alignment
     styled_grouped_result = grouped_result.style.set_properties(**{

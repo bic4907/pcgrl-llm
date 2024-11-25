@@ -91,6 +91,52 @@ class FloodPath(nn.Module):
         flood_state = FloodPathState(flood_input=flood_out, flood_count=flood_count, done=done,
                                      env_map=flood_state.env_map, trg=trg,
                                      nearest_trg_xy=nearest_trg_xy)
+
+        return flood_state
+
+    def flood_step_trg_cell(self, flood_state: FloodPathState):
+        """Flood until a target tile type is reached."""
+        flood_input, flood_count = flood_state.flood_input, flood_state.flood_count
+
+        trg_x, trg_y = flood_state.trg[0], flood_state.trg[1] # check x, y
+        # jax.debug.print("trg_x: {}, trg_y: {}\n", trg_x, trg_y)
+
+        flood_params = self.flood_params
+        occupied_map = flood_input[..., 0]
+        flood_out = self.apply(flood_params, flood_input)
+        flood_out = jnp.clip(flood_out, a_min=0, a_max=1)
+        flood_out = jnp.stack([occupied_map, flood_out[..., -1]], axis=-1)
+
+        # print the start and the end point
+        flood_out_debug = flood_out[..., -1].copy()
+        flood_out_debug = flood_out_debug.at[trg_y, trg_x].set(2)
+
+        # wait for flood_out to be printed
+        # jax.block_until_ready(flood_out_debug)
+
+        # jax.debug.print("flood_out\n{}\n", flood_out[..., -1])
+        #  jax.debug.print("flood_out_debug\n{}\n", flood_out_debug)
+        # jax.debug.print("flood_count\n{}\n", flood_state.flood_count)
+
+        flood_count = flood_out[..., -1] + flood_count
+
+        has_reached_trg = jax.numpy.where(flood_count[trg_y, trg_x] > 0, True, False)
+        no_change = jnp.all(flood_input == flood_out)
+        done = has_reached_trg | no_change
+
+        # make zeros env_map and mark at trg_cell
+        # nearest_trg_xy = flood_state.trg
+        trg_arr = jnp.zeros(flood_state.env_map.shape)
+        trg_arr = trg_arr.at[trg_y, trg_x].set(1)
+
+        nearest_trg_xy = jnp.argwhere(
+                jnp.where(trg_arr, flood_count, 0) > 0,
+            size=1, fill_value=-1)[0]
+
+        flood_state = FloodPathState(flood_input=flood_out, flood_count=flood_count, done=done,
+                                     env_map=flood_state.env_map, trg=flood_state.trg,
+                                     nearest_trg_xy=nearest_trg_xy)
+
         return flood_state
 
 
@@ -334,3 +380,41 @@ def calc_diameter(flood_regions_net: FloodRegions, flood_path_net: FloodPath, en
     path_length = jnp.clip(flood_path_state.flood_count.max() - jnp.where(flood_path_state.flood_count == 0, max_path_length, flood_path_state.flood_count).min(), 0)
 
     return path_length, flood_path_state, n_regions, flood_regions_state
+
+
+def calc_path_from_a_to_b(env_map: chex.Array,
+                          passable_tiles: chex.Array,
+                          src: chex.Array, trg: chex.Array,
+                          flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
+
+    if flood_path_net is None:
+        flood_path_net = FloodPath()
+        flood_path_net.init_params(env_map.shape)
+
+    occupied_map = (env_map[..., None] != passable_tiles).all(-1).astype(jnp.float32)
+
+    src_x, src_y = src
+
+    init_flood = jnp.zeros_like(env_map, dtype=jnp.float32)
+    init_flood = init_flood.at[src_y, src_x].set(1)
+
+    init_flood_count = init_flood.copy()
+
+    # Concatenate init_flood with new_occ_map
+    flood_input = jnp.stack([occupied_map, init_flood], axis=-1)
+    flood_state = FloodPathState(flood_input=flood_input, flood_count=init_flood_count, env_map=env_map,
+                                 trg=trg,
+                                 done=False)
+    flood_state = jax.lax.while_loop(
+        lambda fps: jnp.logical_not(fps.done),
+        flood_path_net.flood_step_trg_cell,
+        flood_state)
+
+    path_length = jnp.clip(
+        flood_state.flood_count.max() - jnp.where(
+            (flood_state.flood_count == 0), jnp.inf, flood_state.flood_count).min(),
+        0)
+
+    return path_length, flood_state, flood_path_net
+
+
