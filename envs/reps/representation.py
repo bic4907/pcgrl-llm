@@ -18,7 +18,7 @@ class RepresentationState:
 
 class Representation(ABC):
     def __init__(self, tile_enum: Tiles, rf_shape: Tuple[int, int],
-                 act_shape: Tuple[int, int], pinpoints: bool, tile_nums: Tuple[int]):
+                 act_shape: Tuple[int, int], pinpoints: bool, tile_nums: Tuple[int], unavailable_tiles: list):
         self.tile_enum = tile_enum
         self.act_shape = act_shape
         self.max_steps = None
@@ -28,6 +28,10 @@ class Representation(ABC):
             self.editable_tile_enum = [t for t, num in zip(self.tile_enum, self.tile_nums) if num == 0 and t != self.tile_enum.BORDER]
         else:
             self.editable_tile_enum = [t for t in self.tile_enum if t != self.tile_enum.BORDER]
+
+        # remove unavailable tiles from editable tiles
+        self.editable_tile_enum = [t for t in self.editable_tile_enum if t not in unavailable_tiles]
+
         self.n_editable_tiles = len(self.editable_tile_enum)
 
     def observation_shape(self):
