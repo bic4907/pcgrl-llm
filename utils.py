@@ -310,7 +310,7 @@ def load_sweep_hypers(cfg: SweepConfig):
     return hypers, eval_hypers
 
 
-def run_evaluation(config: Config, evaluator: LevelEvaluator) -> Optional[EvaluationResult]:
+def run_evaluation(config: Config, evaluator: LevelEvaluator, step_filter=None) -> Optional[EvaluationResult]:
 
 
     iteration = Iteration.from_path(config.exp_dir)
@@ -327,7 +327,8 @@ def run_evaluation(config: Config, evaluator: LevelEvaluator) -> Optional[Evalua
     elif config.task == TaskType.Scenario:
         evaluator_params['scenario_num'] = config.target_character
 
-    result = evaluator.run(iteration=iteration, use_train=True, **evaluator_params)
+    result = evaluator.run(iteration=iteration, use_train=True,
+                           step_filter=step_filter, **evaluator_params)
 
     return result
 
@@ -449,7 +450,7 @@ def render_callback(frames,
             if config.task == TaskType.Scenario:
 
                 evaluator = SolutionEvaluator(logger=logger, task=config.task)
-                result = run_evaluation(config, evaluator)
+                result = run_evaluation(config, evaluator, step_filter=f"{t}")
 
                 if logger is not None:
                     if wandb.run is not None:
@@ -497,7 +498,7 @@ def render_callback(frames,
 
                 # run eval only the target_chracter is in the alphabet
                 if config.target_character in alphabet:
-                    result = run_evaluation(config, evaluator)
+                    result = run_evaluation(config, evaluator, step_filter=f"{t}")
 
                     if logger is not None:
                         if wandb.run is not None:

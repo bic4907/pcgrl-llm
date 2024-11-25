@@ -98,8 +98,8 @@ class SolutionEvaluator(LevelEvaluator):
             sample_size=1)
 
 
-    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False) -> EvaluationResult:
-        numpy_files = iteration.get_numpy_files(use_train)
+    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
+        numpy_files = iteration.get_numpy_files(train=use_train, step_filter=step_filter)
 
         results = []
         for numpy_file in numpy_files:
