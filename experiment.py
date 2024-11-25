@@ -31,7 +31,10 @@ from envs.pcgrl_env import get_prob_cls, ProbEnum, get_available_tiles
 from pcgrllm.evaluation.base import EvaluationResult
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 from pcgrllm.evaluation.llm_evaluator import LLMEvaluator
+from pcgrllm.evaluation.solution import SolutionEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
+from pcgrllm.scenario_preset import Scenario, ScenarioPreset
+from pcgrllm.task import TaskType
 from pcgrllm.utils.graph import GraphManager, NodeInfo
 
 from pcgrllm.utils.logger import print_log, log_rollout_data, log_feedback_data, log_reward_generation_data, \
@@ -40,6 +43,7 @@ from pcgrllm.utils.path_utils import init_config
 from pcgrllm.utils.prompt import get_reward_score_paired_examples
 from pcgrllm.utils.storage import Iteration, Storage
 from pcgrllm.utils.wandb import start_wandb, finish_wandb
+from pcgrllm.generate_feedback import generate_feedback
 
 from pcgrllm.validate_reward import run_validate
 from pcgrllm.stage import Stage
@@ -92,6 +96,7 @@ class Experiment:
         self.load_state()
 
         self._copy_prompt()
+        self._copy_scenario()
 
     @property
     def _experiment_path(self):
@@ -134,6 +139,22 @@ class Experiment:
             self.logging(f"Prompt directory already exists: {dest_dir}")
             pass
 
+    def _copy_scenario(self):
+        """Copies the scenario log file to the experiment directory."""
+
+        self.logging("Copying scenario directory to the experiment directory", level=logging.INFO)
+
+        source_dir = path.join(path.dirname(__file__), 'pcgrllm', 'scenario')
+        dest_dir = path.join(self._experiment_path, 'scenario')
+
+        self.logging(f"Copying scenario directory to the experiment directory: {source_dir} -> {dest_dir}")
+
+        try:
+            shutil.copytree(source_dir, dest_dir)
+        except FileExistsError:
+            self.logging(f"Scenario directory already exists: {dest_dir}")
+            pass
+
     @property
     def reward_functions_dir(self):
         return path.join(self._experiment_path, 'reward_functions')
@@ -171,6 +192,18 @@ class Experiment:
             auxiliary_prompt = get_reward_score_paired_examples(self.storage, self.auxiliary_iter_nums)
             auxiliary_prompt_path = self.storage.set_auxiliary_prompt(self._iteration, auxiliary_prompt)
 
+        target_character = self.config.target_character
+
+        if self.config.task == 'scenario':
+
+            # if the self.config.target_character is numberic value, then use the scenario prompt
+
+            # the target_character is basically a string, try to convert it to int and check if it is a number
+            if self.config.target_character.isnumeric():
+                scenario_preset = ScenarioPreset()
+                scenario_preset = scenario_preset.scenarios.get(target_character, None)
+                target_character = scenario_preset.prompt if scenario_preset is not None else target_character
+
         args_dict = {
             'shared_storage_path': self._experiment_path,
             'postfix': f"reward_outer_{self._iteration}",
@@ -183,7 +216,7 @@ class Experiment:
             'total_iterations': self.config.total_iterations,
             'n_inner': 1,
             'iteration_num': self._iteration,
-            'target_character': self.config.target_character,
+            'target_character': target_character,
             'pe': self.config.pe,
             'branch_factor': self.config.branch_factor,
             'feedback_path': self.previous_feedback_path,
@@ -193,7 +226,7 @@ class Experiment:
             'available_tiles': get_available_tiles(self.config.problem),
             'prev_eval_result': prev_eval_result,
             'auxiliary_prompt_path': auxiliary_prompt_path,
-            'n_codegen_trials': self.config.n_generation_trials,
+            'n_codegen_trials': self.config.n_codegen_trials,
             'n_codefix_trials': self.config.n_codefix_trials,
             'task': self.config.task,
         }
@@ -316,16 +349,22 @@ class Experiment:
     # 파일 분석
     def analyze_output(self, iteration_num: int) -> None:
 
-        from pcgrllm.generate_feedback import generate_feedback
+        if self.config.task == TaskType.Alphabet:
+            condition_prompt = f'Make a level looks like "{self.config.target_character}"'
+        elif self.config.task == TaskType.Scenario:
+            condition_prompt = ScenarioPreset().scenarios.get(self.config.target_character)
+        else:
+            raise ValueError(f"Invalid task type: {self.config.task}")
 
         args_dict = {
             'exp_path': self.config.exp_dir,
-            'condition_prompt': f'Make a level looks like "{self.config.target_character}"',
+            'condition_prompt': condition_prompt,
             'input_type': self.config.feedback_input_type,
             'gpt_model': self.config.gpt_model,
             'reward_function': self._current_reward_function_filename,
             'available_tiles': get_available_tiles(self.config.problem),
             'iteration': self._iteration,
+            'task': self.config.task
         }
 
         feedback = generate_feedback(self.config, args_dict)
@@ -340,23 +379,19 @@ class Experiment:
         return feedback_path
 
     def run_evaluation(self):
-
         exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+        iteration = self.storage.get_iteration(self._iteration)
 
-        if self.config.evaluator == 'vit':
-            evaluator = ViTEvaluator(logger=self.logger)
-        elif self.config.evaluator == 'hr':
-            evaluator = HeuristicEvaluator(logger=self.logger)
-        elif self.config.evaluator == 'llm':
-            evaluator = LLMEvaluator(logger=self.logger, gpt_model=self.config.gpt_model, seed=self.config.seed,
-                                     n_generation_trials=self.config.n_generation_trials)
-
-        iteration = Iteration.from_path(exp_dir)
-
-        if not self.config.random_fitness:
-            result = evaluator.run(iteration=iteration, target_character=self.config.target_character)
+        if self.config.task == TaskType.Alphabet:
+            result = self._run_alphabet_evaluation(iteration=iteration, target_character=self.config.target_character)
+        elif self.config.task == TaskType.Scenario:
+            result = self._run_scenario_evaluation(iteration=iteration, scenario_num=self.config.target_character)
         else:
-            result = EvaluationResult(similarity=random.random(), diversity=random.random(), sample_size=-1)
+            raise ValueError(f"Invalid task type: {self.config.task}")
+
+        # Write the fitness to the file
+        if self.config.random_fitness:
+            result = EvaluationResult(task=self.task).sample() # TODO Check before running experiment
 
         # save to the iteration file
         result_path = path.join(exp_dir, 'evaluation.json')
@@ -364,10 +399,25 @@ class Experiment:
             json.dump(result.to_dict(), f)
 
         if self.config.pe in ['tot', 'got']:
-            self.logging(f"Node evaluation score: {result.similarity}", level=logging.INFO)
-            self.graph_manager.update(self.current_node, similarity=result.similarity, refer_ids=self.auxiliary_iter_nums)
+            self.logging(f"Node evaluation score: {result.total}", level=logging.INFO)
+            self.graph_manager.update(self.current_node, fitness=result.total, refer_ids=self.auxiliary_iter_nums)
 
-        self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
+
+    def _run_alphabet_evaluation(self, iteration: Iteration, target_character: str) -> EvaluationResult:
+        exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+
+        if self.config.evaluator == 'vit':
+            evaluator = ViTEvaluator(task=self.config.task, logger=self.logger)
+        elif self.config.evaluator == 'hr':
+            evaluator = HeuristicEvaluator(task=self.config.task, logger=self.logger)
+        elif self.config.evaluator == 'llm':
+            evaluator = LLMEvaluator(task=self.config.task, logger=self.logger,
+                                     gpt_model=self.config.gpt_model, seed=self.config.seed,
+                                     n_generation_trials=self.config.n_generation_trials)
+        else:
+            raise ValueError(f"Invalid evaluator type: {self.config.evaluator}")
+
+        result = evaluator.run(iteration=iteration, target_character=target_character)
 
         if self.config.evaluator == 'vit':
             log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
@@ -386,6 +436,20 @@ class Experiment:
             # Log the evaluation result
             log_evaluation_result(logger=self.logger, result=vit_result, iteration=self._iteration, evaluator_type=None)
             self.logging(f"ViT Result: {vit_result}", level=logging.INFO)
+
+        return result
+
+    def _run_scenario_evaluation(self, iteration: Iteration, scenario_num: str) -> EvaluationResult:
+
+        if self.config.evaluator == 'hr':
+            evaluator = SolutionEvaluator(task=self.config.task, logger=self.logger)
+            result = evaluator.run(iteration=iteration, scenario_num=scenario_num)
+        else:
+            raise ValueError(f"Invalid evaluator type: {self.config.evaluator}")
+
+        self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
+
+        log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
 
         return result
 
@@ -491,6 +555,7 @@ class Experiment:
                 train_fn()
 
                 self._stage = Stage.RolloutPCGRL
+
             elif self._stage == Stage.RolloutPCGRL:
                 # Collect results
 
@@ -580,6 +645,7 @@ class Experiment:
 
 @hydra.main(version_base=None, config_path='./conf', config_name='train_pcgrllm')
 def main(config: TrainConfig):
+    # if the problem is scenario, set the problem to dungeon3
     init_config(config)
 
     experiment = Experiment(config)

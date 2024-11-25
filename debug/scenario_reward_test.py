@@ -1,7 +1,8 @@
+import pytest
 import jax
 import jax.numpy as jnp
 from jax import jit
-
+from debug.scenario_levels import AllLevels
 
 @jit
 def compute_reward(prev_array, unused3, curr_array, unused4) -> float:
@@ -59,37 +60,33 @@ def compute_reward(prev_array, unused3, curr_array, unused4) -> float:
 
     return reward
 
-# Test function for a 16x16 array
-def test_compute_reward():
-    # Define a 16x16 array with the "M" pattern
-    curr_array_m = jnp.array([
-        [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1],
-        [1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1],
-        [1, 2, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 1],
-        [1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1, 2, 2, 2, 1],
-        [1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 2, 2, 1, 2, 1, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 2, 3, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 2, 3, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 2, 2, 3, 2, 1, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 2, 1, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 1],
-        [1, 2, 1, 2, 2, 2, 2, 1, 2, 2, 2, 2, 2, 2, 2, 1],
-        [1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1],
-        [1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1]
-    ])
 
-    # Define a 16x16 array without the "M" pattern
-    curr_array_non_m = jnp.ones((16, 16)) * 2  # All cells set to 2 (walls)
+@jit
+def compute_reward_example(prev_array, unused3, curr_array, unused4) -> float:
+    WALL = 1
+    cnt_wall = jnp.sum(curr_array == WALL)
+    return cnt_wall
 
-    # Compute rewards
-    reward_m = compute_reward(curr_array_m, None, curr_array_m, None)
-    reward_non_m = compute_reward(None, None, curr_array_non_m, None)
 
-    print(f"Reward for array with 'M' pattern: {reward_m}")
-    print(f"Reward for array without 'M' pattern: {reward_non_m}")
+# Pytest test case
+@pytest.mark.parametrize("index, level", enumerate(AllLevels))
+def test_compute_reward(index, level):
+    """
+    Test compute_reward with all levels in AllLevels.
 
-# Run the test
-test_compute_reward()
+    Parameters:
+        index: Index of the level in AllLevels.
+        level: Matrix data of the level.
+    """
+    prev_array = level  # Treat this as the previous array
+    curr_array = level  # Treat this as the current array
+
+    # Compute reward for the given level
+    reward = compute_reward_example(prev_array, None, curr_array, None)
+
+    # Check if reward is computed without errors
+    assert reward is not None, f"Reward computation failed for level at index: {index}"
+
+    # Optionally add specific checks for reward values if needed
+    print(f"Level index: {index}, Reward: {reward}")
+

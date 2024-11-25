@@ -184,7 +184,7 @@ class HeuristicEvaluator(LevelEvaluator):
         else:
             mean_similarity = float('-inf')
 
-        return EvaluationResult(similarity=mean_similarity, sample_size=len(numpy_files))
+        return EvaluationResult(task=self.task, similarity=mean_similarity, sample_size=len(numpy_files))
 
 
 def run_cross_validation(evaluator, letters, base_path, visualize=False):

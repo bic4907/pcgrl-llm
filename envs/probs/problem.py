@@ -230,7 +230,7 @@ class Problem:
         ctrl_trgs =  jnp.where(
             self.ctrl_metrics_mask,
             ctrl_trgs,
-            self.stat_trgs,
+            self.stat_trgs.astype(jnp.float32)
         )
         return ctrl_trgs
 
