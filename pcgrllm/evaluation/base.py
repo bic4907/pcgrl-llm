@@ -43,7 +43,7 @@ class EvaluationResult:
         if self.task == TaskType.Alphabet:
             return self.similarity
         elif self.task == TaskType.Scenario:
-            return self.playability
+            return self.solvability
 
 
     def __str__(self):
