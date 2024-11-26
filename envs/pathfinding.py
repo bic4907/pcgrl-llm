@@ -25,7 +25,7 @@ class FloodPathState:
     nearest_trg_xy: Optional[chex.Array] = field(default_factory=lambda: 
                                                  (jnp.zeros(2, dtype=jnp.int32) - 1))
     done: bool = False
-
+    has_reached_trg: bool = False
 
 @struct.dataclass
 class FloodRegionsState:
@@ -107,9 +107,9 @@ class FloodPath(nn.Module):
         flood_out = jnp.clip(flood_out, a_min=0, a_max=1)
         flood_out = jnp.stack([occupied_map, flood_out[..., -1]], axis=-1)
 
-        # print the start and the end point
-        flood_out_debug = flood_out[..., -1].copy()
-        flood_out_debug = flood_out_debug.at[trg_y, trg_x].set(2)
+        # # print the start and the end point
+        # flood_out_debug = flood_out[..., -1].copy()
+        # flood_out_debug = flood_out_debug.at[trg_y, trg_x].set(2)
 
         # wait for flood_out to be printed
         # jax.block_until_ready(flood_out_debug)
@@ -120,7 +120,8 @@ class FloodPath(nn.Module):
 
         flood_count = flood_out[..., -1] + flood_count
 
-        has_reached_trg = jax.numpy.where(flood_count[trg_y, trg_x] > 0, True, False)
+        has_reached_trg = jax.numpy.where(flood_count[trg_x, trg_y] > 0, True, False)
+
         no_change = jnp.all(flood_input == flood_out)
         done = has_reached_trg | no_change
 
@@ -135,6 +136,7 @@ class FloodPath(nn.Module):
 
         flood_state = FloodPathState(flood_input=flood_out, flood_count=flood_count, done=done,
                                      env_map=flood_state.env_map, trg=flood_state.trg,
+                                     has_reached_trg=has_reached_trg,
                                      nearest_trg_xy=nearest_trg_xy)
 
         return flood_state
@@ -414,6 +416,9 @@ def calc_path_from_a_to_b(env_map: chex.Array,
         flood_state.flood_count.max() - jnp.where(
             (flood_state.flood_count == 0), jnp.inf, flood_state.flood_count).min(),
         0)
+
+    has_reached_trg = flood_state.has_reached_trg
+    path_length = jnp.where(has_reached_trg, path_length, -1.0)
 
     return path_length, flood_state, flood_path_net
 
