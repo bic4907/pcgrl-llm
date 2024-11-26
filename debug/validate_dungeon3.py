@@ -140,4 +140,3 @@ def validate_dungeon3(enjoy_config: TrainConfig, episode_count: int = 1):
 
 if __name__ == '__main__':
     validate_dungeon3(init_config(TrainConfig()))
-    validate_dungeon3()
