@@ -104,6 +104,7 @@ class Config:
     task: str = "alphabet"
 
     randomize_start_pos: bool = False
+    use_preset_level: bool = True
 
 
 @dataclass

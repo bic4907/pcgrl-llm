@@ -305,7 +305,7 @@ class PCGRLEnv(Environment):
     def reset_env(self, rng, env_params: PCGRLEnvParams, queued_state: QueuedState) \
             -> Tuple[chex.Array, PCGRLEnvState]:
 
-        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=queued_state.map == 0)
+        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=queued_state.frz_map)
 
         map_data = jax.lax.cond(
             queued_state.has_queued_map,

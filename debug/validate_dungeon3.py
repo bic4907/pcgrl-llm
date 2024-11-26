@@ -1,3 +1,5 @@
+from asyncio import QueueEmpty
+
 import pygame
 import hydra
 import jax
@@ -9,21 +11,66 @@ import io
 
 from conf import config
 from conf.config import TrainConfig
+from debug.scenario_levels import AllLevels
+from envs.pcgrl_env import QueuedState
 from eval import init_config_for_eval
 from pcgrllm.validate_reward import read_file
 from purejaxrl.experimental.s5.wrappers import LLMRewardWrapper
 from utils import gymnax_pcgrl_make, init_config
 
 
+def get_random_level() -> QueuedState:
+    # random random level from the AllLevels
+
+    PLAYER = 3
+    DOOR = 8
+
+    # random sample a level
+    level = jnp.array(AllLevels[-1])
+    frz_map = jnp.zeros((16, 16)).astype(bool)
+
+    # Find PLAYER and DOOR positions
+    player_positions = jnp.argwhere(level == PLAYER)
+    door_positions = jnp.argwhere(level == DOOR)
+
+    # Function to mark 3x3 area as frozen
+    def freeze_area(frz_map, pos):
+        x, y = pos
+        x_min, x_max = max(0, x - 1), min(15, x + 1)
+        y_min, y_max = max(0, y - 1), min(15, y + 1)
+        frz_map = frz_map.at[x_min:x_max + 1, y_min:y_max + 1].set(True)
+        return frz_map
+
+    # Freeze PLAYER areas
+    for pos in player_positions:
+        frz_map = freeze_area(frz_map, pos)
+
+    # Freeze DOOR areas
+    for pos in door_positions:
+        frz_map = freeze_area(frz_map, pos)
+
+    queued_state = QueuedState(
+        map=level,
+        frz_map=frz_map,
+        has_queued_ctrl_trgs=False,
+        ctrl_trgs=jnp.zeros((1,)).astype(float),
+        has_queued_map=True,
+        has_queued_frz_map=True
+    )
+
+    return queued_state
+
 @hydra.main(version_base=None, config_path='../conf', config_name='enjoy_pcgrl')
 def main_enjoy(enjoy_config: TrainConfig):
     enjoy_config = init_config(enjoy_config)
 
-    enjoy_config.problem = 'binary'
     enjoy_config.max_board_scans = 1
-    # enjoy_config.representation = 'mazes'
+    enjoy_config.problem = 'dungeon3'
 
     enjoy_config = init_config_for_eval(enjoy_config)
+
+    print(enjoy_config)
+
     env, env_params = gymnax_pcgrl_make(enjoy_config.env_name, config=enjoy_config)
     env.prob.init_graphics()
 
@@ -38,8 +85,12 @@ def main_enjoy(enjoy_config: TrainConfig):
 
         env.set_reward_fn(reward_fn)
 
+    # use lambda for it
+    queued_state_fn = get_random_level if enjoy_config.use_preset_level else lambda : None
+
     rng = jax.random.PRNGKey(enjoy_config.eval_seed)
-    obs, env_state = env.reset(rng)
+    obs, env_state = env.reset(rng, queued_state=queued_state_fn())
+
     frame = env.render(env_state)  # Assuming env.render returns an RGB array
     frame_height, frame_width = frame.shape[:2]
     screen_height, screen_width = frame_height * 2, frame_width * 2
@@ -60,7 +111,7 @@ def main_enjoy(enjoy_config: TrainConfig):
     graph_width, graph_height = screen_width // 2, screen_height // 3
 
     for episode in range(100):
-        obs, env_state = env.reset(rng)
+        obs, env_state = env.reset(rng, queued_state=queued_state_fn())
 
         done = False
         episode_reward = 0
@@ -105,11 +156,16 @@ def main_enjoy(enjoy_config: TrainConfig):
             reward_text = font.render(f"Reward: {reward:.2f}", True, (255, 255, 255))
             episode_reward_text = font.render(f"Episode Reward: {episode_reward:.2f}", True, (255, 255, 255))
 
+            # reward function path (only filename)
+            reward_path = enjoy_config.reward_function_path.split('/')[-1]
+            reward_path_text = font.render(f"Reward Function: {reward_path}", True, (255, 255, 255))
+
             # Blit text onto the screen
             screen.blit(step_text, (10, 10))
             screen.blit(action_text, (10, 40))
             screen.blit(reward_text, (10, 70))
             screen.blit(episode_reward_text, (10, 100))
+            screen.blit(reward_path_text, (10, 130))
 
             # Plot and display cumulative reward graph
             if len(reward_history) > 1:
