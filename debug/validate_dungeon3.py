@@ -1,4 +1,5 @@
 from asyncio import QueueEmpty
+import random
 
 import pygame
 import hydra
@@ -26,7 +27,7 @@ def get_random_level() -> QueuedState:
     DOOR = 8
 
     # random sample a level
-    level = jnp.array(AllLevels[-1])
+    level = jnp.array(random.choice(AllLevels))
     frz_map = jnp.zeros((16, 16)).astype(bool)
 
     # Find PLAYER and DOOR positions
@@ -74,16 +75,6 @@ def main_enjoy(enjoy_config: TrainConfig):
     env, env_params = gymnax_pcgrl_make(enjoy_config.env_name, config=enjoy_config)
     env.prob.init_graphics()
 
-    if hasattr(enjoy_config, 'reward_function_path') and enjoy_config.reward_function_path is not None:
-        env = LLMRewardWrapper(env)
-
-        reward_fn_str = read_file(enjoy_config.reward_function_path)
-
-        exec_scope = {}
-        exec(reward_fn_str, exec_scope)
-        reward_fn = exec_scope['compute_reward']
-
-        env.set_reward_fn(reward_fn)
 
     # use lambda for it
     queued_state_fn = get_random_level if enjoy_config.use_preset_level else lambda : None
@@ -111,12 +102,29 @@ def main_enjoy(enjoy_config: TrainConfig):
     graph_width, graph_height = screen_width // 2, screen_height // 3
 
     for episode in range(100):
+        try:
+            if hasattr(enjoy_config, 'reward_function_path') and enjoy_config.reward_function_path is not None:
+                env = LLMRewardWrapper(env)
+
+                reward_fn_str = read_file(enjoy_config.reward_function_path)
+
+                exec_scope = {}
+                exec(reward_fn_str, exec_scope)
+                reward_fn = exec_scope['compute_reward']
+
+                env.set_reward_fn(reward_fn)
+        except Exception as e:
+            print(f"Error loading reward function: {e}")
+
+
         obs, env_state = env.reset(rng, queued_state=queued_state_fn())
 
         done = False
         episode_reward = 0
         step_count = 0  # Initialize step count for the episode
         reward_history = []  # To store cumulative rewards per step
+
+
 
         while not done:
             for event in pygame.event.get():
@@ -127,6 +135,7 @@ def main_enjoy(enjoy_config: TrainConfig):
             # Random sample action
             rng, subkey = jax.random.split(rng)
             action = env.sample_action(subkey)
+            # action = jnp.array(1).reshape(1, 1, 1)
 
             # If an action is selected, step the environment
             if action is not None:
