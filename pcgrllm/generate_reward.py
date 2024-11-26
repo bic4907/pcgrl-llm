@@ -15,7 +15,7 @@ from os import path
 import tempfile
 from os.path import abspath, basename
 import logging
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
 from transformers.models.esm.openfold_utils import permute_final_dims
 
@@ -173,7 +173,8 @@ class RewardGenerator:
                 if n_response != 1:
                     generated_responses = [response[0] for response in responses]
                     generated_contexts = [response[1] for response in responses]
-                    index = self.response_cluster(generated_responses, n_clusters=3)
+                    index = 1
+                    # ndex = self.response_cluster(generated_responses, n_clusters=3)
                 else:
                     response = responses[0][0]
                     context = responses[0][1]
@@ -298,28 +299,28 @@ class RewardGenerator:
             self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
             return False
 
-    def response_cluster(self, responses, n_clusters=2):
-        # set environment variable for
-
-        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-
-        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-        embeddings = model.encode(responses)
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        labels = kmeans.fit_predict(embeddings)
-
-        clusters = {}
-        for i, label in enumerate(labels):
-            if label not in clusters:
-                clusters[label] = []
-            clusters[label].append(i)
-
-        largest_cluster = max(clusters.values(), key=len)
-        largest_cluster_embeddings = embeddings[largest_cluster]
-
-        cluster_center = np.mean(largest_cluster_embeddings, axis=0)
-        index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
-        return index
+    # def response_cluster(self, responses, n_clusters=2):
+    #     # set environment variable for
+    #
+    #     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    #
+    #     model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    #     embeddings = model.encode(responses)
+    #     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    #     labels = kmeans.fit_predict(embeddings)
+    #
+    #     clusters = {}
+    #     for i, label in enumerate(labels):
+    #         if label not in clusters:
+    #             clusters[label] = []
+    #         clusters[label].append(i)
+    #
+    #     largest_cluster = max(clusters.values(), key=len)
+    #     largest_cluster_embeddings = embeddings[largest_cluster]
+    #
+    #     cluster_center = np.mean(largest_cluster_embeddings, axis=0)
+    #     index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
+    #     return index
 
     def set_execution_config(self, config: Config):
         self.logging(f"Setting the execution config: {config}", logging.INFO)
