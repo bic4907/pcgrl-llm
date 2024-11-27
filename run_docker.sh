@@ -117,7 +117,7 @@ echo "$docker_command" | tee -a "$log_file"
 # Docker 명령 실행 및 로그 기록
 {
     eval $docker_command
-} >> "$log_file" 2>> "$error_log_file"
+} 2>&1 | tee -a "$log_file"
 
 # 실행 결과 확인
 exit_code=$?
