@@ -9,9 +9,12 @@ import jax
 import jax.numpy as jnp
 from flax.linen.initializers import constant, orthogonal
 import chex
+from jax import jit, lax
 
 from envs.utils import Tiles
+from pcgrllm.utils.cuda import get_cuda_version
 
+CUDA_VERSION = get_cuda_version()
 
 @struct.dataclass
 class FloodPathState:
@@ -98,8 +101,7 @@ class FloodPath(nn.Module):
         """Flood until a target tile type is reached."""
         flood_input, flood_count = flood_state.flood_input, flood_state.flood_count
 
-        trg_x, trg_y = flood_state.trg[0], flood_state.trg[1] # check x, y
-        # jax.debug.print("trg_x: {}, trg_y: {}\n", trg_x, trg_y)
+        trg_x, trg_y = flood_state.trg[1], flood_state.trg[0] # check x, y
 
         flood_params = self.flood_params
         occupied_map = flood_input[..., 0]
@@ -114,13 +116,11 @@ class FloodPath(nn.Module):
         # wait for flood_out to be printed
         # jax.block_until_ready(flood_out_debug)
 
-        # jax.debug.print("flood_out\n{}\n", flood_out[..., -1])
-        #  jax.debug.print("flood_out_debug\n{}\n", flood_out_debug)
-        # jax.debug.print("flood_count\n{}\n", flood_state.flood_count)
 
         flood_count = flood_out[..., -1] + flood_count
 
-        has_reached_trg = jax.numpy.where(flood_count[trg_x, trg_y] > 0, True, False)
+        has_reached_trg = jax.numpy.where(flood_count[trg_y, trg_x] > 0, True, False)
+
 
         no_change = jnp.all(flood_input == flood_out)
         done = has_reached_trg | no_change
@@ -389,28 +389,52 @@ def calc_path_from_a_to_b(env_map: chex.Array,
                           src: chex.Array, trg: chex.Array,
                           flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
 
+
     if flood_path_net is None:
         flood_path_net = FloodPath()
         flood_path_net.init_params(env_map.shape)
 
     occupied_map = (env_map[..., None] != passable_tiles).all(-1).astype(jnp.float32)
 
-    src_x, src_y = src
+    src_y, src_x = src
 
     init_flood = jnp.zeros_like(env_map, dtype=jnp.float32)
     init_flood = init_flood.at[src_y, src_x].set(1)
 
     init_flood_count = init_flood.copy()
 
-    # Concatenate init_flood with new_occ_map
     flood_input = jnp.stack([occupied_map, init_flood], axis=-1)
     flood_state = FloodPathState(flood_input=flood_input, flood_count=init_flood_count, env_map=env_map,
                                  trg=trg,
                                  done=False)
-    flood_state = jax.lax.while_loop(
-        lambda fps: jnp.logical_not(fps.done),
-        flood_path_net.flood_step_trg_cell,
-        flood_state)
+
+
+    if CUDA_VERSION is None or CUDA_VERSION >= 12:
+        # Use `scan` for CUDA 12 or higher
+        # Use `while_loop` for CUDA 11 or lower
+        @jit
+        def is_search_done(flood_state):
+            return jnp.logical_not(flood_state.done)
+
+        flood_state = lax.while_loop(
+            is_search_done,
+            flood_path_net.flood_step_trg_cell,
+            flood_state
+        )
+    else:
+        @jit
+        def flood_body(flood_state, _):
+            new_state = lax.cond(
+                flood_state.done,
+                lambda state: state,  # 상태 유지
+                lambda state: flood_path_net.flood_step_trg_cell(state),  # 업데이트
+                flood_state
+            )
+            return new_state, None  # scan은 반드시 (state, output) 형식을 반환
+
+        max_steps = jnp.sum((env_map != 0) & (env_map != 2))
+        flood_state, _ = lax.scan(flood_body, flood_state, xs=None, length=max_steps)
+
 
     path_length = jnp.clip(
         flood_state.flood_count.max() - jnp.where(
