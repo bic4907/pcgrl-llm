@@ -430,7 +430,7 @@ def calc_path_from_a_to_b(env_map: chex.Array,
 
 def check_event(env_map: chex.Array,
                 passable_tiles: chex.Array,
-                src: chex.Array, key: chex.Array, trg: chex.Array, imp_tiles,
+                src: chex.Array, key: chex.Array, trg: chex.Array,
                 flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
 

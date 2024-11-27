@@ -4,7 +4,7 @@ import jax.numpy as jnp
 from os.path import dirname, join, basename
 from typing import Tuple
 
-from envs.pathfinding import calc_path_from_a_to_b
+from envs.pathfinding import calc_path_from_a_to_b, check_event
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from pcgrllm.evaluation.base import *
 from pcgrllm.scenario_preset import ScenarioPreset
@@ -77,11 +77,17 @@ class SolutionEvaluator(LevelEvaluator):
                 if _dist > 0:
                     n_acc_imp_tiles += 1
 
+
+        n_solutions = 0
+        for key in jnp.argwhere(level == Dungeon3Tiles.KEY):
+            cnt, solutions = check_event(env_map= level, passable_tiles=passable_tiles,src=p_xy, key=key, trg=t_xy)
+            n_solutions += cnt
+
         # check if the player and door is connected
         playability = p_t_connected
         path_length = p_t_length
         solvability = is_solavable
-        n_solutions = 0
+        n_solutions = n_solutions
         loss_solutions = len(imp_tiles) - n_solutions
         acc_imp_tiles = n_acc_imp_tiles / len(imp_tiles)
         exist_imp_tiles = n_exist_imp_tiles / len(imp_tiles)
@@ -151,8 +157,8 @@ if __name__ == '__main__':
     iteration = Iteration.from_path(path=example_path)
 
     # remove numpy files in the directory
-    import os
-    os.system(f"rm -rf {iteration.get_numpy_dir()}/*")
+    # import os
+    # os.system(f"rm -rf {iteration.get_numpy_dir()}/*")
 
     # save the alllevels into the numpy dir
     for idx, level in enumerate(AllLevels[:]):
