@@ -7,6 +7,9 @@ Also, the different array shape between input and output could make some errors 
 ### Attempted boolean conversion of traced array with shape bool[].
 In JAX, standard Python if statements cannot be used within JIT-compiled functions, as they create dynamic control flow that JAX’s JIT compiler cannot process. This restriction exists because JAX requires static, vectorized operations to perform optimized computation. To handle conditional logic, use JAX functions like jax.numpy.where or mask arrays instead of if statements. Additionally, consider structuring the code with static conditions outside of JIT-compiled functions if possible, or using control flow functions provided by JAX such as jax.lax.cond and jax.lax.switch for cases requiring conditional branching.
 
+### Always Use jax.lax.cond Instead of Python if Statements in JAX Code
+In JAX, Python if statements cannot handle traced arrays because they require concrete values at runtime. Instead, use jax.lax.cond, which is specifically designed to work with traced arrays in a compiled computation graph.
+
 [Before]
 if current_diameter > diameter_penalty_threshold:
     diameter_penalty = (current_diameter - diameter_penalty_threshold) * 0.5
@@ -46,5 +49,62 @@ curr_has_path.astype(int)
 ### Array value allocation
 Instead of ``x[idx] = y``, use ``x = x.at[idx].set(y)``
 
+### Use jax.lax.cond to Replace Dynamic Boolean Conditions
+Replace dynamic boolean indexing with jax.lax.cond to handle conditions safely in JAX transformations.
+
+[before]
+valid_indices = indices[valid_mask]
+
+[after]
+valid_indices = jax.lax.cond(
+    valid_mask.any(),
+    lambda _: indices[valid_mask],
+    lambda _: jnp.array([]),
+    operand=None
+)
+
+### Use Fixed-Size Arrays in JAX
+Always pad or truncate dynamic arrays to a fixed size using jnp.pad to ensure compatibility with JAX transformations like jit.
+
 ### Looping
 Avoid using double for-loops, as they can lead to performance issues. Instead, try to use `jax.vmap` to vectorize the operation over the first axis.
+Avoid using deep or unbounded recursion in JAX, as it can lead to infinite loops or maximum recursion depth errors.
+
+[before]
+def matrix(dataA, dataB):
+    return np.array([[func(a, b) for b in dataB] for a in dataA])
+[after]
+def matrix(dataA, dataB):
+    vectorized_func = jax.vmap(jax.vmap(func, in_axes=(None, 0)), in_axes=(0, None))
+    return vectorized_func(dataA, dataB)
+
+### Use jnp.nonzero with size parameter instead of jnp.where or jnp.argwhere for Fixed Size Output
+When working with JAX transformations like jit, avoid using jnp.where or jnp.argwhere as they may produce dynamic-sized outputs. Instead, use jnp.nonzero with the size parameter to ensure the output is fixed-size and JAX-compatible.
+
+[before]
+def find_positions(level, tile):
+    indices = jnp.argwhere(level == tile)  # Dynamic size output
+    padded = jnp.pad(indices, ((0, 10 - indices.shape[0]), (0, 0)), constant_values=-1)[:10]
+    return padded
+
+[after]
+def find_positions(level, tile, max_results=10):
+    indices = jnp.nonzero(level == tile, size=max_results, fill_value=-1)
+    return jnp.stack(indices, axis=1)  # Fixed size output
+
+### Using jax.lax.select for Boolean Conditions in JAX
+To handle boolean conditions effectively in JAX, avoid using direct conditional checks (like if or boolean indexing). Instead, use jax.lax.select for conditional selection with arrays. This approach ensures compatibility with JAX's transformations such as jit and vmap.
+
+[before]
+def compute_result(array, condition):
+    if condition:
+        return array + 1
+    else:
+        return array - 1
+[after]
+def compute_result(array, condition):
+    # Use jax.lax.select to choose between two branches
+    return jax.lax.select(condition, array + 1, array - 1)
+
+### Ensure Consistent Shapes in jax.lax.cond
+jax.lax.cond must return outputs with the same shape and type. Use jnp.pad to align output sizes if needed.

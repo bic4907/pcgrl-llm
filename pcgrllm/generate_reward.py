@@ -198,7 +198,7 @@ class RewardGenerator:
         else:
             return response, context
 
-    def run(self):
+    def run(self, return_error: bool = False):
 
         is_success = False
 
@@ -296,7 +296,11 @@ class RewardGenerator:
             return reward_function_file_path
         else:
             self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
-            return False
+
+            if return_error:
+                return False, generating_function_error
+            else:
+                return False
 
     # def response_cluster(self, responses, n_clusters=2):
     #     # set environment variable for
@@ -686,10 +690,10 @@ class RewardGenerator:
         return result
 
 
-def generate_reward(config: Config, generate_args: dict):
+def generate_reward(config: Config, generate_args: dict, return_error: bool = False):
     reward_generator = RewardGenerator(generate_args)
     reward_generator.set_execution_config(config)
-    return reward_generator.run()
+    return reward_generator.run(return_error=return_error)
 
 
 if __name__ == "__main__":

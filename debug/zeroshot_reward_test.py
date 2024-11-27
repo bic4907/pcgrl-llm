@@ -68,9 +68,11 @@ def generate_and_save_reward(train_config, iteration):
         'task': train_config.task,
     }
 
-    result = generate_reward(train_config, args_dict)
-    assert result is not False  # Ensure the reward generation was successful
-    print(result)
+    result = generate_reward(train_config, args_dict, return_error=True)
+
+    print("Result: ", result)
+
+    assert result is not tuple  # Ensure the reward generation was successful
 
     return os.path.join(reward_dir, result)  # Return the full path of the reward file
 
@@ -96,7 +98,7 @@ def validate_generated_reward(train_config, reward_path):
     return is_valid
 
 
-@pytest.mark.parametrize("index", list(range(1, 3)))
+@pytest.mark.parametrize("index", list(range(1, 6)))
 def test_generate_and_validate(index):
     """
     Tests reward generation and validation for all levels in AllLevels.
