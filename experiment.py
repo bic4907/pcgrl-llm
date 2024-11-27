@@ -299,6 +299,7 @@ class Experiment:
         os.makedirs(media_dir, exist_ok=True)
         config._vid_dir = os.path.join(media_dir, 'videos')
         config._img_dir = os.path.join(media_dir, 'images')
+        config._numpy_dir = os.path.join(media_dir, 'numpy')
 
         config.reward_function_path = self._current_reward_function_filename
         # copy to the exp_dir
