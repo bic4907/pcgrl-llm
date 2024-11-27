@@ -96,6 +96,7 @@ for arg in "$@"; do
 done
 
 echo "Container Name: $container_name"
+echo "Output Log File: $log_file"
 
 # Docker 실행 명령어
 docker_command="docker run --rm -it
