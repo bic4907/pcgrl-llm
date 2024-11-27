@@ -17,7 +17,7 @@ from flax.linen.initializers import constant, orthogonal
 import numpy as np
 import orbax.checkpoint as ocp
 from flax.training.train_state import TrainState
-import distrax
+
 
 
 class ActorCategorical(nn.Module):
@@ -27,6 +27,7 @@ class ActorCategorical(nn.Module):
     @nn.compact
     def __call__(self, hidden, x):
         action_logits = self.subnet.__call__(hidden, x)
+        import distrax
         pi = distrax.Categorical(logits=action_logits)
 
         return hidden, pi
@@ -88,6 +89,7 @@ class ActorBox(nn.Module):
         # action_logits = actor_mean - (unavail_actions * 1e10)
         # pi = distrax.Categorical(logits=action_logits)
         actor_logtstd = self.param('log_std', nn.initializers.zeros, (self.action_dim,))
+        import distrax
         pi = distrax.MultivariateNormalDiag(actor_mean, jnp.exp(actor_logtstd))
 
         return hidden, pi
