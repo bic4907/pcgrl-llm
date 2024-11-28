@@ -1,3 +1,5 @@
+import os
+import shutil
 from functools import partial
 
 import jax
@@ -51,34 +53,46 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     p_xy = jnp.argwhere(level == Dungeon3Tiles.PLAYER, size=1, fill_value=-1)[0]
     d_xy = jnp.argwhere(level == Dungeon3Tiles.DOOR, size=1, fill_value=-1)[0]
     k_xy = jnp.argwhere(level == Dungeon3Tiles.KEY, size=1, fill_value=-1)[0]
-    #
+
     p_t_length, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, d_xy)
-    # p_t_length = 0
-    # p_t_connected = 0
     p_t_connected = jnp.where(p_t_length >= 0, 1, 0)
 
-    if (k_xy != NOT_EXISTS).all():
-        p_k_length, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, k_xy)
-    else:
-        p_k_length = -1
+    p_k_length = jax.lax.cond(
+        jnp.all(k_xy != NOT_EXISTS),
+        lambda _: calc_path_from_a_to_b(level, passable_tiles, p_xy, k_xy)[0],
+        lambda _: jnp.array(-1).astype(float),
+        operand=None
+    )
 
     p_k_connected = jnp.where(p_k_length > 0, 1, 0)
     is_solavable = jnp.where(jnp.logical_and(p_t_connected, p_k_connected), 1, 0)
 
-    n_exist_imp_tiles = 0
-    n_acc_imp_tiles = 0
+    def process_important_tile(time_num):
+        _xy = jnp.argwhere(level == time_num, size=1, fill_value=-1)[0]
 
-    for imp_tile in imp_tiles:
-        tile_num = TILE_MAP_STR_ENUM[imp_tile]
-
-        _xy = jnp.argwhere(level == tile_num, size=1, fill_value=-1)[0]
-        if (_xy != NOT_EXISTS).all():
-            n_exist_imp_tiles += 1
-
+        def tile_exists(_xy):
             _dist, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, _xy)
+            n_acc = jnp.where(_dist > 0, 1, 0)
+            return 1, n_acc  # Tile exists and may be reachable
 
-            if _dist > 0:
-                n_acc_imp_tiles += 1
+        def tile_not_exists(_xy):
+            return 0, 0  # Tile does not exist
+
+        return jax.lax.cond(
+            (_xy != NOT_EXISTS).all(),
+            tile_exists,
+            tile_not_exists,
+            _xy
+        )
+
+    # Use vmap to process all important tiles in parallel
+    imp_tiles = jnp.array([TILE_MAP_STR_ENUM[tile] for tile in imp_tiles])
+    imp_tile_results = jax.vmap(process_important_tile)(jnp.array(imp_tiles))
+
+    # Summing results
+    n_exist_imp_tiles = jnp.sum(imp_tile_results[0])  # Count of existing important tiles
+    n_acc_imp_tiles = jnp.sum(imp_tile_results[1])   # Count of reachable important tiles
+
 
     n_solutions = 0
     for key in jnp.argwhere(level == Dungeon3Tiles.KEY):
@@ -120,23 +134,40 @@ class SolutionEvaluator(LevelEvaluator):
     def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
         numpy_files = iteration.get_numpy_files(train=use_train, step_filter=step_filter)
 
-        results = []
-        for numpy_file in numpy_files:
-            level = numpy_file.load()
+        # 로드한 numpy 파일을 JAX 배열로 변환
+        levels = jnp.array([numpy_file.load() for numpy_file in numpy_files])
 
+        # JAX에서 사용 가능한 eval_level 함수로 작성되어야 함
+        def eval_level_jax(level):
+            # eval_level 함수가 JAX와 호환되도록 구현되어야 함
             result = eval_level(level, scenario_num=scenario_num)
-            results.append(result)
+            return (
+                result.playability,
+                result.path_length,
+                result.solvability,
+                result.n_solutions,
+                result.loss_solutions,
+                result.acc_imp_perc,
+                result.exist_imp_perc,
+            )
 
+        # 병렬화를 적용
+        # eval_results = jax.vmap(eval_level_jax)(levels)
+        eval_results = eval_level_jax(levels[0])
 
-        # Calculate the average of the results
-        playability = np.mean([result.playability for result in results])
-        path_length = np.mean([result.path_length for result in results])
-        solvability = np.mean([result.solvability for result in results])
-        n_solutions = np.mean([result.n_solutions for result in results])
-        loss_solutions = np.mean([result.loss_solutions for result in results])
-        acc_imp_tiles = np.mean([result.acc_imp_perc for result in results])
-        exist_imp_tiles = np.mean([result.exist_imp_perc for result in results])
-        sample_size = len(results)
+        # 결과를 개별적으로 계산
+        playability, path_length, solvability, n_solutions, loss_solutions, acc_imp_tiles, exist_imp_tiles = eval_results
+
+        # 평균 계산
+        playability = jnp.mean(playability)
+        path_length = jnp.mean(path_length)
+        solvability = jnp.mean(solvability)
+        n_solutions = jnp.mean(n_solutions)
+        loss_solutions = jnp.mean(loss_solutions)
+        acc_imp_tiles = jnp.mean(acc_imp_tiles)
+        exist_imp_tiles = jnp.mean(exist_imp_tiles)
+
+        sample_size = len(levels)
 
         return EvaluationResult(
             task=self.task,
@@ -170,13 +201,15 @@ if __name__ == '__main__':
     # Load the iteration
     iteration = Iteration.from_path(path=example_path)
 
-    # remove numpy files in the directory
-    # import os
-    # os.system(f"rm -rf {iteration.get_numpy_dir()}/*")
+    numpy_dir = iteration.get_numpy_dir()
+
+    if os.path.exists(numpy_dir):
+        shutil.rmtree(numpy_dir)  # 디렉토리 자체를 삭제
+        os.makedirs(numpy_dir)  # 빈 디렉토리 다시 생성
 
     # save the alllevels into the numpy dir
     for idx, level in enumerate(AllLevels[:]):
         np.save(join(iteration.get_numpy_dir(), f"level_{idx}.npy"), level)
-
     # Run the evaluator with visualization enabled/disabled
     result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True)
+    print(result)
