@@ -71,7 +71,8 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
         _xy = jnp.argwhere(level == time_num, size=1, fill_value=-1)[0]
 
         def tile_exists(_xy):
-            _dist, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, _xy)
+            _passable_tiles = jnp.append(Dungeon3Problem.passable_tiles, time_num)
+            _dist, _, _ = calc_path_from_a_to_b(level, _passable_tiles, p_xy, _xy)
             n_acc = jnp.where(_dist > 0, 1, 0)
             return 1, n_acc  # Tile exists and may be reachable
 

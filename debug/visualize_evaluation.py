@@ -97,6 +97,7 @@ if __name__ == '__main__':
     processed_images = []
 
     levels = AllLevels[:]
+    scenario_num = 3
 
     for idx, level in tqdm(enumerate(levels), desc="Processing Levels", total=len(levels)):
         # Render level as numpy array
@@ -112,8 +113,6 @@ if __name__ == '__main__':
 
         # Save the level data
         np.save(join(iteration.get_numpy_dir(), f"level_{idx}_0.npy"), level)
-
-        scenario_num = 1
 
         # Evaluate level
         result = evaluator.run(iteration=iteration, scenario_num=str(scenario_num), visualize=True, step_filter=idx)
@@ -139,7 +138,7 @@ if __name__ == '__main__':
 
         # Flatten rows into a 2x2 table format
         table = tabulate(
-            [[f"{k1}: {v1}", f"{k2}: {v2}"] for (k1, v1), (k2, v2) in grid],
+            [[f"{k1}: {v1:.1f}", f"{k2}: {v2:.1f}"] for (k1, v1), (k2, v2) in grid],
             tablefmt="grid"
         )
 
