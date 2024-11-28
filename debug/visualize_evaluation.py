@@ -2,7 +2,7 @@ import logging
 import os
 import pprint
 import textwrap
-
+from tabulate import tabulate
 from tqdm import tqdm
 import cv2
 import numpy as np
@@ -17,10 +17,12 @@ from pcgrllm.task import TaskType
 from pcgrllm.utils.storage import Iteration
 
 
+from PIL import Image, ImageDraw, ImageFont
+
 def add_text_below_image(image, text, font_size=20, target_width=500):
-    """Add wrapped text below an image with a black background."""
+    """Add properly formatted text (including tables) below an image with a black background."""
     # Path to the font file
-    font_path = "Pretendard-Regular.ttf"  # Update this to the correct path
+    font_path = "JetBrainsMono-Regular.ttf"  # Update this to the correct path
     try:
         font = ImageFont.truetype(font_path, font_size)
     except IOError:
@@ -28,9 +30,9 @@ def add_text_below_image(image, text, font_size=20, target_width=500):
 
     draw = ImageDraw.Draw(image)
 
-    # Wrap text to fit within the target width
-    wrapped_text = textwrap.fill(text, width=int(target_width / (font_size / 2)))
-    text_lines = wrapped_text.split("\n")
+    # Split text by line manually to preserve table formatting
+    text_lines = text.split("\n")
+
 
     # Calculate total text height
     text_height = sum(
@@ -48,12 +50,10 @@ def add_text_below_image(image, text, font_size=20, target_width=500):
     draw = ImageDraw.Draw(new_image)
     y_text = image.height + 10
     for line in text_lines:
-        # Calculate text width and height using textbbox
-        line_bbox = draw.textbbox((0, 0), line, font=font)
-        line_width = line_bbox[2] - line_bbox[0]
-        text_x = (image.width - line_width) // 2
-        draw.text((text_x, y_text), line, fill=(255, 255, 255), font=font)  # Ensure white text is used
-        y_text += line_bbox[3] - line_bbox[1]
+        # Left-align text
+        text_x = 10  # Small padding from the left edge
+        draw.text((text_x, y_text), line, fill=(255, 255, 255), font=font)
+        y_text += draw.textbbox((0, 0), line, font=font)[3] - draw.textbbox((0, 0), line, font=font)[1]
 
     return new_image
 
@@ -95,9 +95,9 @@ if __name__ == '__main__':
 
     processed_images = []
 
-    for idx, level in tqdm(enumerate(AllLevels[:])):
+    for idx, level in tqdm(enumerate(AllLevels[:]), desc="Processing Levels", total=len(AllLevels)):
         # Render level as numpy array
-        level_img = render_level(level, return_numpy=True, tile_size=32)
+        level_img = render_level(level, return_numpy=True, tile_size=28)
         # level_img = cv2.cvtColor(level_img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
         level_image_pil = Image.fromarray(level_img)  # Convert numpy to PIL Image
 
@@ -108,22 +108,46 @@ if __name__ == '__main__':
         result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True, step_filter=idx)
 
         # Format result using pformat
-        result_str = pprint.pformat(vars(result), indent=2, width=80)
+        output_str = ''
+        result_dict = result.to_dict()
+
+        output_str += f"task: {result_dict['task']}, level: {idx}\n"
+
+        # Exclude the 'task' key and prepare items for 2x2 layout
+        items = [
+            [key, value] for key, value in result_dict.items() if key != 'task'
+        ]
+
+        # Convert items to a 2x2 grid format
+        grid = []
+        for i in range(0, len(items), 2):
+            row = items[i:i + 2]
+            if len(row) < 2:  # Pad row if it has less than 2 items
+                row.append(["", ""])
+            grid.append(row)
+
+        # Flatten rows into a 2x2 table format
+        table = tabulate(
+
+            [[f"{k1}: {v1}", f"{k2}: {v2}"] for (k1, v1), (k2, v2) in grid],
+            tablefmt="grid"
+        )
+
+
+        # Combine the strings
+        output_str += table
 
         # Add text below the image
-        level_image_with_text = add_text_below_image(level_image_pil, result_str)
+        level_image_with_text = add_text_below_image(level_image_pil, output_str, font_size=15)
 
-        # Append processed image to the list
-        processed_images.append(level_image_with_text)
+        # make sure the height is determined by the image height
+        width = 8
+        height = int((level_image_with_text.height / level_image_with_text.width) * width)
 
-    # Create a grid of images
-    grid_output_path = join(base_path, "level_results_grid.png")
-    grid_img = create_image_grid(processed_images, grid_size=(4, 4), output_path=grid_output_path)
-
-    # Show the grid
-    plt.figure(figsize=(20, 20))
-    plt.imshow(grid_img)
-    plt.axis('off')
-    plt.show()
-
-    print(f"Grid saved at {grid_output_path}")
+        plt.figure(figsize=(width, height))
+        plt.tight_layout()
+        plt.axis('off')  # Turn off axes
+        plt.tight_layout(pad=0)  # Remove padding
+        plt.gca().set_position([0, 0, 1, 1])  # Ensure the image fills the figure
+        plt.imshow(level_image_with_text)
+        plt.show()
