@@ -9,6 +9,3 @@ The level is represented with tile numbers. The tile number is an integer value.
 
 [Tile Number]
 {tile_enum}
-
-- Generate reward function which fills "1 (Empty)" to show alphabet shape in the level.
-- Make sure "0 (Unavailable)" is not present in the level array. Fill the not passible tile with "2 (Wall)" tile number.
