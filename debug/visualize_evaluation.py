@@ -95,11 +95,19 @@ if __name__ == '__main__':
 
     processed_images = []
 
-    for idx, level in tqdm(enumerate(AllLevels[:]), desc="Processing Levels", total=len(AllLevels)):
+    levels = AllLevels[:]
+
+    for idx, level in tqdm(enumerate(levels), desc="Processing Levels", total=len(levels)):
         # Render level as numpy array
         level_img = render_level(level, return_numpy=True, tile_size=28)
         # level_img = cv2.cvtColor(level_img, cv2.COLOR_BGR2RGB)  # Convert BGR to RGB
         level_image_pil = Image.fromarray(level_img)  # Convert numpy to PIL Image
+
+
+        # remove the npy files in the numpy_dir
+        for file in os.listdir(iteration.get_numpy_dir()):
+            if file.endswith(".npy"):
+                os.remove(os.path.join(iteration.get_numpy_dir(), file))
 
         # Save the level data
         np.save(join(iteration.get_numpy_dir(), f"level_{idx}_0.npy"), level)
@@ -128,7 +136,6 @@ if __name__ == '__main__':
 
         # Flatten rows into a 2x2 table format
         table = tabulate(
-
             [[f"{k1}: {v1}", f"{k2}: {v2}"] for (k1, v1), (k2, v2) in grid],
             tablefmt="grid"
         )
