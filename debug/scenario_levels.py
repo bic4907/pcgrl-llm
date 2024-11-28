@@ -154,5 +154,5 @@ level_7 = np.array([
     [1, 2, 1, 2, 2, 1, 2, 2, 5, 1, 2, 2, 1, 1, 1, 1]
 ])
 
-# AllLevels = [level_0, level_1, level_2, level_3, level_4, level_5, level_6]
-AllLevels = [level_7]
+AllLevels = [level_0, level_1, level_2, level_3, level_4, level_5, level_6, level_7]
+# AllLevels = [level_7]
