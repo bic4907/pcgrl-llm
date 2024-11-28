@@ -66,8 +66,8 @@ class EvaluationResult:
                 'solvability': float(self.solvability),
                 'n_solutions': float(self.n_solutions),
                 'loss_solutions': float(self.loss_solutions),
-                'acc_imp_tiles': float(self.acc_imp_perc),
-                'exist_imp_tiles': float(self.exist_imp_perc),
+                'acc_imp_perc': float(self.acc_imp_perc),
+                'exist_imp_perc': float(self.exist_imp_perc),
             }
         else:
             raise ValueError(f"Invalid task type: {self.task}")

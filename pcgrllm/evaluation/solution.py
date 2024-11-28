@@ -155,12 +155,15 @@ class SolutionEvaluator(LevelEvaluator):
         # eval_results = jax.vmap(eval_level_jax)(levels)
         eval_results = eval_level_jax(levels[0])
 
+
         # 결과를 개별적으로 계산
         playability, path_length, solvability, n_solutions, loss_solutions, acc_imp_tiles, exist_imp_tiles = eval_results
 
         # 평균 계산
         playability = jnp.mean(playability)
-        path_length = jnp.mean(path_length)
+        path_length = jnp.nan_to_num(
+            jnp.nanmean(jnp.where(path_length != -1, path_length, jnp.nan))
+        )
         solvability = jnp.mean(solvability)
         n_solutions = jnp.mean(n_solutions)
         loss_solutions = jnp.mean(loss_solutions)
@@ -176,8 +179,8 @@ class SolutionEvaluator(LevelEvaluator):
             solvability=solvability,
             n_solutions=n_solutions,
             loss_solutions=loss_solutions,
-            acc_imp_tiles=acc_imp_tiles,
-            exist_imp_tiles=exist_imp_tiles,
+            acc_imp_perc=acc_imp_tiles,
+            exist_imp_perc=exist_imp_tiles,
             sample_size=sample_size)
 
 # Example

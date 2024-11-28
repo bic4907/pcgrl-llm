@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 from debug.render_level import render_level
 from debug.scenario_levels import AllLevels
 from pcgrllm.evaluation.solution import SolutionEvaluator
+from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.task import TaskType
 from pcgrllm.utils.storage import Iteration
 
@@ -112,8 +113,10 @@ if __name__ == '__main__':
         # Save the level data
         np.save(join(iteration.get_numpy_dir(), f"level_{idx}_0.npy"), level)
 
+        scenario_num = 1
+
         # Evaluate level
-        result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True, step_filter=idx)
+        result = evaluator.run(iteration=iteration, scenario_num=str(scenario_num), visualize=True, step_filter=idx)
 
         # Format result using pformat
         output_str = ''
@@ -140,6 +143,8 @@ if __name__ == '__main__':
             tablefmt="grid"
         )
 
+        preset = ScenarioPreset().scenarios[str(scenario_num)]
+        output_str += f'imp_tiles: {preset.important_tiles}\n'
 
         # Combine the strings
         output_str += table
