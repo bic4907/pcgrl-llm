@@ -14,8 +14,6 @@ from jax import jit, lax
 from envs.utils import Tiles
 from pcgrllm.utils.cuda import get_cuda_version
 
-CUDA_VERSION = get_cuda_version()
-
 @struct.dataclass
 class FloodPathState:
     flood_input: chex.Array
@@ -379,6 +377,7 @@ def calc_diameter(flood_regions_net: FloodRegions, flood_path_net: FloodPath, en
 
     return path_length, flood_path_state, n_regions, flood_regions_state
 
+
 def calc_path_from_a_to_b(env_map: chex.Array,
                           passable_tiles: chex.Array,
                           src: chex.Array, trg: chex.Array,
@@ -404,6 +403,7 @@ def calc_path_from_a_to_b(env_map: chex.Array,
                                  done=False)
 
 
+    CUDA_VERSION = get_cuda_version()
     if CUDA_VERSION is None or CUDA_VERSION >= 12:
         # Use `scan` for CUDA 12 or higher
         # Use `while_loop` for CUDA 11 or lower
