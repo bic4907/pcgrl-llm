@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 from debug.render_level import render_level
 from debug.scenario_levels import AllLevels
 from pcgrllm.evaluation.solution import SolutionEvaluator
+from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.task import TaskType
 from pcgrllm.utils.storage import Iteration
 
@@ -96,6 +97,7 @@ if __name__ == '__main__':
     processed_images = []
 
     levels = AllLevels[:]
+    scenario_num = 3
 
     for idx, level in tqdm(enumerate(levels), desc="Processing Levels", total=len(levels)):
         # Render level as numpy array
@@ -113,7 +115,7 @@ if __name__ == '__main__':
         np.save(join(iteration.get_numpy_dir(), f"level_{idx}_0.npy"), level)
 
         # Evaluate level
-        result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True, step_filter=idx)
+        result = evaluator.run(iteration=iteration, scenario_num=str(scenario_num), visualize=True, step_filter=idx)
 
         # Format result using pformat
         output_str = ''
@@ -136,10 +138,12 @@ if __name__ == '__main__':
 
         # Flatten rows into a 2x2 table format
         table = tabulate(
-            [[f"{k1}: {v1}", f"{k2}: {v2}"] for (k1, v1), (k2, v2) in grid],
+            [[f"{k1}: {v1:.1f}", f"{k2}: {v2:.1f}"] for (k1, v1), (k2, v2) in grid],
             tablefmt="grid"
         )
 
+        preset = ScenarioPreset().scenarios[str(scenario_num)]
+        output_str += f'imp_tiles: {preset.important_tiles}\n'
 
         # Combine the strings
         output_str += table

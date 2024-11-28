@@ -71,7 +71,8 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
         _xy = jnp.argwhere(level == time_num, size=1, fill_value=-1)[0]
 
         def tile_exists(_xy):
-            _dist, _, _ = calc_path_from_a_to_b(level, passable_tiles, p_xy, _xy)
+            _passable_tiles = jnp.append(Dungeon3Problem.passable_tiles, time_num)
+            _dist, _, _ = calc_path_from_a_to_b(level, _passable_tiles, p_xy, _xy)
             n_acc = jnp.where(_dist > 0, 1, 0)
             return 1, n_acc  # Tile exists and may be reachable
 
@@ -155,12 +156,15 @@ class SolutionEvaluator(LevelEvaluator):
         # eval_results = jax.vmap(eval_level_jax)(levels)
         eval_results = eval_level_jax(levels[0])
 
+
         # 결과를 개별적으로 계산
         playability, path_length, solvability, n_solutions, loss_solutions, acc_imp_tiles, exist_imp_tiles = eval_results
 
         # 평균 계산
         playability = jnp.mean(playability)
-        path_length = jnp.mean(path_length)
+        path_length = jnp.nan_to_num(
+            jnp.nanmean(jnp.where(path_length != -1, path_length, jnp.nan))
+        )
         solvability = jnp.mean(solvability)
         n_solutions = jnp.mean(n_solutions)
         loss_solutions = jnp.mean(loss_solutions)
@@ -176,8 +180,8 @@ class SolutionEvaluator(LevelEvaluator):
             solvability=solvability,
             n_solutions=n_solutions,
             loss_solutions=loss_solutions,
-            acc_imp_tiles=acc_imp_tiles,
-            exist_imp_tiles=exist_imp_tiles,
+            acc_imp_perc=acc_imp_tiles,
+            exist_imp_perc=exist_imp_tiles,
             sample_size=sample_size)
 
 # Example
