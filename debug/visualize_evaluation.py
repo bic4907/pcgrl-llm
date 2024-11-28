@@ -24,7 +24,7 @@ def add_text_below_image(image, text, font_size=20, target_width=500):
     # Path to the font file
     font_path = "JetBrainsMono-Regular.ttf"  # Update this to the correct path
     try:
-        font = ImageFont.truetype(font_path, font_size)
+        font = ImageFont.truetype(os.path.join(dirname(__file__), font_path), font_size)
     except IOError:
         raise FileNotFoundError(f"Font file not found at {font_path}. Please provide a valid font file path.")
 
