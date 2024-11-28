@@ -68,7 +68,7 @@ class RewardGenerator:
         self.branch_factor = config.get('branch_factor', None)
 
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
-        self.file_path = path.join(self.shared_storage_path, 'prompt')
+        self.file_path = path.join(self.shared_storage_path, 'prompt', self.config['task'])
 
         self.prev_eval_result = config.get('prev_eval_result', None)
         self.auxiliary_prompt_path = config.get('auxiliary_prompt_path', None)
@@ -83,8 +83,7 @@ class RewardGenerator:
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
         self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
-        self.task_description = file_to_string(path.join(self.file_path, "task_description.txt"))
-        # self.second_user = file_to_string(path.join(self.file_path, "second_user.txt"))
+        self.task_description = file_to_string(path.join(self.file_path, "task.txt"))
 
         self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
 
@@ -378,7 +377,7 @@ class RewardGenerator:
         initial_user = copy.deepcopy(self.initial_user)
 
         # get the prompt file from the task dir
-        task_file = path.join(self.file_path, TASK_DIR, f"{self.task}.txt")
+        task_file = path.join(self.file_path, 'task.txt')
         task_prompt = file_to_string(task_file)
 
         task_prompt.format(target_character=self.config['target_character'])

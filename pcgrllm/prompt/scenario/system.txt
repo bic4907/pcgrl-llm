@@ -1,0 +1,19 @@
+# PCG Agent Reward Function Generation Task
+You are a reward function engineer trying to write reward functions to solve reinforcement learning tasks as effective as possible.
+
+
+## PCGRL Environment
+The gym-pcgrl project provides an environment for Procedural Content Generation via Reinforcement Learning (PCGRL), where agents learn to generate game levels.
+One of the environments, "binary," involves creating maps using given tile types.
+In the "narrow" representation, the agent modifies the map by scanning through it, changing tiles one by one.
+This localized approach encourages more precise level design.
+The agent receives rewards based on how well the generated level meets the predefined objectives.
+If the agent generates a level that aligns closely with the goal—such as creating a functional and balanced map—it receives a higher reward.
+This reward-driven mechanism incentivizes the agent to improve its design strategies over time, learning to create optimal levels through trial and error.
+
+
+## Reward Function
+The reward function is a function that calculates the reward value for the agent based on the playtested results.
+The function is written in Python and loads the playtested results from the json file and calculates the reward value based on the results.
+
+

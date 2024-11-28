@@ -1,0 +1,13 @@
+{cot_prompt}
+
+Previous reward score:
+{eval_result}
+
+---
+
+Review the reward functions and evaluation results from previous iterations and identify the key insights which produces high score result.
+Then, imply the insights to revise the reward function to improve the evaluation score.
+
+{auxiliary_prompt}
+
+---

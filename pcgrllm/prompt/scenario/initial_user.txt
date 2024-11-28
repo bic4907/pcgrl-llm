@@ -1,0 +1,14 @@
+# Task
+{task}
+
+{few_shot_code_string}
+
+{reward_function_inputs}
+
+{thought_tips}
+
+
+## Output
+Reward function:
+```python
+```
