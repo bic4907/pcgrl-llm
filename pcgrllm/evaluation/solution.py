@@ -3,13 +3,12 @@ from functools import partial
 import jax
 import numpy as np
 import jax.numpy as jnp
-from os.path import dirname, join, basename, abspath
+from os.path import dirname, join, basename
 from typing import Tuple
 
 from jax import jit
-from tensorflow_probability.python.internal.backend.jax import accumulate_n
 
-from envs.pathfinding import calc_path_from_a_to_b
+from envs.pathfinding import calc_path_from_a_to_b, check_event
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from pcgrllm.evaluation.base import *
 from pcgrllm.scenario_preset import ScenarioPreset
@@ -81,22 +80,24 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
             if _dist > 0:
                 n_acc_imp_tiles += 1
 
-    # # check if the player and door is connected
+    n_solutions = 0
+    for key in jnp.argwhere(level == Dungeon3Tiles.KEY):
+        cnt, solutions = check_event(env_map=level,
+                                     passable_tiles=passable_tiles,
+                                     src=p_xy,
+                                     key=key,
+                                     trg=d_xy)
+        n_solutions += cnt
+
+    # check if the player and door is connected
     playability = p_t_connected
     path_length = p_t_length
     solvability = is_solavable
-    n_solutions = 0
+    n_solutions = n_solutions
     loss_solutions = len(imp_tiles) - n_solutions
     acc_imp_tiles = n_acc_imp_tiles / len(imp_tiles)
     exist_imp_tiles = n_exist_imp_tiles / len(imp_tiles)
 
-    # playability = playability
-    # path_length = path_length
-    # solvability = 0
-    # n_solutions = 0
-    # loss_solutions = 0
-    # acc_imp_tiles = 0
-    # exist_imp_tiles = 0
 
     return EvaluationResult(
         task=TaskType.Scenario,
@@ -126,6 +127,7 @@ class SolutionEvaluator(LevelEvaluator):
             result = eval_level(level, scenario_num=scenario_num)
             results.append(result)
 
+
         # Calculate the average of the results
         playability = np.mean([result.playability for result in results])
         path_length = np.mean([result.path_length for result in results])
@@ -154,34 +156,27 @@ if __name__ == '__main__':
     # Initialize logger
     from debug.scenario_levels import AllLevels
 
-    level_7 = AllLevels[0]
-    print(level_7)
 
     logger = logging.getLogger(basename(__file__))
     logger.setLevel(logging.DEBUG)
 
     evaluator = SolutionEvaluator(logger=logger, task=TaskType.Scenario)
-    result = eval_level(jnp.array(level_7), scenario_num="1")
-    print(result)
-    #
-    # #
-    # # base_path = join(dirname(__file__), 'example')
-    # # # Define the path for the iteration folder
-    # # example_path = join(base_path, 'scenario_1', 'iteration_1')
-    #
-    # example_path = abspath(join(dirname(__file__), '..', '..', 'saves', 'pe-io_it-1_fit-hr_exp-bp_t-sce_chr-1_1_s-1', 'iteration_1'))
-    #
-    # # Load the iteration
-    # iteration = Iteration.from_path(path=example_path)
-    #
-    # # # remove numpy files in the directory
-    # # import os
-    # # os.system(f"rm -rf {iteration.get_numpy_dir()}/*")
-    #
-    # # save the alllevels into the numpy dir
-    # # for idx, level in enumerate(AllLevels[:]):
-    # #     np.save(join(iteration.get_numpy_dir(), f"level_{idx}.npy"), level)
-    #
-    # print(iteration.get_numpy_dir(train=True))
-    # # Run the evaluator with visualization enabled/disabled
-    # result = evaluator.run(iteration=iteration, scenario_num="1", use_train=True, visualize=True)
+
+
+    base_path = join(dirname(__file__), 'example')
+    # Define the path for the iteration folder
+    example_path = join(base_path, 'scenario_1', 'iteration_1')
+
+    # Load the iteration
+    iteration = Iteration.from_path(path=example_path)
+
+    # remove numpy files in the directory
+    # import os
+    # os.system(f"rm -rf {iteration.get_numpy_dir()}/*")
+
+    # save the alllevels into the numpy dir
+    for idx, level in enumerate(AllLevels[:]):
+        np.save(join(iteration.get_numpy_dir(), f"level_{idx}.npy"), level)
+
+    # Run the evaluator with visualization enabled/disabled
+    result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True)
