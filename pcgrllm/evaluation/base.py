@@ -56,26 +56,27 @@ class EvaluationResult:
         if self.task == TaskType.Alphabet:
 
             result_dict = {
-                'similarity': self.similarity,
-                'diversity': self.diversity,
+                'similarity': float(self.similarity),
+                'diversity': float(self.diversity),
             }
         elif self.task == TaskType.Scenario:
             result_dict = {
-                'playability': self.playability,
-                'path_length': self.path_length,
-                'solvability': self.solvability,
-                'n_solutions': self.n_solutions,
-                'loss_solutions': self.loss_solutions,
-                'acc_imp_tiles': self.acc_imp_tiles,
-                'exist_imp_tiles': self.exist_imp_tiles,
+                'playability': float(self.playability),
+                'path_length': float(self.path_length),
+                'solvability': float(self.solvability),
+                'n_solutions': float(self.n_solutions),
+                'loss_solutions': float(self.loss_solutions),
+                'acc_imp_tiles': float(self.acc_imp_perc),
+                'exist_imp_tiles': float(self.exist_imp_perc),
             }
         else:
             raise ValueError(f"Invalid task type: {self.task}")
 
         # Add common attributes
         result_dict['task'] = self.task
-        result_dict['sample_size'] = self.sample_size
+        result_dict['sample_size'] = int(self.sample_size)
 
+        # dict_obj = {k: float(v) for k, v in dict_obj.items()}
         return result_dict
 
 
