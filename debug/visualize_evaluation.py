@@ -96,6 +96,7 @@ if __name__ == '__main__':
 
     processed_images = []
 
+    # levels = AllLevels[]
     levels = AllLevels[2:3]
     scenario_num = 3
 

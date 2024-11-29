@@ -49,7 +49,7 @@ def get_solution(env_map) -> Solutions:
 
     # TODO Change the size to N
     sol_cnt = 0
-    for i, key in enumerate(jnp.argwhere(env_map == Dungeon3Tiles.KEY, size=2)):
+    for i, key in enumerate(jnp.argwhere(env_map == Dungeon3Tiles.KEY)):
         _cnt, _solutions = check_event(env_map=env_map,
                                      passable_tiles=passable_tiles,
                                      src=p_xy,
