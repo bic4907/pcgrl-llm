@@ -5,6 +5,7 @@ from enum import IntEnum
 
 import numpy as np
 import matplotlib.pyplot as plt  # For generating color palettes
+from PIL.Image import Image
 
 
 class Tiles(IntEnum):
@@ -48,6 +49,7 @@ def get_available_tile_mapping(tile_enum, unavailable_tiles):
     return index_mapping
 
 
+
 def generate_color_palette(num_colors, seed=0):
     """
     Generate a shuffled color palette with distinct colors using JAX.
@@ -69,7 +71,7 @@ def generate_color_palette(num_colors, seed=0):
     shuffled_colors = colors[shuffled_indices]
 
     # Convert JAX array back to a list of tuples
-    return [tuple(color) for color in shuffled_colors]
+    return shuffled_colors
 
 
 def create_rgba_circle(tile_size, thickness=2, color=(255, 255, 255, 128), alpha=1.0):
@@ -102,4 +104,7 @@ def create_rgba_circle(tile_size, thickness=2, color=(255, 255, 255, 128), alpha
     # Convert BGRA to RGBA (OpenCV uses BGRA by default)
     circle_image = cv2.cvtColor(circle_image, cv2.COLOR_BGRA2RGBA)
 
-    return circle_image
+    # Convert the NumPy array to a PIL Image
+    circle = Image.fromarray(circle_image)
+
+    return circle

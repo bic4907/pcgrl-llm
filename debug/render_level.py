@@ -6,75 +6,12 @@ from PIL import Image
 
 from envs.pathfinding import check_event
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
+from envs.utils import generate_color_palette, create_rgba_circle
 
 image_dir = join(dirname(__file__), '..', 'envs', 'probs', 'tile_ims')
 
-import random
-import matplotlib.pyplot as plt  # For generating color palettes
-
-import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 
-
-def generate_color_palette(num_colors, seed=0):
-    """
-    Generate a shuffled color palette with distinct colors using JAX.
-
-    Args:
-        num_colors (int): Number of colors to generate.
-        seed (int): Random seed for shuffling.
-
-    Returns:
-        list: A shuffled list of RGBA tuples.
-    """
-    # Generate a color palette using matplotlib
-    palette = plt.cm.get_cmap('tab20', num_colors)  # Use a distinct colormap
-    colors = jnp.array([(int(r * 255), int(g * 255), int(b * 255), 128) for r, g, b, _ in palette.colors])
-
-    # Shuffle the colors using JAX
-    key = jax.random.PRNGKey(seed)
-    shuffled_indices = jax.random.permutation(key, num_colors)
-    shuffled_colors = colors[shuffled_indices]
-
-    # Convert JAX array back to a list of tuples
-    return [tuple(color) for color in shuffled_colors]
-
-
-def create_rgba_circle(tile_size, thickness=2, color=(255, 255, 255, 128), alpha=1.0):
-    """
-    Create an RGBA circle with transparency using OpenCV and convert it to a PIL Image.
-
-    Args:
-        tile_size (int): The size of the square image (width and height in pixels).
-        thickness (int): The thickness of the circle's outline.
-        color (tuple): The RGBA color of the circle (R, G, B, A).
-
-    Returns:
-        PIL.Image.Image: The circle as a PIL Image.
-    """
-    color = list(color)
-    color[3] = int(color[3] * alpha)  # Adjust the alpha value
-
-    # Create a blank RGBA image
-    circle_image = np.zeros((tile_size, tile_size, 4), dtype=np.uint8)
-
-    # Draw the circle with the specified RGBA color
-    cv2.circle(
-        circle_image,
-        (tile_size // 2, tile_size // 2),  # Center of the circle
-        tile_size // 2 - thickness // 2,  # Radius of the circle
-        color,  # RGBA color (B, G, R, A in OpenCV)
-        thickness
-    )
-
-    # Convert BGRA to RGBA (OpenCV uses BGRA by default)
-    circle_image = cv2.cvtColor(circle_image, cv2.COLOR_BGRA2RGBA)
-
-    # Convert the NumPy array to a PIL Image
-    circle = Image.fromarray(circle_image)
-
-    return circle
 
 def render_level(array: np.array, tile_size: int = 16, return_numpy: bool = False):
     """

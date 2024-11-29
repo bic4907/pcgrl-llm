@@ -1,9 +1,9 @@
-from flax import struct
+import warnings
 
+from flax import struct
+import jax
 import chex
 import jax.numpy as jnp
-from gradio.themes.builder_app import palette_range
-from seaborn import color_palette
 
 from debug.render_level import generate_color_palette
 from envs.pathfinding import check_event
@@ -74,5 +74,13 @@ if __name__ == '__main__':
 
     solutions = get_solution(level)
     print(solutions)
+
+    try:
+        # with jax
+        jit = jax.jit(get_solution)
+        solutions = jit(level)
+    except:
+        # without jax
+        warnings.warn('JIT is not available')
 
 
