@@ -49,15 +49,17 @@ def get_solution(env_map) -> Solutions:
 
     # TODO Change the size to N
     sol_cnt = 0
-    for i, key in enumerate(jnp.argwhere(env_map == Dungeon3Tiles.KEY)):
+    exist_keys = jnp.argwhere(env_map == Dungeon3Tiles.KEY, size=30, fill_value=-1)
+    for i, key in enumerate(exist_keys):
         _cnt, _solutions = check_event(env_map=env_map,
                                      passable_tiles=passable_tiles,
                                      src=p_xy,
                                      key=key,
-                                     trg=d_xy)
-
-        for solution in _solutions:
-            path = jnp.concatenate(solution)
+                                     trg=d_xy,
+                                        exist_keys=exist_keys)
+        if _solutions:
+            # for solution in _solutions:
+            path = jnp.concatenate(_solutions)
             color = color_palette[sol_cnt % len(color_palette)]
             offset = offset_palette[sol_cnt % len(offset_palette)]
 

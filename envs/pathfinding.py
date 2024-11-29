@@ -444,31 +444,69 @@ def calc_path_from_a_to_b(env_map: chex.Array,
 
 def check_event(env_map: chex.Array,
                 passable_tiles: chex.Array,
-                src: chex.Array, key: chex.Array, trg: chex.Array,
+                src: chex.Array, key: chex.Array, trg: chex.Array, exist_keys: chex.Array,
                 flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
 
-    solutions = []
     pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
     kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
 
     if pk_path_length > 0 and kd_path_length > 0:
-        whole_path = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
-        solutions.append(whole_path)
-
-    copy_env_map = env_map.copy()
-
-    # erase Monster
-    for monster_label in [4, 5, 6]:
-        copy_env_map, solution = get_len_solutions(copy_env_map, passable_tiles, src, key, trg, monster_label)
-        if solution in solutions:
-            continue
-        solutions += solution
-    if len(solutions) != 0:
-        solutions = remove_duplicates(solutions)
-        return len(solutions), solutions
+        whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
+        for exist_key in exist_keys:
+            if jnp.array_equal(exist_key, jnp.array([-1, -1])):
+                continue
+            if not jnp.array_equal(key, exist_key):
+                for row in whole_route[0]:
+                    if jnp.array_equal(row, exist_key):
+                        return 0, None
+        encounter_monster = check_monster(env_map=env_map, route_path=whole_route)
+        return encounter_monster, whole_route
     else:
-        return 0, solutions
+        return 0, None
+
+def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[
+    int, chex.Array, chex.Array]:
+    from collections import defaultdict
+
+    max_path_len = get_max_path_length_static(map_shape=env_map.shape)
+    dx = [-1, 0, 1, 0, 0]
+    dy = [0, -1, 0, 1, 0]
+
+    monster = {}
+    monster_types = jnp.array([4, 5, 6])
+    env_map = jnp.array(env_map)
+
+    for path in route_path:
+        for point in path:
+            y, x = point  # Assuming point is already a list or tuple
+
+            if x == -1 or y == -1:
+                continue
+
+            for dd in zip(dx, dy):
+                kx, ky = x + dd[0], y + dd[1]
+
+                if kx < 0 or kx >= max_path_len or ky < 0 or ky >= max_path_len:
+                    continue
+
+                key = env_map[ky, kx]
+                key_python = key.item()  # Convert JAX scalar to Python scalar
+
+                # Check for monster types
+                if key_python in monster_types:
+                    key_str = str(key_python)  # Convert to string for dictionary key
+                    if key_str in monster:
+                        monster[key_str] = jnp.unique(jnp.vstack([monster[key_str], jnp.array([(ky, kx)])]), axis=0)
+                    else:
+                        monster[key_str] = jnp.array([(ky, kx)])
+
+    # Safely return results, handle cases where a monster type is missing
+    return {
+        'BAT': len(monster.get('4', [])),
+        'SCORPION': len(monster.get('5', [])),
+        'SPIDER': len(monster.get('6', []))
+    }
 
 def remove_duplicates(data):
     unique_data = []
@@ -496,7 +534,7 @@ def get_len_solutions(env_map: chex.Array,
     for _xy in jnp.argwhere(env_map == monster_label):
         y, x = _xy
 
-        env_map.at[y, x].set(1)
+        env_map = env_map.at[y, x].set(1)
         pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
         kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
         if pk_path_length > 0 and kd_path_length > 0:

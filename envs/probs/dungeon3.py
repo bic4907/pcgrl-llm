@@ -76,7 +76,7 @@ class Dungeon3Problem(Problem):
     tile_nums = tuple(tile_nums)
 
     # Passible tiles 등록하기
-    passable_tiles = jnp.array([Dungeon3Tiles.EMPTY, Dungeon3Tiles.KEY, Dungeon3Tiles.DOOR, Dungeon3Tiles.PLAYER])
+    passable_tiles = jnp.array([Dungeon3Tiles.EMPTY, Dungeon3Tiles.KEY, Dungeon3Tiles.DOOR, Dungeon3Tiles.PLAYER, Dungeon3Tiles.BAT, Dungeon3Tiles.SCORPION, Dungeon3Tiles.SPIDER])
 
     def __init__(self, map_shape, ctrl_metrics, pinpoints, randomize_start_pos):
         self.flood_path_net = FloodPath()
