@@ -474,7 +474,8 @@ def flatten_obs(obs: PCGRLObs) -> chex.Array:
 
 @partial(jax.jit, static_argnums=(0,))
 def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
-               path_coords_tpl: chex.Array):
+               path_coords_tpl: chex.Array, solutions: Optional[chex.Array] = None) -> chex.Array:
+
     tile_size = int(env.prob.tile_size)
     env_map = env_state.env_map
     border_size = np.array((1, 1))
@@ -492,14 +493,16 @@ def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
             lvl_img = lvl_img.at[y*tile_size: (y+1)*tile_size,
                                  x*tile_size: (x+1)*tile_size, :].set(tile_img)
 
-    # lvl_img = env.prob.draw_path(lvl_img=lvl_img, env_map=env_map,
-    #                              path_coords_tpl=path_coords_tpl, border_size=border_size, tile_size=tile_size)
+    # task에 따라서 그리는편이 맞지 않을까?
+    lvl_img = env.prob.draw_path(lvl_img=lvl_img, env_map=env_map,
+                                 path_coords_tpl=path_coords_tpl, border_size=border_size, tile_size=tile_size)
 
     clr = (255, 255, 255, 255)
     y_border = jnp.zeros((2, tile_size, 4), dtype=jnp.uint8)
     y_border = y_border.at[:, :, :].set(clr)
     x_border = jnp.zeros((tile_size, 2, 4), dtype=jnp.uint8)
     x_border = x_border.at[:, :, :].set(clr)
+
     if hasattr(env_state.rep_state, 'pos'):
 
         def render_pos(a_pos, lvl_img):
@@ -565,17 +568,17 @@ def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
         return lvl_img
 
     render_frozen_tiles(lvl_img)
-    # lvl_img = jax.lax.cond(
-    #     # env.static_tile_prob > 0 or env.n_freezies > 0 or env_state.queued_state.has_queued_frz_map,
 
-    #     # The order matters here. If we have concrete_bool, traced_bool, then concrete_bool, there is an issue,
-    #     # but concrete_bool, concrete_bool, traced_bool is fine. LMAO.
-    #     env.static_tile_prob > 0 or env.n_freezies > 0 or env.pinpoints or env_state.queued_state.has_queued_frz_map,
+    jax.debug.print("{}", solutions)
 
-    #     lambda lvl_img: render_frozen_tiles(lvl_img),
-    #     lambda lvl_img: lvl_img,
-    #     lvl_img
-    # )
+
+    # solution을 가져온 뒤에, circle로 solution 개수를 표현한다.
+
+
+    # dungeon3 specific rendering
+    # if env.prob.__class__.__name__ == 'Dungeon3Problem':
+    #     if env_state.prob_state is not None:
+    #         lvl_img = render_stats(env, env_state, lvl_img)
 
     return lvl_img
 

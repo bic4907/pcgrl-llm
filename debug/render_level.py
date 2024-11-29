@@ -12,18 +12,34 @@ image_dir = join(dirname(__file__), '..', 'envs', 'probs', 'tile_ims')
 import random
 import matplotlib.pyplot as plt  # For generating color palettes
 
-def generate_color_palette(num_colors):
+import jax
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+
+
+def generate_color_palette(num_colors, seed=0):
     """
-    Generate a color palette with distinct colors.
+    Generate a shuffled color palette with distinct colors using JAX.
 
     Args:
         num_colors (int): Number of colors to generate.
+        seed (int): Random seed for shuffling.
 
     Returns:
-        list: A list of RGBA tuples.
+        list: A shuffled list of RGBA tuples.
     """
+    # Generate a color palette using matplotlib
     palette = plt.cm.get_cmap('tab20', num_colors)  # Use a distinct colormap
-    return [(int(r * 255), int(g * 255), int(b * 255), 128) for r, g, b, _ in palette.colors]
+    colors = jnp.array([(int(r * 255), int(g * 255), int(b * 255), 128) for r, g, b, _ in palette.colors])
+
+    # Shuffle the colors using JAX
+    key = jax.random.PRNGKey(seed)
+    shuffled_indices = jax.random.permutation(key, num_colors)
+    shuffled_colors = colors[shuffled_indices]
+
+    # Convert JAX array back to a list of tuples
+    return [tuple(color) for color in shuffled_colors]
+
 
 def create_rgba_circle(tile_size, thickness=2, color=(255, 255, 255, 128), alpha=1.0):
     """
