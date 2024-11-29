@@ -77,7 +77,7 @@ def generate_color_palette(num_colors, seed=0):
     return shuffled_colors
 
 @partial(jit, static_argnums=(0, 1))
-def generate_offset_palette(num_offsets, range_x=(-8, 8), range_y=(-8, 8), seed=0):
+def generate_offset_palette(num_offsets, range_x=(-10, 10), range_y=(-10, 10), seed=0):
     """
     Generate a shuffled offset palette with random (x, y) values using JAX.
 
@@ -131,13 +131,13 @@ def create_rgba_circle(tile_size, thickness=2, color=[255, 255, 255, 128], alpha
     cv2.circle(
         circle_image,
         (tile_size // 2, tile_size // 2),  # Center of the circle
-        tile_size // 6 - thickness // 6,  # Radius of the circle
+        tile_size // 7 - thickness // 7,  # Radius of the circle
         color,  # RGBA color (B, G, R, A in OpenCV)
         thickness
     )
 
     # Convert BGRA to RGBA (OpenCV uses BGRA by default)
-    circle_image = cv2.cvtColor(circle_image, cv2.COLOR_BGRA2RGBA)
+    # circle_image = cv2.cvtColor(circle_image, cv2.COLOR_BGRA2RGBA)
 
     # Convert the NumPy array to a PIL Image
     circle = Image.fromarray(circle_image)
