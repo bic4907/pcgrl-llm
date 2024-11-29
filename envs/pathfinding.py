@@ -468,7 +468,7 @@ def check_event(env_map: chex.Array,
         solutions = remove_duplicates(solutions)
         return len(solutions), solutions
     else:
-        return 0, None
+        return 0, solutions
 
 def remove_duplicates(data):
     unique_data = []

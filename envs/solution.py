@@ -5,9 +5,9 @@ import jax
 import chex
 import jax.numpy as jnp
 
-from debug.render_level import generate_color_palette
 from envs.pathfinding import check_event
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
+from envs.utils import generate_color_palette, generate_offset_palette
 
 
 @struct.dataclass
@@ -45,18 +45,22 @@ def get_solution(env_map) -> Solutions:
 
     solutions = list()
     color_palette = generate_color_palette(30)
+    offset_palette = generate_offset_palette(9)
 
+    # TODO Change the size to N
     sol_cnt = 0
-    for i, key in enumerate(jnp.argwhere(env_map == Dungeon3Tiles.KEY)):
+    for i, key in enumerate(jnp.argwhere(env_map == Dungeon3Tiles.KEY, size=2)):
         _cnt, _solutions = check_event(env_map=env_map,
                                      passable_tiles=passable_tiles,
                                      src=p_xy,
                                      key=key,
                                      trg=d_xy)
 
-        for path in _solutions:
+        for solution in _solutions:
+            path = jnp.concatenate(solution)
             color = color_palette[sol_cnt % len(color_palette)]
-            offset = jnp.array([0, 0])
+            offset = offset_palette[sol_cnt % len(offset_palette)]
+
             solution = Solution(index=i, color=color, path=path, offset=offset, layover=key)
             solutions.append(solution)
             sol_cnt += 1

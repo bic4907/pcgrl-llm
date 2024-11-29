@@ -26,6 +26,8 @@ from envs.reps.turtle import MultiTurtleRepresentation, TurtleRepresentation
 from envs.reps.wide import WideRepresentation
 from envs.reps.nca import NCARepresentation
 from envs.reps.representation import Representation, RepresentationState
+from envs.solution import Solutions, get_solution
+from envs.probs.problem import draw_solutions as render_solution
 from envs.utils import Tiles
 from sawtooth import triangle_wave
 
@@ -401,12 +403,13 @@ class PCGRLEnv(Environment):
             params.change_pct > 0, state.pct_changed >= params.change_pct))
         return done
 
-    def render(self, env_state: PCGRLEnvState):
+    def render(self, env_state: PCGRLEnvState, draw_solutions: bool = False):
         # TODO: Refactor this into problem
         path_coords_tpl = self.prob.get_path_coords(
             env_map=env_state.env_map,
             prob_state=env_state.prob_state)
-        return render_map(self, env_state, path_coords_tpl)
+
+        return render_map(self, env_state, path_coords_tpl, draw_solutions=draw_solutions)
 
     @property
     def default_params(self) -> PCGRLEnvParams:
@@ -474,7 +477,7 @@ def flatten_obs(obs: PCGRLObs) -> chex.Array:
 
 @partial(jax.jit, static_argnums=(0,))
 def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
-               path_coords_tpl: chex.Array, solutions: Optional[chex.Array] = None) -> chex.Array:
+               path_coords_tpl: chex.Array, draw_solutions: bool = False) -> chex.Array:
 
     tile_size = int(env.prob.tile_size)
     env_map = env_state.env_map
@@ -569,16 +572,18 @@ def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
 
     render_frozen_tiles(lvl_img)
 
-    jax.debug.print("{}", solutions)
-
-
-    # solution을 가져온 뒤에, circle로 solution 개수를 표현한다.
-
-
-    # dungeon3 specific rendering
-    # if env.prob.__class__.__name__ == 'Dungeon3Problem':
-    #     if env_state.prob_state is not None:
-    #         lvl_img = render_stats(env, env_state, lvl_img)
+    # def draw_solution(lvl_img):
+    #     solutions = get_solution(env_state.env_map)
+    #     # def draw_solution(lvl_img, env_map, border_size, solutions, tile_size):
+    #     render_solution(lvl_img=lvl_img, env_map=env_map, border_size=border_size, solutions=solutions,
+    #                     tile_size=tile_size)
+    #
+    # jax.lax.cond(
+    #     draw_solutions,
+    #     lambda _: draw_solution(lvl_img),
+    #     lambda _: lvl_img,
+    #     None,
+    # )
 
     return lvl_img
 
