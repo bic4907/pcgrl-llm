@@ -465,9 +465,8 @@ def check_event(env_map: chex.Array,
         redun_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
 
         # erase [-1, -1] route
-        non_redun_route = erase_unnecessary_route(non_redun_route)
-
-        redun_route = erase_unnecessary_route(redun_route)
+        non_redun_route = (erase_unnecessary_route(non_redun_route[0]), erase_unnecessary_route(non_redun_route[1]))
+        redun_route = (erase_unnecessary_route(redun_route[1]), erase_unnecessary_route(redun_route[1]))
 
         if len(non_redun_route[0]) == len(redun_route[0]):
             encounter_monster = check_monster(env_map=env_map, route_path=non_redun_route)
@@ -529,13 +528,9 @@ def get_whole_path(pk_flood_state: chex.Array, kd_flood_state: chex.Array, max_p
     return (pk_coords, kd_coords)
 
 def erase_unnecessary_route(route_path: chex.Array):
-    arr1 = jnp.array(route_path[0], dtype=jnp.int32)
-    arr2 = jnp.array(route_path[1], dtype=jnp.int32)
+    arr = jnp.array(route_path[0], dtype=jnp.int32)
 
-    valid_mask1 = jnp.all(arr1 != jnp.array([-1, -1]), axis=1)
-    filtered_arr1 = arr1[valid_mask1]
+    valid_mask1 = jnp.all(arr != jnp.array([-1, -1]), axis=1)
+    filtered_arr1 = arr[valid_mask1]
 
-    valid_mask2 = jnp.all(arr2 != jnp.array([-1, -1]), axis=1)
-    filtered_arr2 = arr2[valid_mask2]
-
-    return (filtered_arr1, filtered_arr2)
+    return filtered_arr1
