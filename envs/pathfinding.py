@@ -495,7 +495,6 @@ def check_event_jit(
     def compute_route_and_check_keys(_):
         whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
 
-        # Check if any exist_key is on the whole_route # TODO 성현 체크 필요
         def check_key_exists(i, flag):
             exist_key = exist_keys[i]
 
