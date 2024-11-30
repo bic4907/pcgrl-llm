@@ -448,20 +448,32 @@ def check_event(env_map: chex.Array,
                 flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
 
-    pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
-    kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
+    # Non_redundant keys
+    copy_env_map = env_map.copy()
+    k_y, k_x = key
+    copy_env_map = copy_env_map.at[k_y, k_x].set(1)
+    non_pk_path_length, non_keys_pk_flood_state, _ = calc_path_from_a_to_b(copy_env_map, passable_tiles, src, key)
 
-    if pk_path_length > 0 and kd_path_length > 0:
-        whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
-        for exist_key in exist_keys:
-            if jnp.array_equal(exist_key, jnp.array([-1, -1])):
-                continue
-            if not jnp.array_equal(key, exist_key):
-                for row in whole_route[0]:
-                    if jnp.array_equal(row, exist_key):
-                        return 0, None
-        encounter_monster = check_monster(env_map=env_map, route_path=whole_route)
-        return encounter_monster, whole_route
+    # redundant keys used
+    redun_passable_tiles = jnp.concatenate([passable_tiles, jnp.array([7])])
+    pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, redun_passable_tiles, src, key)
+
+    kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, redun_passable_tiles, key, trg)
+
+    if non_pk_path_length > 0 and kd_path_length > 0:
+        non_redun_route = get_whole_path(non_keys_pk_flood_state, kd_flood_state, max_path_len)
+        redun_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
+
+        # erase [-1, -1] route
+        non_redun_route = erase_unnecessary_route(non_redun_route)
+
+        redun_route = erase_unnecessary_route(redun_route)
+
+        if len(non_redun_route[0]) == len(redun_route[0]):
+            encounter_monster = check_monster(env_map=env_map, route_path=non_redun_route)
+            return encounter_monster, non_redun_route
+        else:
+            return 0, None
     else:
         return 0, None
 
@@ -470,8 +482,8 @@ def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[
     from collections import defaultdict
 
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
-    dx = [-1, 0, 1, 0, 0]
-    dy = [0, -1, 0, 1, 0]
+    dx = [-1, 0, 1, 0]
+    dy = [0, -1, 0, 1]
 
     monster = {}
     monster_types = jnp.array([4, 5, 6])
@@ -508,41 +520,6 @@ def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[
         'SPIDER': len(monster.get('6', []))
     }
 
-def remove_duplicates(data):
-    unique_data = []
-    seen = []
-
-    for item in data:
-        key1 = item[0].flatten()
-        key2 = item[1].flatten()
-
-        # check duplicate
-        if not any(jnp.array_equal(key1, s[0]) and jnp.array_equal(key2, s[1]) for s in seen):
-            seen.append((key1, key2))
-            unique_data.append(item)
-
-    return unique_data
-
-def get_len_solutions(env_map: chex.Array,
-                      passable_tiles: chex.Array,
-                      src: chex.Array, key: chex.Array, trg: chex.Array,
-                      monster_label: chex.Array) -> Tuple[int, chex.Array]:
-    solutions = []
-    max_path_len = get_max_path_length_static(map_shape=env_map.shape)
-
-    env_map = jnp.array(env_map)
-    for _xy in jnp.argwhere(env_map == monster_label):
-        y, x = _xy
-
-        env_map = env_map.at[y, x].set(1)
-        pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
-        kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
-        if pk_path_length > 0 and kd_path_length > 0:
-            whole_path = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
-            solutions.append(whole_path)
-
-    return env_map, solutions
-
 def get_whole_path(pk_flood_state: chex.Array, kd_flood_state: chex.Array, max_path_len: chex.Array) -> Tuple[int, chex.Array]:
     pk_flood_count = pk_flood_state.flood_count
     kd_flood_count = kd_flood_state.flood_count
@@ -550,3 +527,15 @@ def get_whole_path(pk_flood_state: chex.Array, kd_flood_state: chex.Array, max_p
     kd_coords = get_path_coords(kd_flood_count, max_path_len=max_path_len, coord1=kd_flood_state.trg)
 
     return (pk_coords, kd_coords)
+
+def erase_unnecessary_route(route_path: chex.Array):
+    arr1 = jnp.array(route_path[0], dtype=jnp.int32)
+    arr2 = jnp.array(route_path[1], dtype=jnp.int32)
+
+    valid_mask1 = jnp.all(arr1 != jnp.array([-1, -1]), axis=1)
+    filtered_arr1 = arr1[valid_mask1]
+
+    valid_mask2 = jnp.all(arr2 != jnp.array([-1, -1]), axis=1)
+    filtered_arr2 = arr2[valid_mask2]
+
+    return (filtered_arr1, filtered_arr2)

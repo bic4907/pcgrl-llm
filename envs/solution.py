@@ -50,6 +50,8 @@ def get_solution(env_map) -> Solutions:
     # TODO Change the size to N
     sol_cnt = 0
     exist_keys = jnp.argwhere(env_map == Dungeon3Tiles.KEY, size=30, fill_value=-1)
+    exist_keys = exist_keys[jnp.all(exist_keys != jnp.array([-1, -1]), axis=1)]
+    print(exist_keys)
     for i, key in enumerate(exist_keys):
         _cnt, _solutions = check_event(env_map=env_map,
                                      passable_tiles=passable_tiles,

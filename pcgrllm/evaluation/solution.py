@@ -98,9 +98,8 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     n_solutions = 0
     encounter_monster = {}
     exist_keys = jnp.argwhere(level == Dungeon3Tiles.KEY, size=30, fill_value=-1)
+    exist_keys = exist_keys[jnp.all(exist_keys != jnp.array([-1, -1]), axis=1)]
     for key in exist_keys:
-        if jnp.array_equal(key, jnp.array([-1, -1])):
-            continue
         encounter_monster_num, route = check_event(env_map=level,
                                                        passable_tiles=passable_tiles,
                                                        src=p_xy,
