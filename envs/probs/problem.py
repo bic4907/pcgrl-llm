@@ -313,14 +313,16 @@ def draw_solutions(lvl_img, solutions, tile_size):
 
     NO_PATH = jnp.array([-1, -1])
 
-    for solution in solutions.solutions:
-        for point in solution.path:
+    for idx in range(solutions.n):
+
+        for point in solutions.path[idx]:
             if (point == NO_PATH).all():
                 continue
+
             y, x = point
-            y_offset, x_offset = solution.offset
+            y_offset, x_offset = solutions.offset[idx]
             # Draw the circle on the image
-            circle = create_rgba_circle(tile_size=tile_size, color=solution.color, alpha=0.7)
+            circle = create_rgba_circle(tile_size=tile_size, color=solutions.color[idx], alpha=0.7)
             lvl_img.paste(circle, (x * tile_size + x_offset, y * tile_size + y_offset), circle)
 
 

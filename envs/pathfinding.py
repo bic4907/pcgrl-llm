@@ -1,5 +1,6 @@
 from dataclasses import field
 import math
+from functools import partial
 from typing import Optional, Tuple
 import numpy as np
 from flax import struct
@@ -428,7 +429,7 @@ def calc_path_from_a_to_b(env_map: chex.Array,
             return new_state, None  # scan은 반드시 (state, output) 형식을 반환
 
         max_steps = env_map.size
-        flood_state, _ = lax.scan(flood_body, flood_state, xs=None, length=max_steps)
+        flood_state, _ = lax.scan(flood_body.astype(int), flood_state, xs=None, length=max_steps)
 
 
     path_length = jnp.clip(
@@ -444,12 +445,13 @@ def calc_path_from_a_to_b(env_map: chex.Array,
 
 def check_event(env_map: chex.Array,
                 passable_tiles: chex.Array,
-                src: chex.Array, key: chex.Array, trg: chex.Array, exist_keys: chex.Array,
-                flood_path_net: FloodPath = None) -> Tuple[int, chex.Array, chex.Array]:
+                src: chex.Array, key: chex.Array, trg: chex.Array, exist_keys: chex.Array) -> Tuple[int, int, chex.Array, chex.Array]:
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
 
     pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
     kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
+
+    default_count = jnp.zeros(3, dtype=jnp.int32)
 
     if pk_path_length > 0 and kd_path_length > 0:
         whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
@@ -459,15 +461,80 @@ def check_event(env_map: chex.Array,
             if not jnp.array_equal(key, exist_key):
                 for row in whole_route[0]:
                     if jnp.array_equal(row, exist_key):
-                        return 0, None
+                        return 0, default_count, np.array([])
         encounter_monster = check_monster(env_map=env_map, route_path=whole_route)
-        return encounter_monster, whole_route
-    else:
-        return 0, None
+        whole_route = jnp.concatenate(whole_route, axis=0)
 
-def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[
-    int, chex.Array, chex.Array]:
-    from collections import defaultdict
+        return 1, encounter_monster, whole_route
+    else:
+        return 0, default_count, np.array([])
+
+@jax.jit
+def check_event_jit(
+    env_map: chex.Array,
+    passable_tiles: chex.Array,
+    src: chex.Array,
+    key: chex.Array,
+    trg: chex.Array,
+    exist_keys: chex.Array
+) -> Tuple[int, chex.Array, chex.Array]:
+    """
+    JAX-compatible implementation of check_event.
+    """
+    max_path_len = get_max_path_length_static(map_shape=env_map.shape)
+
+    pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
+    kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
+
+    # Condition to check valid paths
+    valid_paths = (pk_path_length > 0) & (kd_path_length > 0)
+
+    monster_count_default = jnp.zeros(3, dtype=jnp.int32)
+    whole_route_default = jnp.full((2 * max_path_len, 2), -1, dtype=jnp.int32)
+
+    def compute_route_and_check_keys(_):
+        whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
+
+        # Check if any exist_key is on the whole_route # TODO 성현 체크 필요
+        def check_key_exists(i, flag):
+            exist_key = exist_keys[i]
+
+            # if 'is_invalid_pos' or 'is_equal_key' is True, return True
+            is_invalid_pos = jnp.all(exist_key == jnp.array([-1, -1]))
+            is_equal_key = jnp.all(key == exist_key)
+
+            # if 'is_on_route' is route, return False
+            is_on_route = jnp.any(jnp.all(whole_route[0] == exist_key, axis=-1))
+
+            # Skip invalid positions or equal keys
+            next_flag = jax.lax.cond(
+                is_invalid_pos | is_equal_key,
+                lambda: flag,  # Keep the flag unchanged
+                lambda: jnp.logical_and(flag, ~is_on_route)  # Update based on is_on_route
+            )
+            return next_flag
+
+        valid_key_flag = jax.lax.fori_loop(0, exist_keys.shape[0], check_key_exists, True)
+
+        def run_check_monster(whole_route):
+            encounter_monster = check_monster_jit(env_map=env_map, route_path=whole_route)
+            return 1, encounter_monster, jnp.concatenate(whole_route, axis=0)
+
+        return jax.lax.cond(
+            valid_key_flag,
+            run_check_monster,
+            lambda _: (0, monster_count_default, whole_route_default),
+            operand=whole_route
+        )
+
+    return jax.lax.cond(
+        valid_paths,
+        compute_route_and_check_keys,
+        lambda _: (0, monster_count_default, whole_route_default),
+        operand=None
+    )
+
+def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
 
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
     dx = [-1, 0, 1, 0, 0]
@@ -475,6 +542,7 @@ def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[
 
     monster = {}
     monster_types = jnp.array([4, 5, 6])
+    monster_countered = jnp.zeros(3, dtype=jnp.int32)
     env_map = jnp.array(env_map)
 
     for path in route_path:
@@ -501,12 +569,136 @@ def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[
                     else:
                         monster[key_str] = jnp.array([(ky, kx)])
 
-    # Safely return results, handle cases where a monster type is missing
-    return {
-        'BAT': len(monster.get('4', [])),
-        'SCORPION': len(monster.get('5', [])),
-        'SPIDER': len(monster.get('6', []))
-    }
+    monster_counts = jnp.array([
+        monster.get('4', jnp.array([])).shape[0],  # BAT count
+        monster.get('5', jnp.array([])).shape[0],  # SCORPION count
+        monster.get('6', jnp.array([])).shape[0]  # SPIDER count
+    ])
+    return monster_counts
+
+
+partial(jit, static_argnums=(0, 1))
+def check_monster_jit(env_map: chex.Array, route_path: chex.Array) -> chex.Array:
+    max_path_len = env_map.shape[0]  # Assuming square map
+    dx = jnp.array([-1, 0, 1, 0, 0])
+    dy = jnp.array([0, -1, 0, 1, 0])
+
+    monster_types = jnp.array([4, 5, 6], dtype=jnp.int32)  # Define monster types
+
+    # Process each point
+    def process_point(point, monster_counts, seen_mask):
+        y, x = point
+        # Skip invalid points
+        cond = jnp.logical_or(x == -1, y == -1)
+        monster_counts, seen_mask = jax.lax.cond(
+            cond,
+            lambda payload: payload,
+            lambda payload: process_neighbors(y, x, payload),
+            (monster_counts, seen_mask)
+        )
+        return monster_counts, seen_mask
+
+    # Process neighbors
+    def process_neighbors(y, x, payload):
+        monster_counts, seen_mask = payload
+        kx = x + dx
+        ky = y + dy
+        # Ensure indices are within bounds
+        valid = jnp.logical_and(
+            jnp.logical_and(0 <= kx, kx < max_path_len),
+            jnp.logical_and(0 <= ky, ky < max_path_len)
+        )
+        valid_kx = jnp.where(valid, kx, -1)  # Replace invalid indices with -1
+        valid_ky = jnp.where(valid, ky, -1)
+
+        def check_neighbor(kx, ky, monster_counts, seen_mask):
+            # Ensure kx and ky are valid
+            cond = jnp.logical_or(kx == -1, ky == -1)
+
+            def valid_case(payload):
+                counts, seen_mask = payload
+
+                tgt_tile = env_map[ky, kx]
+                indices = jnp.where(monster_types == tgt_tile, size=1, fill_value=-1)
+
+                def _check_duplicate_cell(payload, xy):
+                    """
+                    Checks if the cell at `xy` has already been seen. If not, updates `seen_mask` and `counts`.
+
+                    Args:
+                        counts: JAX array of monster counts.
+                        xy: JAX array of shape (2,) containing the coordinates [y, x].
+                        seen_mask: JAX array tracking visited cells.
+                        indices: The index of the monster type being processed.
+
+                    Returns:
+                        Updated `counts` and `seen_mask`.
+                    """
+                    counts, seen_mask = payload
+                    y, x = xy[0], xy[1]
+
+                    def not_seen_case(payload):
+                        counts, seen_mask = payload
+
+                        # Mark the cell as seen and update the monster count
+                        seen_mask = seen_mask.at[y, x].set(True)
+                        counts = counts.at[indices].add(1)
+                        return counts, seen_mask
+
+                    # Use jax.lax.cond to decide whether to update
+                    counts, seen_mask = jax.lax.cond(
+                        seen_mask[y, x],  # Check if the cell is already seen
+                        lambda payload: payload,
+                        not_seen_case,
+                        payload
+                    )
+
+                    return counts, seen_mask
+
+
+                # return counts
+                return jax.lax.cond(
+                    indices != -1,
+                    lambda payload: _check_duplicate_cell(payload, jnp.array([ky, kx])),
+                    lambda payload: payload,
+                    (counts, seen_mask)
+                )
+
+            return jax.lax.cond(cond, lambda x: x, valid_case, (monster_counts, seen_mask))
+
+        # Apply check for all neighbors using vmap
+        check_fn = jax.vmap(
+            lambda kx, ky, counts, seen_mask: check_neighbor(kx, ky, counts, seen_mask),
+            in_axes=(0, 0, None, None),
+            out_axes=(0, 0)
+        )
+
+        seen_mask = jnp.zeros_like(env_map, dtype=jnp.bool_)
+
+        result_check_fn, seen_mask = check_fn(valid_kx, valid_ky, monster_counts, seen_mask)
+        result_check_fn = result_check_fn.sum(axis=0)
+        seen_mask = seen_mask.any(axis=0)
+
+        return result_check_fn, seen_mask
+
+    monster_encountered = jnp.zeros(3, dtype=jnp.int32)  # Initialize monster count
+    seen_mask = jnp.zeros_like(env_map, dtype=jnp.bool_)
+
+    # Vectorize over all points using vmap
+    process_fn = jax.vmap(lambda point: process_point(point, monster_encountered, seen_mask), in_axes=0, out_axes=0)
+    all_points = route_path.reshape(-1, 2)  # Flatten all paths into one array
+    monster_encountered, seen_mask = process_fn(all_points)
+
+    # or seen_mask.any(axis=0)
+    seen_mask = seen_mask.any(axis=0)
+
+    bat_count = jnp.sum(jnp.logical_and(seen_mask, env_map == 4))
+    scorpion_count = jnp.sum(jnp.logical_and(seen_mask, env_map == 5))
+    spider_count = jnp.sum(jnp.logical_and(seen_mask, env_map == 6))
+
+    return jnp.array([bat_count, scorpion_count, spider_count])  # [BAT, SCORPION, SPIDER]
+
+
 
 def remove_duplicates(data):
     unique_data = []
@@ -522,6 +714,7 @@ def remove_duplicates(data):
             unique_data.append(item)
 
     return unique_data
+
 
 def get_len_solutions(env_map: chex.Array,
                       passable_tiles: chex.Array,
@@ -549,4 +742,4 @@ def get_whole_path(pk_flood_state: chex.Array, kd_flood_state: chex.Array, max_p
     pk_coords = get_path_coords(pk_flood_count, max_path_len=max_path_len, coord1=pk_flood_state.trg)
     kd_coords = get_path_coords(kd_flood_count, max_path_len=max_path_len, coord1=kd_flood_state.trg)
 
-    return (pk_coords, kd_coords)
+    return jnp.array([pk_coords, kd_coords])

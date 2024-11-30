@@ -1,13 +1,10 @@
 import logging
 import os
-import pprint
-import textwrap
+
 from tabulate import tabulate
 from tqdm import tqdm
-import cv2
 import numpy as np
 from os.path import basename, join, dirname
-from PIL import Image, ImageDraw, ImageFont
 from matplotlib import pyplot as plt
 
 from debug.render_level import render_level
@@ -19,6 +16,7 @@ from pcgrllm.utils.storage import Iteration
 
 
 from PIL import Image, ImageDraw, ImageFont
+
 
 def add_text_below_image(image, text, font_size=20, target_width=500):
     """Add properly formatted text (including tables) below an image with a black background."""
@@ -97,7 +95,7 @@ if __name__ == '__main__':
     processed_images = []
 
     # levels = AllLevels[]
-    levels = AllLevels
+    levels = AllLevels[:]
     scenario_num = 3
 
     for idx, level in tqdm(enumerate(levels), desc="Processing Levels", total=len(levels)):

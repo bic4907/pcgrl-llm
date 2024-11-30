@@ -4,7 +4,7 @@ from PIL import Image
 
 
 from envs.probs.problem import draw_solutions
-from envs.solution import get_solution
+from envs.solution import get_solution, get_solution_jit
 
 image_dir = join(dirname(__file__), '..', 'envs', 'probs', 'tile_ims')
 

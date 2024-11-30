@@ -31,7 +31,6 @@ TILE_MAP_STR_ENUM = {
 }
 
 
-partial(jit, static_argnums=(0, 1))
 def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     '''
     # Scenario generation task
@@ -96,21 +95,23 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
 
     n_solutions = 0
-    encounter_monster = {}
+    encounter_monster_sum = np.zeros(3, dtype=int)
     exist_keys = jnp.argwhere(level == Dungeon3Tiles.KEY, size=30, fill_value=-1)
     for key in exist_keys:
         if jnp.array_equal(key, jnp.array([-1, -1])):
             continue
-        encounter_monster_num, route = check_event(env_map=level,
+        has_solution, encounter_monster_num, route = check_event(env_map=level,
                                                        passable_tiles=passable_tiles,
                                                        src=p_xy,
                                                        key=key,
                                                        trg=d_xy,
                                                        exist_keys=exist_keys)
-        if route:
+        if has_solution:
             n_solutions += 1
-            encounter_monster = {**encounter_monster, **encounter_monster_num}
-            print(encounter_monster)
+            encounter_monster_sum += encounter_monster_num
+
+            # encounter_monster = {**encounter_monster, **encounter_monster_num}
+            # print(encounter_monster)
 
     # check if the player and door is connected
     playability = p_t_connected

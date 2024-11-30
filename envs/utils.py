@@ -74,7 +74,7 @@ def generate_color_palette(num_colors, seed=0):
     shuffled_colors = colors[shuffled_indices]
 
     # Convert JAX array back to a list of tuples
-    return shuffled_colors
+    return jnp.array(shuffled_colors, dtype=jnp.uint8)
 
 @partial(jit, static_argnums=(0, 1))
 def generate_offset_palette(num_offsets, range_x=(-10, 10), range_y=(-10, 10), seed=0):
@@ -104,7 +104,8 @@ def generate_offset_palette(num_offsets, range_x=(-10, 10), range_y=(-10, 10), s
     shuffled_offsets = offsets[shuffled_indices]
 
     # Convert JAX array back to a list of tuples
-    return [tuple(offset) for offset in shuffled_offsets]
+    return jnp.array([jnp.array(offset) for offset in shuffled_offsets], dtype=jnp.int32)
+
 
 partial(jit, static_argnums=(0, 1, 2, 3))
 def create_rgba_circle(tile_size, thickness=2, color=[255, 255, 255, 128], alpha=1.0):
