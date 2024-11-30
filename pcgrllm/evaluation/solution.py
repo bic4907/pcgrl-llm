@@ -10,7 +10,7 @@ from typing import Tuple
 
 from jax import jit
 
-from envs.pathfinding import calc_path_from_a_to_b, check_event, erase_unnecessary_route
+from envs.pathfinding import calc_path_from_a_to_b, check_event, erase_unnecessary_arr
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from pcgrllm.evaluation.base import *
 from pcgrllm.scenario_preset import ScenarioPreset
@@ -98,7 +98,7 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     n_solutions = 0
     encounter_monster = {}
     exist_keys = jnp.argwhere(level == Dungeon3Tiles.KEY, size=30, fill_value=-1)
-    exist_keys = erase_unnecessary_route(exist_keys)
+    exist_keys = erase_unnecessary_arr(exist_keys)
     for key in exist_keys:
         encounter_monster_num, route = check_event(env_map=level,
                                                        passable_tiles=passable_tiles,
