@@ -7,7 +7,8 @@ import chex
 import jax.numpy as jnp
 from jax import jit
 
-from envs.pathfinding import check_event, check_event_jit, get_max_path_length_static
+
+from envs.pathfinding import check_event, erase_unnecessary_arr, check_event_jit, get_max_path_length_static
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from envs.utils import generate_color_palette, generate_offset_palette
 
@@ -54,7 +55,8 @@ def get_solution(env_map) -> Solutions:
 
     sol_cnt = 0
 
-    # Loop over keys and compute solutions
+    exist_keys = erase_unnecessary_arr(exist_keys)
+
     for i, key in enumerate(exist_keys):
 
         # Skip invalid keys

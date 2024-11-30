@@ -446,26 +446,52 @@ def calc_path_from_a_to_b(env_map: chex.Array,
 def check_event(env_map: chex.Array,
                 passable_tiles: chex.Array,
                 src: chex.Array, key: chex.Array, trg: chex.Array, exist_keys: chex.Array) -> Tuple[int, int, chex.Array, chex.Array]:
-    max_path_len = get_max_path_length_static(map_shape=env_map.shape)
+#     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
 
-    pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
-    kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
+#     pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, src, key)
+#     kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
 
+#     default_count = jnp.zeros(3, dtype=jnp.int32)
+
+#     if pk_path_length > 0 and kd_path_length > 0:
+#         whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
+#         for exist_key in exist_keys:
+#             if jnp.array_equal(exist_key, jnp.array([-1, -1])):
+#                 continue
+#             if not jnp.array_equal(key, exist_key):
+#                 for row in whole_route[0]:
+#                     if jnp.array_equal(row, exist_key):
+#                         return 0, default_count, np.array([])
+#         encounter_monster = check_monster(env_map=env_map, route_path=whole_route)
+#         whole_route = jnp.concatenate(whole_route, axis=0)
+
+#         return 1, encounter_monster, whole_route
+
+    # Non_redundant keys
+    copy_env_map = env_map.copy()
+    k_y, k_x = key
+    copy_env_map = copy_env_map.at[k_y, k_x].set(1)
     default_count = jnp.zeros(3, dtype=jnp.int32)
+    non_pk_path_length, non_keys_pk_flood_state, _ = calc_path_from_a_to_b(copy_env_map, passable_tiles, src, key)
 
-    if pk_path_length > 0 and kd_path_length > 0:
-        whole_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
-        for exist_key in exist_keys:
-            if jnp.array_equal(exist_key, jnp.array([-1, -1])):
-                continue
-            if not jnp.array_equal(key, exist_key):
-                for row in whole_route[0]:
-                    if jnp.array_equal(row, exist_key):
-                        return 0, default_count, np.array([])
-        encounter_monster = check_monster(env_map=env_map, route_path=whole_route)
-        whole_route = jnp.concatenate(whole_route, axis=0)
+    # redundant keys used
+    redun_passable_tiles = jnp.concatenate([passable_tiles, jnp.array([7])])
+    pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, redun_passable_tiles, src, key)
+    kd_path_length, kd_flood_state, _ = calc_path_from_a_to_b(env_map, redun_passable_tiles, key, trg)
 
-        return 1, encounter_monster, whole_route
+    if non_pk_path_length > 0 and kd_path_length > 0:
+        non_redun_route = get_whole_path(non_keys_pk_flood_state, kd_flood_state, max_path_len)
+        redun_route = get_whole_path(pk_flood_state, kd_flood_state, max_path_len)
+
+        # erase [-1, -1] route
+        non_redun_route = (erase_unnecessary_arr(non_redun_route[0]), erase_unnecessary_arr(non_redun_route[1]))
+        redun_route = (erase_unnecessary_arr(redun_route[0]), erase_unnecessary_arr(non_redun_route[1]))
+
+        if len(non_redun_route[0]) == len(redun_route[0]):
+            encounter_monster = check_monster(env_map=env_map, route_path=non_redun_route)
+            return 1, encounter_monster, non_redun_route
+        else:
+            return 0, default_count, np.array([])
     else:
         return 0, default_count, np.array([])
 
@@ -536,8 +562,8 @@ def check_event_jit(
 def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
 
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
-    dx = [-1, 0, 1, 0, 0]
-    dy = [0, -1, 0, 1, 0]
+    dx = [-1, 0, 1, 0]
+    dy = [0, -1, 0, 1]
 
     monster = {}
     monster_types = jnp.array([4, 5, 6])
@@ -698,7 +724,6 @@ def check_monster_jit(env_map: chex.Array, route_path: chex.Array) -> chex.Array
     return jnp.array([bat_count, scorpion_count, spider_count])  # [BAT, SCORPION, SPIDER]
 
 
-
 def remove_duplicates(data):
     unique_data = []
     seen = []
@@ -742,3 +767,13 @@ def get_whole_path(pk_flood_state: chex.Array, kd_flood_state: chex.Array, max_p
     kd_coords = get_path_coords(kd_flood_count, max_path_len=max_path_len, coord1=kd_flood_state.trg)
 
     return jnp.array([pk_coords, kd_coords])
+
+
+def erase_unnecessary_arr(unprocess_arr: chex.Array):
+    arr = jnp.array(unprocess_arr, dtype=jnp.int32)
+
+    valid_mask1 = jnp.all(arr != jnp.array([-1, -1]), axis=1)
+    filtered_arr1 = arr[valid_mask1]
+
+    return filtered_arr1
+
