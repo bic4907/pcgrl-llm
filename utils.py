@@ -9,12 +9,15 @@ import numpy as np
 import jax.numpy as jnp
 import yaml
 import imageio
+
 import wandb
 from conf.config import Config, EvoMapConfig, SweepConfig, TrainConfig
 from envs.candy import Candy, CandyParams
 from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, RepEnum, get_prob_cls, \
     gen_dummy_queued_state
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
+from envs.probs.problem import draw_solutions
+from envs.solution import get_solution_jit
 from marl.model import ActorRNN, ActorCategorical
 from marl.wrappers.baselines import MultiAgentWrapper
 from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, NCA, SeqNCA
@@ -382,13 +385,20 @@ def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_p
         states = jax.tree.map(lambda x, y: jnp.concatenate([x[None], y], axis=0), init_state, states)
         # 첫 번째 환경의 상태만 선택 (2번째 차원의 첫 번째 인덱스 선택)
         first_env_state = jax.tree_map(lambda x: x[:, 0], states.env_state)
-
-        # 첫 번째 환경 상태를 렌더링
+        first_env_last_state = first_env_state.env_map[-1]
 
         frames = jax.vmap(env.render)(first_env_state)
 
+        if config.task == TaskType.Scenario:
+            solution = get_solution_jit(first_env_last_state)
+            final_frame = frames[-1]
+            final_frame = draw_solutions(final_frame, solution, env.prob.tile_size, np.array((1, 1)))
+            # stack the final frame to the frames duplicating 10 images
+            frames = jnp.concatenate([frames, jnp.stack([final_frame] * 10)], axis=0)
+
         # pass states to save them as "npy" files
         return frames, states
+
 
     # JIT compile the simulation function for better performance
     return jax.jit(sim_render_episode)

@@ -77,7 +77,7 @@ def generate_color_palette(num_colors, seed=0):
     return jnp.array(shuffled_colors, dtype=jnp.uint8)
 
 @partial(jit, static_argnums=(0, 1))
-def generate_offset_palette(num_offsets, range_x=(-10, 10), range_y=(-10, 10), seed=0):
+def generate_offset_palette(num_offsets, range_x=(-5, 5), range_y=(-5, 5), seed=0):
     """
     Generate a shuffled offset palette with random (x, y) values using JAX.
 
@@ -107,8 +107,49 @@ def generate_offset_palette(num_offsets, range_x=(-10, 10), range_y=(-10, 10), s
     return jnp.array([jnp.array(offset) for offset in shuffled_offsets], dtype=jnp.int32)
 
 
+def draw_circle_with_jax(image, center, radius, color, thickness=1):
+    """
+    Draws a circle on an RGBA image using JAX.
+
+    Parameters:
+    - tile_size: Size of the square image.
+    - center: (x, y) coordinates of the circle's center.
+    - radius: Radius of the circle.
+    - color: RGBA color (array of 4 values in range 0-255).
+    - thickness: Thickness of the circle's border. Use -1 for filled circle.
+
+    Returns:
+    - image: RGBA image with the circle drawn.
+    """
+    # Create a blank RGBA image
+
+    # Generate grid of coordinates
+    height, width, _ = image.shape  # Get the canvas size
+
+    # Generate grid of coordinates
+    y, x = jnp.meshgrid(jnp.arange(height), jnp.arange(width), indexing='ij')
+
+    # Compute distance of each pixel from the circle's center
+    distance_from_center = jnp.sqrt((x - center[0]) ** 2 + (y - center[1]) ** 2)
+
+    # Create a mask for the circle's border
+    if thickness > 0:
+        inner_radius = radius - thickness
+        circle_mask = (distance_from_center <= radius) & (distance_from_center >= inner_radius)
+    else:
+        # For filled circle
+        circle_mask = distance_from_center <= radius
+
+    # Apply the color to the circle mask
+    for i in range(4):  # Iterate over RGBA channels
+        image = image.at[:, :, i].set(jnp.where(circle_mask, color[i], image[:, :, i]))
+
+    return image
+
 partial(jit, static_argnums=(0, 1, 2, 3))
-def create_rgba_circle(tile_size, thickness=2, color=[255, 255, 255, 128], alpha=1.0):
+def create_rgba_circle(tile_size, thickness=2, color=jnp.array([255, 255, 255, 128]),
+                       alpha=0.7,
+                       return_image=True):
     """
     Create an RGBA circle with transparency using OpenCV and convert it to a PIL Image.
 
@@ -121,26 +162,20 @@ def create_rgba_circle(tile_size, thickness=2, color=[255, 255, 255, 128], alpha
         PIL.Image.Image: The circle as a PIL Image.
     """
 
-    color = [int(c) for c in color]  # Convert to integers
-    color[3] = int(color[3] * alpha)  # Adjust the alpha value
 
+    # set the index 3 item to by multiplied by alpha
+    # multiply the alpha value by the alpha value
+    color.at[3].set(color[3] * alpha // 1)
     # Create a blank RGBA image
-    circle_image = np.zeros((tile_size, tile_size, 4), dtype=np.uint8)
+    circle = jnp.zeros((tile_size, tile_size, 4), dtype=np.uint8)
 
     # Draw the circle with the specified RGBA color
 
-    cv2.circle(
-        circle_image,
-        (tile_size // 2, tile_size // 2),  # Center of the circle
-        tile_size // 7 - thickness // 7,  # Radius of the circle
-        color,  # RGBA color (B, G, R, A in OpenCV)
-        thickness
-    )
 
-    # Convert BGRA to RGBA (OpenCV uses BGRA by default)
-    # circle_image = cv2.cvtColor(circle_image, cv2.COLOR_BGRA2RGBA)
+    circle = draw_circle_with_jax(circle, (tile_size // 2, tile_size // 2), tile_size // 6 - thickness // 6, color, thickness)
 
-    # Convert the NumPy array to a PIL Image
-    circle = Image.fromarray(circle_image)
+
+    if return_image:
+        circle = Image.fromarray(circle)
 
     return circle

@@ -92,9 +92,7 @@ def main_rollout(enjoy_config: EnjoyConfig):
 
             if enjoy_config.task == TaskType.Scenario:
                 solution = get_solution_jit(final_level)
-                # change it to pil image
-                final_frame = np.array(final_frame)
-                final_frame = Image.fromarray(final_frame)
+
                 final_frame = draw_solutions(final_frame, solution, env.prob.tile_size, np.array((1, 1)))
                 final_frame = np.array(final_frame)
 

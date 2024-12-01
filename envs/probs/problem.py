@@ -309,23 +309,113 @@ def draw_path(prob, lvl_img, env_map, border_size, path_coords, tile_size,
 
     return lvl_img
 
+
+def alpha_blend(background, overlay):
+    """
+    Blends an overlay onto the background using the overlay's alpha channel.
+
+    Parameters:
+    - background: (h, w, 4) RGBA region from img (alpha assumed to be 255).
+    - overlay: (h, w, 4) RGBA region from circle (alpha 0-255).
+
+    Returns:
+    - blended_region: (h, w, 4) RGBA blended region.
+    """
+    # Extract alpha channel from the overlay and normalize to 0-1
+    overlay_alpha = overlay[:, :, 3:4] * 0.7 / 255.0  # Shape (h, w, 1)
+
+    # Blend RGB channels
+    blended_rgb = (
+            overlay_alpha * overlay[:, :, :3] + (1 - overlay_alpha) * background[:, :, :3]
+    )
+
+    # Keep the alpha channel of the background as 255
+    blended_alpha = jnp.full((background.shape[0], background.shape[1], 1), 255, dtype=jnp.uint8)
+
+    # Combine the blended RGB and alpha
+    blended_region = jnp.concatenate([blended_rgb, blended_alpha], axis=-1)
+
+    return blended_region.astype(jnp.uint8)
+
 def draw_solutions(lvl_img, solutions, tile_size, border_size=(0, 0)):
+    """
+    Draw solutions on the level image using JAX operations with `jax.lax.cond`.
 
+    Args:
+        lvl_img (PIL.Image): The level image to draw on.
+        solutions (object): Contains solution data including paths, offsets, and colors.
+        tile_size (int): Size of each tile.
+        border_size (tuple): Border size adjustment as (y_border, x_border).
+
+    Returns:
+        PIL.Image: The modified level image with solutions drawn.
+    """
     NO_PATH = jnp.array([-1, -1])
-
     border_offset_y, border_offset_x = border_size[0] * tile_size, border_size[1] * tile_size
 
-    for idx in range(solutions.n):
+    def draw_point(index, inputs):
+        """
+        Draws a single point of the path onto the image.
 
-        for point in solutions.path[idx]:
-            if (point == NO_PATH).all():
-                continue
+        Args:
+            index (tuple): (solution_idx, path_idx).
+            inputs (tuple): (current_img, solutions).
 
+        Returns:
+            PIL.Image: Updated image with the point drawn.
+        """
+        idx, i = index
+        img, solutions = inputs
+        point = solutions.path[idx][i]
+        offset_y, offset_x = solutions.offset[idx]
+        color = solutions.color[idx]
+
+        is_image_obj = isinstance(img, Image.Image)
+        circle = create_rgba_circle(tile_size=tile_size, color=color, alpha=0.5, return_image=is_image_obj)
+
+
+        def no_op(img):
+            return img  # If NO_PATH, do nothing
+
+        def draw_circle(img):
             y, x = point
-            y_offset, x_offset = solutions.offset[idx]
-            # Draw the circle on the image
-            circle = create_rgba_circle(tile_size=tile_size, color=solutions.color[idx], alpha=0.7)
-            lvl_img.paste(circle, (x * tile_size + x_offset + border_offset_x, y * tile_size + y_offset + border_offset_y), circle)
+            adjusted_x = x * tile_size + offset_x + border_offset_x
+            adjusted_y = y * tile_size + offset_y + border_offset_y
 
 
-    return lvl_img
+            if isinstance(img, Image.Image) and isinstance(circle, Image.Image):
+                img.paste(circle, (adjusted_x, adjusted_y), circle)
+            else:
+                h, w = circle.shape[:2]
+                x, y = adjusted_x, adjusted_y
+
+                # Extract the region to be updated from the img
+                region = jax.lax.dynamic_slice(img, (y, x, 0), (h, w, 4))
+                region = alpha_blend(region, circle)
+                img = jax.lax.dynamic_update_slice(img, region, (y, x, 0))
+            return img
+
+        # Use `jax.lax.cond` to decide whether to draw the circle
+        return jax.lax.cond(jnp.all(point == NO_PATH), no_op, draw_circle, img)
+
+    def draw_single_solution(idx, img):
+        """
+        Draws a single solution's path onto the image.
+
+        Args:
+            idx (int): The index of the solution.
+            img (PIL.Image): The current image to update.
+
+        Returns:
+            PIL.Image: Updated image with the solution path drawn.
+        """
+        path_length = solutions.path[idx].shape[0]
+        indices = jnp.arange(path_length)  # Indices for the path points
+
+        def loop_body(i, current_img):
+            return draw_point((idx, i), (current_img, solutions))
+
+        return jax.lax.fori_loop(0, path_length, loop_body, img)
+
+    # Loop through all solutions using `jax.lax.fori_loop`
+    return jax.lax.fori_loop(0, solutions.n, draw_single_solution, lvl_img)
