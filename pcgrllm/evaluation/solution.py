@@ -10,8 +10,9 @@ from typing import Tuple
 
 from jax import jit
 
-from envs.pathfinding import calc_path_from_a_to_b, check_event
+from envs.pathfinding import calc_path_from_a_to_b, check_event, check_event_jit
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
+from envs.solution import get_solution_jit
 from pcgrllm.evaluation.base import *
 from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.utils.storage import Iteration
@@ -30,6 +31,14 @@ TILE_MAP_STR_ENUM = {
     "DOOR": Dungeon3Tiles.DOOR,
 }
 
+ENUM_TO_ENCOUNTER_INDEX = {
+    Dungeon3Tiles.BAT: 0,
+    Dungeon3Tiles.SCORPION: 1,
+    Dungeon3Tiles.SPIDER: 2,
+}
+
+tile_keys = jnp.array(list(ENUM_TO_ENCOUNTER_INDEX.keys()))
+tile_indices = jnp.array(list(ENUM_TO_ENCOUNTER_INDEX.values()))
 
 def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     '''
@@ -91,37 +100,48 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
     # Summing results
     n_exist_imp_tiles = jnp.sum(imp_tile_results[0])  # Count of existing important tiles
-    n_acc_imp_tiles = jnp.sum(imp_tile_results[1])   # Count of reachable important tiles
+    n_reach_imp_tiles = jnp.sum(imp_tile_results[1])   # Count of reachable important tiles
 
 
-    n_solutions = 0
-    encounter_monster_sum = np.zeros(3, dtype=int)
-    exist_keys = jnp.argwhere(level == Dungeon3Tiles.KEY, size=30, fill_value=-1)
-    for key in exist_keys:
-        if jnp.array_equal(key, jnp.array([-1, -1])):
-            continue
-        has_solution, encounter_monster_num, route = check_event(env_map=level,
-                                                       passable_tiles=passable_tiles,
-                                                       src=p_xy,
-                                                       key=key,
-                                                       trg=d_xy,
-                                                       exist_keys=exist_keys)
-        if has_solution:
-            n_solutions += 1
-            encounter_monster_sum += encounter_monster_num
+    solutions = get_solution_jit(level)
+    enemy_counter = solutions.enemy_encounter
+    enemy_counter_type = jnp.any(jnp.where(enemy_counter > 0, 1, 0), axis=0)
 
-            # encounter_monster = {**encounter_monster, **encounter_monster_num}
-            # print(encounter_monster)
+    def convert_to_boolean(imp_tiles):
+        # 모든 타일에 대해 초기값 False 배열 생성
+        result = jnp.zeros(len(tile_indices), dtype=bool)
+
+        # imp_tiles를 ENUM_TO_ENCOUNTER_INDEX에서 찾아 매핑
+        mapped_indices = jnp.searchsorted(tile_keys, imp_tiles)
+
+        # Boolean 배열에 해당 인덱스를 True로 설정
+        result = result.at[mapped_indices].set(True)
+
+        return result
+
+    # 예제 데이터
+    imp_tiles = jnp.array([4, 5])  # 중요 타일
+
+    # 호출
+    onehot_imp_tiles = convert_to_boolean(imp_tiles)
+    correct_count = jnp.sum(jnp.where(onehot_imp_tiles == enemy_counter_type, 1, 0))
+
+    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles, jnp.logical_not(enemy_counter_type)))
+    false_positive = jnp.sum(jnp.logical_and(jnp.logical_not(onehot_imp_tiles), enemy_counter_type))
+
 
     # check if the player and door is connected
     playability = p_t_connected
     path_length = p_t_length
     solvability = is_solavable
-    n_solutions = n_solutions
-    loss_solutions = len(imp_tiles) - n_solutions
-    acc_imp_tiles = n_acc_imp_tiles / len(imp_tiles)
+    n_solutions = solutions.n
+    loss_solutions = jnp.abs(len(imp_tiles) - n_solutions)
+    reach_imp_tiles = n_reach_imp_tiles / len(imp_tiles)
     exist_imp_tiles = n_exist_imp_tiles / len(imp_tiles)
 
+    correct_count = correct_count / len(imp_tiles)
+    false_positive = false_positive / len(imp_tiles)
+    false_negative = false_negative / len(imp_tiles)
 
     return EvaluationResult(
         task=TaskType.Scenario,
@@ -130,8 +150,13 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
         solvability=solvability,
         n_solutions=n_solutions,
         loss_solutions=loss_solutions,
-        acc_imp_perc=acc_imp_tiles,
+        reach_imp_perc=reach_imp_tiles,
         exist_imp_perc=exist_imp_tiles,
+
+        acc_imp_perc=correct_count,
+        fp_imp_perc=false_positive,
+        fn_imp_perc=false_negative,
+
         sample_size=1)
 
 
@@ -157,17 +182,20 @@ class SolutionEvaluator(LevelEvaluator):
                 result.solvability,
                 result.n_solutions,
                 result.loss_solutions,
-                result.acc_imp_perc,
+                result.reach_imp_perc,
                 result.exist_imp_perc,
+                result.acc_imp_perc,
+                result.fp_imp_perc,
+                result.fn_imp_perc
             )
 
         # 병렬화를 적용
         # eval_results = jax.vmap(eval_level_jax)(levels)
         eval_results = eval_level_jax(levels[0])
 
-
         # 결과를 개별적으로 계산
-        playability, path_length, solvability, n_solutions, loss_solutions, acc_imp_tiles, exist_imp_tiles = eval_results
+        (playability, path_length, solvability, n_solutions, loss_solutions, reach_imp_tiles,
+         exist_imp_tiles, acc_imp_perc, fp_imp_perc, fn_imp_perc) = eval_results
 
         # 평균 계산
         playability = jnp.mean(playability)
@@ -177,8 +205,12 @@ class SolutionEvaluator(LevelEvaluator):
         solvability = jnp.mean(solvability)
         n_solutions = jnp.mean(n_solutions)
         loss_solutions = jnp.mean(loss_solutions)
-        acc_imp_tiles = jnp.mean(acc_imp_tiles)
+        reach_imp_tiles = jnp.mean(reach_imp_tiles)
         exist_imp_tiles = jnp.mean(exist_imp_tiles)
+
+        acc_imp_perc = jnp.mean(acc_imp_perc)
+        fp_imp_perc = jnp.mean(fp_imp_perc)
+        fn_imp_perc = jnp.mean(fn_imp_perc)
 
         sample_size = len(levels)
 
@@ -189,8 +221,11 @@ class SolutionEvaluator(LevelEvaluator):
             solvability=solvability,
             n_solutions=n_solutions,
             loss_solutions=loss_solutions,
-            acc_imp_perc=acc_imp_tiles,
+            reach_imp_perc=reach_imp_tiles,
             exist_imp_perc=exist_imp_tiles,
+            acc_imp_perc=acc_imp_perc,
+            fp_imp_perc=fp_imp_perc,
+            fn_imp_perc=fn_imp_perc,
             sample_size=sample_size)
 
 # Example
@@ -224,5 +259,5 @@ if __name__ == '__main__':
     for idx, level in enumerate(AllLevels[:]):
         np.save(join(iteration.get_numpy_dir(), f"level_{idx}.npy"), level)
     # Run the evaluator with visualization enabled/disabled
-    result = evaluator.run(iteration=iteration, scenario_num="1", visualize=True)
+    result = evaluator.run(iteration=iteration, scenario_num="2", visualize=True)
     print(result)

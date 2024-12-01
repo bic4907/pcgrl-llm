@@ -25,8 +25,13 @@ class EvaluationResult:
     solvability: float = 0      # if the player can reach the door with the key
     n_solutions: float = 0      # Number of solutions the player can reach the door
     loss_solutions: float = 0   # Loss of between the target and the current solution count
-    acc_imp_perc: float = 0        # (reachable of important tiles <-> prompt)
+    reach_imp_perc: float = 0        # (reachable of important tiles <-> prompt)
     exist_imp_perc: float = 0      # (existence of important tiles <-> prompt)
+
+    acc_imp_perc: float = 0
+    fp_imp_perc: float = 0
+    fn_imp_perc: float = 0
+
     attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'acc_imp_perc', 'exist_imp_perc']
 
     def __init__(self, task: TaskType, **kwargs):
@@ -66,8 +71,11 @@ class EvaluationResult:
                 'solvability': float(self.solvability),
                 'n_solutions': float(self.n_solutions),
                 'loss_solutions': float(self.loss_solutions),
-                'acc_imp_perc': float(self.acc_imp_perc),
+                'reach_imp_perc': float(self.reach_imp_perc),
                 'exist_imp_perc': float(self.exist_imp_perc),
+                'acc_imp_perc': float(self.acc_imp_perc),
+                'fp_imp_perc': float(self.fp_imp_perc),
+                'fn_imp_perc': float(self.fn_imp_perc)
             }
         else:
             raise ValueError(f"Invalid task type: {self.task}")
@@ -85,7 +93,13 @@ class EvaluationResult:
         return EvaluationResult(**data)
 
     def to_prompt(self):
-        return f"Similarity: {self.similarity}, Diversity: {self.diversity}"
+        if self.task == TaskType.Alphabet:
+            return f"Similarity: {self.similarity}, Diversity: {self.diversity}"
+        elif self.task == TaskType.Scenario:
+            return (f"Solvability: {self.solvability}, "
+                    f"Number of Solutions: {self.n_solutions}, "
+                    f"Reachable Important Tiles: {self.reach_imp_perc}, ")
+
 
     def sample(self) -> 'EvaluationResult':
         result = EvaluationResult(self.task)
