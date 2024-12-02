@@ -1,4 +1,6 @@
 from os.path import join, dirname
+
+import jax.lax
 import numpy as np
 from PIL import Image
 
@@ -37,17 +39,25 @@ def render_level(array: np.array, tile_size: int = 16, return_numpy: bool = Fals
     # Generate a color palette for the circles
 
     # Create a blank image with the appropriate size
-    img = Image.new('RGB', (array.shape[1] * tile_size, array.shape[0] * tile_size), color='white')
+    #  img = Image.new('RGB', (array.shape[1] * tile_size, array.shape[0] * tile_size), color='white')
+    img = jnp.zeros((array.shape[0] * tile_size, array.shape[1] * tile_size, 4), dtype=jnp.uint8)
 
     # Paste tiles onto the image
     for y, row in enumerate(array):
         for x, tile in enumerate(row):
             val = int(tile)
             resized_tile = tiles[val].resize((tile_size, tile_size))
-            img.paste(resized_tile, (x * tile_size, y * tile_size))
+            resized_tile_np = np.array(resized_tile, dtype=np.uint8)
+
+            # Use dynamic update slice to place the resized tile
+            img = jax.lax.dynamic_update_slice(
+                img,
+                jnp.array(resized_tile_np),
+                (y * tile_size, x * tile_size, 0)
+            )
+            # img.paste(resized_tile, (x * tile_size, y * tile_size))
 
     level = jnp.array(array)
-
     solutions = get_solution(level)
 
     img = draw_solutions(lvl_img=img, solutions=solutions, tile_size=tile_size)

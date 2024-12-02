@@ -137,7 +137,13 @@ if __name__ == '__main__':
 
         # Flatten rows into a 2x2 table format
         table = tabulate(
-            [[f"{k1}: {v1:.1f}", f"{k2}: {v2:.1f}"] for (k1, v1), (k2, v2) in grid],
+            [
+                [
+                    f"{k1}: {v1:.1f}" if isinstance(v1, (float, int)) and v1 != '' else f"{k1}: {v1}",
+                    f"{k2}: {v2:.1f}" if isinstance(v2, (float, int)) and v2 != '' else f"{k2}: {v2}"
+                ]
+                for (k1, v1), (k2, v2) in grid
+            ],
             tablefmt="grid"
         )
 
