@@ -94,10 +94,11 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
             _xy
         )
 
+    jax.debug.print('before jax.vmap(process_important_tile)(jnp.array(imp_tiles)): {}', imp_tiles)
     # Use vmap to process all important tiles in parallel
     imp_tiles = jnp.array([TILE_MAP_STR_ENUM[tile] for tile in imp_tiles])
     imp_tile_results = jax.vmap(process_important_tile)(jnp.array(imp_tiles))
-
+    jax.debug.print('after jax.vmap(process_important_tile)(jnp.array(imp_tiles)): {}', imp_tile_results)
     # Summing results
     n_exist_imp_tiles = jnp.sum(imp_tile_results[0])  # Count of existing important tiles
     n_reach_imp_tiles = jnp.sum(imp_tile_results[1])   # Count of reachable important tiles

@@ -429,7 +429,7 @@ def calc_path_from_a_to_b(env_map: chex.Array,
             return new_state, None  # scan은 반드시 (state, output) 형식을 반환
 
         max_steps = env_map.size
-        flood_state, _ = lax.scan(flood_body.astype(int), flood_state, xs=None, length=max_steps)
+        flood_state, _ = lax.scan(flood_body, flood_state, xs=None, length=max_steps)
 
 
     path_length = jnp.clip(
