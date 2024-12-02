@@ -426,7 +426,7 @@ class Experiment:
             log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=self.config.evaluator)
 
             # Get the evaluation result
-            vit_evaluator = ViTEvaluator(logger=self.logger)
+            vit_evaluator = ViTEvaluator(task=self.config.task, logger=self.logger)
             vit_result = vit_evaluator.run(iteration=iteration, target_character=self.config.target_character)
 
             # Save the evaluation result to the iteration file
@@ -442,17 +442,39 @@ class Experiment:
 
     def _run_scenario_evaluation(self, iteration: Iteration, scenario_num: str) -> EvaluationResult:
 
+        exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+
         if self.config.evaluator == 'hr':
             evaluator = SolutionEvaluator(task=self.config.task, logger=self.logger)
-            result = evaluator.run(iteration=iteration, scenario_num=scenario_num)
+        elif self.config.evaluator == 'llm':
+            evaluator = LLMEvaluator(task=self.config.task, logger=self.logger,
+                                     gpt_model=self.config.gpt_model, seed=self.config.seed,
+                                     n_generation_trials=self.config.n_generation_trials)
         else:
             raise ValueError(f"Invalid evaluator type: {self.config.evaluator}")
 
-        self.logging(f"{self.config.evaluator.upper()} Result: {result}", level=logging.INFO)
+        result = evaluator.run(iteration=iteration, target_character=scenario_num)
 
-        log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
+        if self.config.evaluator == 'hr':
+            log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
+        else:
+            log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=self.config.evaluator)
+
+            # Get the evaluation result
+            sol_evaluator = SolutionEvaluator(task=self.config.task, logger=self.logger)
+            sol_result = sol_evaluator.run(iteration=iteration, target_character=self.config.target_character)
+
+            # Save the evaluation result to the iteration file
+            result_path = path.join(exp_dir, 'evaluation.vit.json')
+            with open(result_path, 'w') as f:
+                json.dump(sol_result.to_dict(), f)
+
+            # Log the evaluation result
+            log_evaluation_result(logger=self.logger, result=sol_result, iteration=self._iteration, evaluator_type=None)
+            self.logging(f"Solution Result: {sol_result}", level=logging.INFO)
 
         return result
+
 
     def save_state(self):
         """Saves all instance variables to a YAML file, excluding specified keys."""

@@ -167,8 +167,10 @@ class SolutionEvaluator(LevelEvaluator):
         super().__init__(**kwargs)
 
 
-    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
+    def run(self, iteration: Iteration, scenario_num: str = None, target_character: str = None, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
         numpy_files = iteration.get_numpy_files(train=use_train, step_filter=step_filter)
+
+        scenario_num = scenario_num if scenario_num is not None else target_character
 
         # 로드한 numpy 파일을 JAX 배열로 변환
         levels = jnp.array([numpy_file.load() for numpy_file in numpy_files])
