@@ -11,7 +11,7 @@ from typing import Tuple
 
 from flax import struct
 
-from envs.pathfinding import calc_path_from_a_to_b, check_event, check_event_jit
+from envs.pathfinding import calc_path_from_a_to_b
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from envs.solution import get_solution_jit
 from pcgrllm.evaluation.base import LevelEvaluator, EvaluationResult
@@ -19,6 +19,7 @@ from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.task import TaskType
 from pcgrllm.utils.cuda import get_cuda_version
 from pcgrllm.utils.storage import Iteration
+from pcgrllm.utils.solution_evaluator import create_fixed_size_onehot
 
 NOT_EXISTS = jnp.array([-1, -1])
 
@@ -51,6 +52,8 @@ class EvaluationResultStruct:
     acc_imp_perc: float = 0
     fp_imp_perc: float = 0
     fn_imp_perc: float = 0
+    tp_imp_perc: float = 0
+    tn_imp_perc: float = 0
 
 
 def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
@@ -122,75 +125,18 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     enemy_counter = solutions.enemy_encounter
     enemy_counter_type = jnp.any(jnp.where(enemy_counter > 0, 1, 0), axis=0)
 
-    jax.debug.print("{}", enemy_counter_type)
-    def convert_to_boolean(imp_tiles):
-        # 모든 타일에 대해 초기값 False 배열 생성
-        result = jnp.zeros(len(tile_indices), dtype=bool)
+    onehot_imp_tiles = create_fixed_size_onehot(imp_tiles).astype(jnp.bool_)
 
-        # imp_tiles를 ENUM_TO_ENCOUNTER_INDEX에서 찾아 매핑
-        mapped_indices = jnp.searchsorted(tile_keys, imp_tiles)
+    correct_count = jnp.sum(onehot_imp_tiles == enemy_counter_type)
 
-        # Boolean 배열에 해당 인덱스를 True로 설정
-        result = result.at[mapped_indices].set(True)
-
-        return result
-
-
-    # 호출
-    #ccccccc
-    # onehot_imp_tiles = jnp.zeros(3, dtype=jnp.int32)
-    #
-    # # Fill the array with values from imp_tiles, up to the size of the array
-    # num_elements_to_fill = min(len(imp_tiles), 3)
-    # onehot_imp_tiles = onehot_imp_tiles.at[:num_elements_to_fill].set(imp_tiles[:num_elements_to_fill])
-
-    # onehot_imp_tiles = jnp.zeros(3, dtype=jnp.int32)
-    #
-    # # Normalize values to indices (map 4 -> 0, 5 -> 1, 6 -> 2)
-    # imp_indices = imp_tiles - Dungeon3Tiles.BAT
-    #
-    # # Ensure indices are within the range [0, size-1]
-    # imp_indices = imp_indices[(imp_indices >= 0) & (imp_indices < 3)]
-    #
-    # # Set one-hot values
-    # onehot_imp_tiles = onehot_imp_tiles.at[imp_indices].set(1)
-    #
-    # jax.debug.print("{}", onehot_imp_tiles)
-    # # onehot_imp_tiles = convert_to_boolean(imp_tiles)
-    def create_fixed_size_onehot(imp_tiles, size=3, value_range=(4, 6)):
-        """
-        Generate a fixed-size one-hot encoded array for `imp_tiles`.
-
-        Parameters:
-        - imp_tiles: Array of input values (e.g., [4, 5, 6]).
-        - size: Size of the one-hot encoded array (default is 3).
-        - value_range: The range of acceptable values (default is [4, 5, 6]).
-
-        Returns:
-        - A one-hot encoded array of fixed size.
-        """
-        # Create a zero-initialized one-hot array
-        onehot_array = jnp.zeros(size, dtype=jnp.int32)
-
-        # Normalize values to indices (e.g., 4 -> 0, 5 -> 1, 6 -> 2)
-        imp_indices = imp_tiles - value_range[0]
-
-        # Use jnp.where to find valid indices
-        valid_mask = (imp_indices >= 0) & (imp_indices < size)
-        valid_indices = jnp.where(valid_mask, imp_indices, -1)
-
-        onehot_array = onehot_array.at[valid_indices].set(1)
-
-        return onehot_array
-
-    onehot_imp_tiles = create_fixed_size_onehot(imp_tiles)
-    jax.debug.print("{}", jnp.where(onehot_imp_tiles == enemy_counter_type.astype(jnp.int32), 1, 0))
-    correct_count = jnp.sum(jnp.where(onehot_imp_tiles == enemy_counter_type.astype(jnp.int32), 1, 0))
-    jax.debug.print("{}", correct_count)
-
-    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles, jnp.logical_not(enemy_counter_type)))
-    false_positive = jnp.sum(jnp.logical_and(jnp.logical_not(onehot_imp_tiles), enemy_counter_type))
-
+    # True Positive: Predicted as 1 (positive) and actually 1 (positive)
+    true_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 1))
+    # True Negative: Predicted as 0 (negative) and actually 0 (negative)
+    true_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 0))
+    # False Positive: Predicted as 1 (positive) but actually 0 (negative)
+    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0))
+    # False Negative: Predicted as 0 (negative) but actually 1 (positive)
+    false_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 1))
 
     # check if the player and door is connected
     playability = p_t_connected
@@ -204,6 +150,9 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     correct_count = correct_count / len(imp_tiles)
     false_positive = false_positive / len(imp_tiles)
     false_negative = false_negative / len(imp_tiles)
+    true_positive = true_positive / len(imp_tiles)
+    true_negative = true_negative / len(imp_tiles)
+
 
     return EvaluationResultStruct(
         playability=playability,
@@ -216,7 +165,10 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
         acc_imp_perc=correct_count,
         fp_imp_perc=false_positive,
-        fn_imp_perc=false_negative)
+        fn_imp_perc=false_negative,
+        tp_imp_perc=true_positive,
+        tn_imp_perc=true_negative
+    )
 
 
 def eval_level_jax(levels, scenario_num):
