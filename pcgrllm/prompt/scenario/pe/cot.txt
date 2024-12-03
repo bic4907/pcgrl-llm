@@ -1,0 +1,4 @@
+Reward function is improved by getting feedback on end of each iteration.
+The reward generation should be completed by the end of the iteration.
+
+Current Iteration: {curr_iteration_num} / Max Iteration: {max_iteration_num} ({perc_iteration})

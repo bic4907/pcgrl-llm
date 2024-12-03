@@ -3,41 +3,40 @@ import datetime
 import os, re, ast, sys, time, argparse, json, pickle
 import pprint
 import shutil
-import multiprocessing
 import traceback
 import warnings
 from copy import deepcopy
-import random
 
-import pandas as pd
 import numpy as np
-from os import path
-import tempfile
+
 from os.path import abspath, basename
 import logging
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from sklearn.cluster import KMeans
-from transformers.models.esm.openfold_utils import permute_final_dims
 
-from conf.config import TrainLLMConfig, TrainConfig, Config
+
+from conf.config import TrainLLMConfig, Config
 from envs.probs.binary import BinaryTiles
-from envs.probs.dungeon import DungeonTiles
+
 from envs.probs.dungeon2 import Dungeon2Tiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
+from pcgrllm.utils.path_utils import init_config
 from pcgrllm.validate_reward import run_validate, read_file
 
 logging.getLogger('openai').setLevel(logging.WARNING)
 logging.getLogger('httpcore').setLevel(logging.WARNING)
 logging.getLogger('httpx').setLevel(logging.WARNING)
-
+logging.getLogger('jax').setLevel(logging.WARNING)
 
 from pcgrllm.llm_client.llm import ChatContext, UnifiedLLMClient
 from pcgrllm.llm_client.utils import *
 
 # Configure logging
 log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+# set logging level to DEBUG
+logging.basicConfig(level=getattr(logging, log_level, logging.DEBUG))
 logger = logging.getLogger(basename(__file__))
-logger.setLevel(getattr(logging, log_level, logging.INFO))
+logger.setLevel(getattr(logging, log_level, logging.DEBUG))
 
 PE_DIR = 'pe'
 FEATURE_DIR = 'feature'
@@ -69,7 +68,7 @@ class RewardGenerator:
         self.branch_factor = config.get('branch_factor', None)
 
         self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
-        self.file_path = path.join(self.shared_storage_path, 'prompt')
+        self.file_path = path.join(self.shared_storage_path, 'prompt', self.config['task'])
 
         self.prev_eval_result = config.get('prev_eval_result', None)
         self.auxiliary_prompt_path = config.get('auxiliary_prompt_path', None)
@@ -84,8 +83,7 @@ class RewardGenerator:
         self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
         self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
 
-        self.task_description = file_to_string(path.join(self.file_path, "task_description.txt"))
-        # self.second_user = file_to_string(path.join(self.file_path, "second_user.txt"))
+        self.task_description = file_to_string(path.join(self.file_path, "task.txt"))
 
         self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
 
@@ -173,7 +171,8 @@ class RewardGenerator:
                 if n_response != 1:
                     generated_responses = [response[0] for response in responses]
                     generated_contexts = [response[1] for response in responses]
-                    index = self.response_cluster(generated_responses, n_clusters=3)
+                    index = 1
+                    # ndex = self.response_cluster(generated_responses, n_clusters=3)
                 else:
                     response = responses[0][0]
                     context = responses[0][1]
@@ -198,7 +197,7 @@ class RewardGenerator:
         else:
             return response, context
 
-    def run(self):
+    def run(self, return_error: bool = False):
 
         is_success = False
 
@@ -296,30 +295,34 @@ class RewardGenerator:
             return reward_function_file_path
         else:
             self.logging(f"Failed to generate the reward function: {reward_function_name}", logging.WARNING)
-            return False
 
-    def response_cluster(self, responses, n_clusters=2):
-        # set environment variable for
+            if return_error:
+                return False, generating_function_error
+            else:
+                return False
 
-        os.environ['TOKENIZERS_PARALLELISM'] = 'false'
-
-        model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
-        embeddings = model.encode(responses)
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-        labels = kmeans.fit_predict(embeddings)
-
-        clusters = {}
-        for i, label in enumerate(labels):
-            if label not in clusters:
-                clusters[label] = []
-            clusters[label].append(i)
-
-        largest_cluster = max(clusters.values(), key=len)
-        largest_cluster_embeddings = embeddings[largest_cluster]
-
-        cluster_center = np.mean(largest_cluster_embeddings, axis=0)
-        index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
-        return index
+    # def response_cluster(self, responses, n_clusters=2):
+    #     # set environment variable for
+    #
+    #     os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+    #
+    #     model = SentenceTransformer('paraphrase-MiniLM-L6-v2')
+    #     embeddings = model.encode(responses)
+    #     kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    #     labels = kmeans.fit_predict(embeddings)
+    #
+    #     clusters = {}
+    #     for i, label in enumerate(labels):
+    #         if label not in clusters:
+    #             clusters[label] = []
+    #         clusters[label].append(i)
+    #
+    #     largest_cluster = max(clusters.values(), key=len)
+    #     largest_cluster_embeddings = embeddings[largest_cluster]
+    #
+    #     cluster_center = np.mean(largest_cluster_embeddings, axis=0)
+    #     index = min(largest_cluster, key=lambda i: np.linalg.norm(embeddings[i] - cluster_center))
+    #     return index
 
     def set_execution_config(self, config: Config):
         self.logging(f"Setting the execution config: {config}", logging.INFO)
@@ -374,7 +377,7 @@ class RewardGenerator:
         initial_user = copy.deepcopy(self.initial_user)
 
         # get the prompt file from the task dir
-        task_file = path.join(self.file_path, TASK_DIR, f"{self.task}.txt")
+        task_file = path.join(self.file_path, 'task.txt')
         task_prompt = file_to_string(task_file)
 
         task_prompt.format(target_character=self.config['target_character'])
@@ -686,10 +689,10 @@ class RewardGenerator:
         return result
 
 
-def generate_reward(config: Config, generate_args: dict):
+def generate_reward(config: Config, generate_args: dict, return_error: bool = False):
     reward_generator = RewardGenerator(generate_args)
     reward_generator.set_execution_config(config)
-    return reward_generator.run()
+    return reward_generator.run(return_error=return_error)
 
 
 if __name__ == "__main__":
@@ -698,15 +701,15 @@ if __name__ == "__main__":
     parser.add_argument('--shared_storage_path', type=str, default=abspath('.'))
     parser.add_argument('--postfix', type=str, default=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     parser.add_argument('--reward_functions_dir', type=str, default='RewardFunctions')
-    parser.add_argument('--gpt_model', type=str, default='gpt-4o-mini')
+    parser.add_argument('--gpt_model', type=str, default='gpt-4o')
     parser.add_argument('--gpt_max_token', type=int, default=4096)
     parser.add_argument('--verbose', default=False, action='store_true')
     parser.add_argument('--current_inner', type=int, default=1)
     parser.add_argument('--task', type=str, default='alphabet')
     parser.add_argument('--available_tiles', type=list, default=list())
     parser.add_argument('--arbitrary_dataset', type=str, default='./example/random_dataset.txt')
-    parser.add_argument('--n_codegen_trials', type=int, default=2)
-    parser.add_argument('--n_codefix_trials', type=int, default=2)
+    parser.add_argument('--n_codegen_trials', type=int, default=1)
+    parser.add_argument('--n_codefix_trials', type=int, default=5)
     parser.add_argument('--iteration_num', type=int, default=1)
     parser.add_argument('--previous_reward_function', type=str, default=None)
     parser.add_argument('--map_width', type=int, default=16)
@@ -721,8 +724,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     args = vars(args)
-    reward_generator = RewardGenerator(args)
 
-    reward_generator.set_execution_config(TrainLLMConfig())
+    train_config = TrainLLMConfig()
+    init_config(train_config)
+
+    reward_generator = RewardGenerator(args)
+    reward_generator.set_execution_config(train_config)
 
     reward_generator.run()

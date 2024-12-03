@@ -54,13 +54,13 @@ class Dungeon3Problem(Problem):
     tile_probs = {
         Dungeon3Tiles.BORDER: 0.0,
         Dungeon3Tiles.EMPTY: 0.58,
-        Dungeon3Tiles.WALL: 0.3,
+        Dungeon3Tiles.WALL: 0.5,
         Dungeon3Tiles.PLAYER: 0.00, # Don't place this block on initialization
-        Dungeon3Tiles.KEY: 0.02,
+        Dungeon3Tiles.KEY: 0.005,
         Dungeon3Tiles.DOOR: 0.00,  # Don't place this block on initialization
-        Dungeon3Tiles.BAT: 0.02,
-        Dungeon3Tiles.SCORPION: 0.02,
-        Dungeon3Tiles.SPIDER: 0.02,
+        Dungeon3Tiles.BAT: 0.01,
+        Dungeon3Tiles.SCORPION: 0.01,
+        Dungeon3Tiles.SPIDER: 0.01,
     }
     tile_probs = tuple(idx_dict_to_arr(tile_probs))
 
@@ -76,7 +76,7 @@ class Dungeon3Problem(Problem):
     tile_nums = tuple(tile_nums)
 
     # Passible tiles 등록하기
-    passable_tiles = jnp.array([Dungeon3Tiles.EMPTY, Dungeon3Tiles.KEY,])
+    passable_tiles = jnp.array([Dungeon3Tiles.EMPTY, Dungeon3Tiles.KEY, Dungeon3Tiles.DOOR, Dungeon3Tiles.PLAYER, Dungeon3Tiles.BAT, Dungeon3Tiles.SCORPION, Dungeon3Tiles.SPIDER])
 
     def __init__(self, map_shape, ctrl_metrics, pinpoints, randomize_start_pos):
         self.flood_path_net = FloodPath()
@@ -228,5 +228,3 @@ class Dungeon3Problem(Problem):
 
     def draw_path(self, lvl_img,env_map, border_size, path_coords_tpl, tile_size):
         return lvl_img
-
-

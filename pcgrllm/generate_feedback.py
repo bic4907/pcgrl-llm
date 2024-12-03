@@ -40,8 +40,8 @@ class FeedbackGenerator:
         self.iteration = self.storage.get_iteration(config['iteration'])
         assert self.iteration is not None, f"Iteration {config['iteration']} not found in {self.config['exp_path']}."
 
-        self._system_template = open(join(dirname(__file__), 'prompt', 'feedback_system.txt'), 'r').read()
-        self._user_template = open(join(dirname(__file__), 'prompt', 'feedback_user.txt'), 'r').read()
+        self._system_template = open(join(dirname(__file__), 'prompt', self.config['task'], 'feedback_system.txt'), 'r').read()
+        self._user_template = open(join(dirname(__file__), 'prompt', self.config['task'], 'feedback_user.txt'), 'r').read()
 
         # Create feedback folder inside exp_path
 

@@ -4,13 +4,14 @@ from os.path import dirname, join, basename
 
 from pcgrllm.evaluation.base import *
 from pcgrllm.llm_client.llm import UnifiedLLMClient, ChatContext
+from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.utils.storage import Iteration
 
 class LLMEvaluator(LevelEvaluator):
     def __init__(self, gpt_model: str, seed: int, n_generation_trials: int = 1, **kwargs):
         super().__init__(**kwargs)
 
-        self.prompt_template_path = path.join(path.dirname(path.abspath(__file__)), '..', 'prompt', 'evaluation', 'llm_evaluation.txt')
+        self.prompt_template_path = path.join(path.dirname(path.abspath(__file__)), '..', 'prompt', self.task, 'evaluation', 'llm_evaluation.txt')
         with open(self.prompt_template_path, 'r') as f:
             self.prompt_template = f.read()
 
@@ -19,16 +20,14 @@ class LLMEvaluator(LevelEvaluator):
         self.n_generation_trials = n_generation_trials
         self.seed = seed
 
-    def run(self, iteration: Iteration, target_character: str, use_train: bool = False) -> EvaluationResult:
+    def run(self, iteration: Iteration, target_character: str, use_train: bool = False, step_filter=None) -> EvaluationResult:
         # if the target_character is not alphabet, return 0
-        if len(target_character) >= 2 or (not target_character.isalpha()):
-            return EvaluationResult(similarity=0, diversity=0, sample_size=0)
 
         if use_train is True:
             self.logging("LLM evaluator is only for inference. Use ViT evaluator for training.")
             exit(1)
 
-        numpy_files = iteration.get_numpy_files()
+        numpy_files = iteration.get_numpy_files(step_filter=step_filter)
         numpy_str = ''
         for idx, numpy_file in enumerate(numpy_files):
             numpy_data = numpy_file.load()
@@ -62,8 +61,8 @@ class LLMEvaluator(LevelEvaluator):
 
                         iteration.set_evaluation_context(context.to_json())
 
-                        return EvaluationResult(similarity=parsed_response.get('similarity'),
-                                                diversity=parsed_response.get('diversity'),
+                        return EvaluationResult(task=self.task,
+                                                **parsed_response,
                                                 sample_size=len(numpy_files))
                     except Exception as e:
                         self.logging(f"Model call failed on attempt {attempts + 1}: {e}")
@@ -119,11 +118,23 @@ if __name__ == '__main__':
     logger = logging.getLogger(basename(__file__))
     logger.setLevel(logging.DEBUG)
 
-    evaluator = LLMEvaluator(logger=logger, gpt_model='gpt-4o', seed=3)
+    # Alphabet Task
+    # evaluator = LLMEvaluator(logger=logger, gpt_model='gpt-4o', seed=3)
+    #
+    # # Define the letters and the base path for the evaluations
+    # letters = ['A', 'B']
+    # base_path = join(dirname(__file__), 'example')
+    #
+    # # Run the cross-validation and show sorted results with visualization enabled
+    # run_cross_validation(evaluator, letters, base_path)
 
-    # Define the letters and the base path for the evaluations
-    letters = ['A', 'B']
-    base_path = join(dirname(__file__), 'example')
 
-    # Run the cross-validation and show sorted results with visualization enabled
-    run_cross_validation(evaluator, letters, base_path)
+
+    # Scenario Task
+    evaluator = LLMEvaluator(task=TaskType.Scenario, logger=logger, gpt_model='gpt-4o', seed=3)
+    iteration = Iteration.from_path(join(dirname(__file__), 'example', 'scenario_1', 'iteration_1'))
+    scenario_num = '1'
+    scenario = ScenarioPreset().scenarios[scenario_num]
+
+    result = evaluator.run(iteration=iteration, target_character=scenario.prompt)
+    print(result)

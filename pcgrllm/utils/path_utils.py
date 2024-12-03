@@ -1,19 +1,24 @@
 import json
 import os
-
+import logging
 import gymnax
 import jax
 import numpy as np
 import yaml
+from os.path import basename
 
 from conf.config import Config, EvoMapConfig, SweepConfig, TrainConfig
 from envs.candy import Candy, CandyParams
 from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, RepEnum, get_prob_cls
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
-from envs.probs.binary import BinaryProblem
-from envs.probs.problem import Problem
-from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, \
+from models import ActorCritic, ActorCriticPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, \
     NCA, SeqNCA
+from pcgrllm.scenario_preset import Scenario, ScenarioPreset
+from pcgrllm.task import TaskType
+
+log_level = os.getenv('LOG_LEVEL', 'INFO').upper()  # Add the environment variable ;LOG_LEVEL=DEBUG
+logger = logging.getLogger(basename(__file__))
+logger.setLevel(getattr(logging, log_level, logging.INFO))
 
 
 def get_exp_dir_evo_map(config: EvoMapConfig):
@@ -36,12 +41,18 @@ def is_default_hiddims(config: Config):
 
 def get_exp_group(config):
     if config.env_name == 'PCGRL':
+
+        # task
         config_dict = {
             'pe': config.pe,
             'it': config.total_iterations,
             'fit': config.evaluator,
             'exp': config.exp_name,
         }
+
+        if config.task != 'alphabet':
+            task = config.task[:3]
+            config_dict['t'] = task
 
         # key와 value를 '_'로 구분하여 join
         exp_group = os.path.join(
@@ -103,6 +114,17 @@ def get_exp_dir(config):
 def init_config(config: Config):
     config.n_gpus = jax.local_device_count()
 
+    # problem
+    if config.task == 'scenario' and config.problem != 'dungeon3':
+        config.problem = 'dungeon3'
+        logger.log(logging.INFO, f"Changing config.problem to dungeon3 for scenario task")
+
+    # Validate if the evaluator is supported
+    if config.task == TaskType.Alphabet and config.evaluator not in {'llm', 'hr', 'vit'}:
+        raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")
+    elif config.task == TaskType.Scenario and config.evaluator not in {'hr', 'llm'}:
+        raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")
+
     if config.representation in set({'wide', 'nca'}):
         # TODO: Technically, maybe arf/vrf size should affect kernel widths in (we're assuming here) the NCA model?
         config.arf_size = config.vrf_size = config.map_width
@@ -127,6 +149,7 @@ def init_config(config: Config):
 
     config._vid_dir = os.path.join(config.exp_dir, 'videos')
     config._img_dir = os.path.join(config.exp_dir, 'images')
+    config._numpy_dir = os.path.join(config.exp_dir, 'numpy')
 
     if config.model == 'seqnca':
         config.hidden_dims = config.hidden_dims[:1]
@@ -136,6 +159,14 @@ def init_config(config: Config):
         if config.total_iterations >= 2:
             print("Total iterations must be less than 2 for IO PE. Did you forget to change the 'pe=' argument?")
             exit(0)
+
+    if config.task == 'scenario':
+        try:
+            ScenarioPreset().scenarios[str(config.target_character)]
+        except:
+            print(f"Could not find scenario with condition: {config.target_character}")
+            exit(0)
+
 
     return config
 

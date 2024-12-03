@@ -9,18 +9,24 @@ import numpy as np
 import jax.numpy as jnp
 import yaml
 import imageio
+
 import wandb
 from conf.config import Config, EvoMapConfig, SweepConfig, TrainConfig
 from envs.candy import Candy, CandyParams
 from envs.pcgrl_env import PROB_CLASSES, PCGRLEnvParams, PCGRLEnv, ProbEnum, RepEnum, get_prob_cls, \
     gen_dummy_queued_state
 from envs.play_pcgrl_env import PlayPCGRLEnv, PlayPCGRLEnvParams
+from envs.probs.problem import draw_solutions
+from envs.solution import get_solution_jit
 from marl.model import ActorRNN, ActorCategorical
 from marl.wrappers.baselines import MultiAgentWrapper
 from models import ActorCritic, ActorCriticPCGRL, ActorCriticPlayPCGRL, AutoEncoder, ConvForward, ConvForward2, Dense, NCA, SeqNCA
 from pcgrllm.evaluation import EvaluationResult
+from pcgrllm.evaluation.base import LevelEvaluator
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
+from pcgrllm.evaluation.solution import SolutionEvaluator
 from pcgrllm.evaluation.vit import ViTEvaluator
+from pcgrllm.task import TaskType
 from pcgrllm.utils.storage import Iteration
 
 
@@ -308,9 +314,9 @@ def load_sweep_hypers(cfg: SweepConfig):
     return hypers, eval_hypers
 
 
-def run_evaluation(config: Config, logger) -> Optional[EvaluationResult]:
+def run_evaluation(config: Config, evaluator: LevelEvaluator, step_filter=None) -> Optional[EvaluationResult]:
 
-    evaluator = ViTEvaluator(logger=logger)
+
     iteration = Iteration.from_path(config.exp_dir)
 
     # if exp_dir includes 'iteration', then it is a path to the iteration directory
@@ -319,7 +325,14 @@ def run_evaluation(config: Config, logger) -> Optional[EvaluationResult]:
     else:
         iteration.iterative_mode = False
 
-    result = evaluator.run(iteration=iteration, target_character=config.target_character, use_train=True)
+    evaluator_params = dict()
+    if config.task == TaskType.Alphabet:
+        evaluator_params['target_character'] = config.target_character
+    elif config.task == TaskType.Scenario:
+        evaluator_params['scenario_num'] = int(config.target_character)
+
+    result = evaluator.run(iteration=iteration, use_train=True,
+                           step_filter=step_filter, **evaluator_params)
 
     return result
 
@@ -372,18 +385,33 @@ def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_p
         states = jax.tree.map(lambda x, y: jnp.concatenate([x[None], y], axis=0), init_state, states)
         # 첫 번째 환경의 상태만 선택 (2번째 차원의 첫 번째 인덱스 선택)
         first_env_state = jax.tree_map(lambda x: x[:, 0], states.env_state)
-
-        # 첫 번째 환경 상태를 렌더링
+        first_env_last_state = first_env_state.env_map[-1]
 
         frames = jax.vmap(env.render)(first_env_state)
 
-        return frames
+        if config.task == TaskType.Scenario:
+            solution = get_solution_jit(first_env_last_state)
+            final_frame = frames[-1]
+            final_frame = draw_solutions(final_frame, solution, env.prob.tile_size, np.array((1, 1)))
+            # stack the final frame to the frames duplicating 10 images
+            frames = jnp.concatenate([frames, jnp.stack([final_frame] * 10)], axis=0)
+
+        # pass states to save them as "npy" files
+        return frames, states
+
 
     # JIT compile the simulation function for better performance
     return jax.jit(sim_render_episode)
 
-def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str = None, t: int = 0,
-                    max_steps: int = 0, logger=None, metric=None, config: Config = None):
+def render_callback(frames,
+                    states,
+                    video_dir: str = None,
+                    image_dir: str = None,
+                    numpy_dir: str = None,
+                    t: int = 0,
+                    logger=None,
+                    config: Config = None):
+
     fps = 60  # 초당 프레임 수
 
 
@@ -410,6 +438,46 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
             wandb.log({key_name: wandb.Video(video_path, fps=fps, format="gif"), 'train/step': t})
 
+    if numpy_dir is None:
+        warnings.warn("numpy_dir is not set. Skipping image numpy.")
+    else:
+        if not os.path.exists(numpy_dir):
+            os.makedirs(numpy_dir, exist_ok=True)
+
+        levels = states.env_state.env_map[-1, :10, ...]
+
+        # save with level_0.npy, level_1.npy, ...
+        for idx, level in enumerate(levels):
+            numpy_path = os.path.join(numpy_dir, f"level_{t}_{idx}.npy")
+            np.save(numpy_path, level)
+
+        if logger is not None:
+            logger.info(f"Saved {len(levels)} npy files to {numpy_dir}/level_{t}_*.npy")
+        else:
+            print(f"Saved {len(levels)} npy files to {numpy_dir}/level_{t}_*.npy")
+
+        # evaluate
+        if config is not None:
+            if config.task == TaskType.Scenario:
+
+                evaluator = SolutionEvaluator(logger=logger, task=config.task)
+                result = run_evaluation(config, evaluator, step_filter=f"{t}")
+
+                if logger is not None:
+                    if wandb.run is not None:
+                        result_dict = result.to_dict()
+
+                        for key, value in result_dict.items():
+                            if key == 'task': continue
+
+                            key_name = f"Iteration_{config.current_iteration}/train/{key}" if config.current_iteration > 0 else f"Train/{key}"
+                            wandb.log({key_name: value, 'train/step': t})
+
+                    logger.info(f"global step={t}; {str(result.to_dict())}")
+                else:
+                    print(f"global step={t}; {str(result.to_dict())}")
+
+
     # 마지막 프레임을 PNG로 저장
     if image_dir is None:
         warnings.warn("image_dir is not set. Skipping image save.")
@@ -431,21 +499,22 @@ def render_callback(env: PCGRLEnv, frames, video_dir: str = None, image_dir: str
 
             wandb.log({key_name: wandb.Image(image_path), 'train/step': t})
 
-
         # evaluate
         if config is not None:
-            alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
-            # run eval only the target_chracter is in the alphabet
-            if config.target_character in alphabet:
-                result = run_evaluation(config, logger)
-                if logger is not None:
-                    if wandb.run is not None:
-                        key_name = f"Iteration_{config.current_iteration}/train/similarity" if config.current_iteration > 0 else "Train/similarity"
-                        wandb.log({key_name: result.similarity, 'train/step': t})
-                    logger.info(f"global step={t}; similarity={result.similarity:.4f}")
-                else:
-                    print(f"global step={t}; similarity={result.similarity:.4f}")
+            if config.task == TaskType.Alphabet:
 
+                alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                evaluator = ViTEvaluator(logger=logger, task=config.task)
 
+                # run eval only the target_chracter is in the alphabet
+                if config.target_character in alphabet:
+                    result = run_evaluation(config, evaluator, step_filter=f"{t}")
 
+                    if logger is not None:
+                        if wandb.run is not None:
+                            key_name = f"Iteration_{config.current_iteration}/train/similarity" if config.current_iteration > 0 else "Train/similarity"
+                            wandb.log({key_name: result.similarity, 'train/step': t})
+                        logger.info(f"global step={t}; similarity={result.similarity:.4f}")
+                    else:
+                        print(f"global step={t}; similarity={result.similarity:.4f}")

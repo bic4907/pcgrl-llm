@@ -5,13 +5,14 @@ from os.path import basename
 import hydra
 import imageio
 import jax
-from jax import numpy as jnp
+from PIL import Image
 import numpy as np
 
 from conf.config import EnjoyConfig
 from envs.pcgrl_env import PCGRLEnv, render_stats, gen_dummy_queued_state
-from envs.probs.problem import get_loss
-from eval import get_eval_name, init_config_for_eval
+from envs.probs.problem import get_loss, draw_solutions
+from envs.solution import get_solution, get_solution_jit
+from pcgrllm.task import TaskType
 from purejaxrl.experimental.s5.wrappers import LossLogWrapper
 from train import init_checkpointer
 from utils import get_exp_dir, init_network, gymnax_pcgrl_make, init_config
@@ -87,6 +88,13 @@ def main_rollout(enjoy_config: EnjoyConfig):
         for ep_idx in range(enjoy_config.n_eps):
             final_step = (ep_idx + 1) * env.max_steps - 2
             final_frame = frames[final_step, env_idx]
+            final_level = env_maps[final_step, env_idx]
+
+            if enjoy_config.task == TaskType.Scenario:
+                solution = get_solution_jit(final_level)
+
+                final_frame = draw_solutions(final_frame, solution, env.prob.tile_size, np.array((1, 1)))
+                final_frame = np.array(final_frame)
 
             # Save the final frame as PNG
             png_name = os.path.join(enjoy_config._img_dir, f"level_{cnt}.png")

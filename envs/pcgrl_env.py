@@ -26,6 +26,8 @@ from envs.reps.turtle import MultiTurtleRepresentation, TurtleRepresentation
 from envs.reps.wide import WideRepresentation
 from envs.reps.nca import NCARepresentation
 from envs.reps.representation import Representation, RepresentationState
+from envs.solution import Solutions, get_solution
+from envs.probs.problem import draw_solutions as render_solution
 from envs.utils import Tiles
 from sawtooth import triangle_wave
 
@@ -43,6 +45,7 @@ PROB_CLASSES = {
     ProbEnum.MAZE: MazeProblem,
     ProbEnum.DUNGEON: DungeonProblem,
     ProbEnum.DUNGEON2: Dungeon2Problem,
+    ProbEnum.DUNGEON3: Dungeon3Problem,
     ProbEnum.MAZE_PLAY: MazePlayProblem,
     ProbEnum.DUNGEON3: Dungeon3Problem,
 }
@@ -278,6 +281,7 @@ class PCGRLEnv(Environment):
                                                 act_shape=act_shape, map_shape=map_shape,
                                                 pinpoints=self.pinpoints,
                                                 tile_nums=self.prob.tile_nums,
+                                                unavailable_tiles=self.unavailable_tiles,
                                                 max_board_scans=env_params.max_board_scans,
                                                 )
         elif representation == RepEnum.PLAYER:
@@ -302,7 +306,8 @@ class PCGRLEnv(Environment):
     @partial(jax.jit, static_argnames=('self',))
     def reset_env(self, rng, env_params: PCGRLEnvParams, queued_state: QueuedState) \
             -> Tuple[chex.Array, PCGRLEnvState]:
-        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=jnp.zeros(self.map_shape, dtype=bool))
+
+        queued_map_data = MapData(env_map=queued_state.map, actual_map_shape=jnp.array(self.map_shape), static_map=queued_state.frz_map)
 
         map_data = jax.lax.cond(
             queued_state.has_queued_map,
@@ -398,12 +403,13 @@ class PCGRLEnv(Environment):
             params.change_pct > 0, state.pct_changed >= params.change_pct))
         return done
 
-    def render(self, env_state: PCGRLEnvState):
+    def render(self, env_state: PCGRLEnvState, draw_solutions: bool = False):
         # TODO: Refactor this into problem
         path_coords_tpl = self.prob.get_path_coords(
             env_map=env_state.env_map,
             prob_state=env_state.prob_state)
-        return render_map(self, env_state, path_coords_tpl)
+
+        return render_map(self, env_state, path_coords_tpl, draw_solutions=draw_solutions)
 
     @property
     def default_params(self) -> PCGRLEnvParams:
@@ -433,7 +439,7 @@ class PCGRLEnv(Environment):
         n_dims = len(action_shape)
         act_window_shape = action_shape[:-1]
         n_tile_types = action_shape[-1]
-        return jax.random.randint(rng, act_window_shape, 0, n_tile_types)[None, ...]
+        return jax.random.randint(rng, act_window_shape, 0, self.rep.action_space.n)[None, ...]
 
 
 def gen_dummy_queued_state(env):
@@ -471,7 +477,8 @@ def flatten_obs(obs: PCGRLObs) -> chex.Array:
 
 @partial(jax.jit, static_argnums=(0,))
 def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
-               path_coords_tpl: chex.Array):
+               path_coords_tpl: chex.Array, draw_solutions: bool = False) -> chex.Array:
+
     tile_size = int(env.prob.tile_size)
     env_map = env_state.env_map
     border_size = np.array((1, 1))
@@ -489,14 +496,16 @@ def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
             lvl_img = lvl_img.at[y*tile_size: (y+1)*tile_size,
                                  x*tile_size: (x+1)*tile_size, :].set(tile_img)
 
-    # lvl_img = env.prob.draw_path(lvl_img=lvl_img, env_map=env_map,
-    #                              path_coords_tpl=path_coords_tpl, border_size=border_size, tile_size=tile_size)
+    # task에 따라서 그리는편이 맞지 않을까?
+    lvl_img = env.prob.draw_path(lvl_img=lvl_img, env_map=env_map,
+                                 path_coords_tpl=path_coords_tpl, border_size=border_size, tile_size=tile_size)
 
     clr = (255, 255, 255, 255)
     y_border = jnp.zeros((2, tile_size, 4), dtype=jnp.uint8)
     y_border = y_border.at[:, :, :].set(clr)
     x_border = jnp.zeros((tile_size, 2, 4), dtype=jnp.uint8)
     x_border = x_border.at[:, :, :].set(clr)
+
     if hasattr(env_state.rep_state, 'pos'):
 
         def render_pos(a_pos, lvl_img):
@@ -562,16 +571,18 @@ def render_map(env: PCGRLEnv, env_state: PCGRLEnvState,
         return lvl_img
 
     render_frozen_tiles(lvl_img)
-    # lvl_img = jax.lax.cond(
-    #     # env.static_tile_prob > 0 or env.n_freezies > 0 or env_state.queued_state.has_queued_frz_map,
 
-    #     # The order matters here. If we have concrete_bool, traced_bool, then concrete_bool, there is an issue,
-    #     # but concrete_bool, concrete_bool, traced_bool is fine. LMAO.
-    #     env.static_tile_prob > 0 or env.n_freezies > 0 or env.pinpoints or env_state.queued_state.has_queued_frz_map,
-
-    #     lambda lvl_img: render_frozen_tiles(lvl_img),
-    #     lambda lvl_img: lvl_img,
-    #     lvl_img
+    # def draw_solution(lvl_img):
+    #     solutions = get_solution(env_state.env_map)
+    #     # def draw_solution(lvl_img, env_map, border_size, solutions, tile_size):
+    #     render_solution(lvl_img=lvl_img, env_map=env_map, border_size=border_size, solutions=solutions,
+    #                     tile_size=tile_size)
+    #
+    # jax.lax.cond(
+    #     draw_solutions,
+    #     lambda _: draw_solution(lvl_img),
+    #     lambda _: lvl_img,
+    #     None,
     # )
 
     return lvl_img

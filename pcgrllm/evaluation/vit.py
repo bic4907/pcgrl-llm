@@ -20,14 +20,14 @@ class ViTEvaluator(LevelEvaluator):
         self.processor = AutoImageProcessor.from_pretrained(model_name)
         self.model = AutoModelForImageClassification.from_pretrained(model_name).to(self.device)
 
-    def run(self, iteration: Iteration, target_character: str, use_train: bool = False) -> EvaluationResult:
+    def run(self, iteration: Iteration, target_character: str, use_train: bool = False, step_filter=None) -> EvaluationResult:
         # if the target_chracater is not alphabet, return 0
         if len(target_character) >= 2 or (not target_character.isalpha()):
             return EvaluationResult(similarity=0, diversity=0, sample_size=0)
 
         target_character = target_character.upper()
 
-        image_files = iteration.get_images(use_train)
+        image_files = iteration.get_images(train=use_train, step_filter=step_filter)
 
         trials = [image_file.path for image_file in image_files]
         similarity_rate = 0
@@ -59,10 +59,10 @@ class ViTEvaluator(LevelEvaluator):
                 diversity = 0
 
             # return similarity, diversity
-            return EvaluationResult(similarity=similarity, diversity=diversity, sample_size=total_trials)
+            return EvaluationResult(task=self.task, similarity=similarity, diversity=diversity, sample_size=total_trials)
         else:
             print("No valid images found in the source folder.")
-            return EvaluationResult(similarity=float('-inf'), diversity=float('-inf'), sample_size=0)
+            return EvaluationResult(task=self.task, similarity=float('-inf'), diversity=float('-inf'), sample_size=0)
 
     def predict(self, file_path: str):
         image = Image.open(file_path).convert("RGBA")

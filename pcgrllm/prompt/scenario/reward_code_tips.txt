@@ -1,0 +1,22 @@
+### Delta Reward
+Calculating rewards based only on the current state can result in a large reward magnitude, which may lead to overly significant updates in the agent's weights during reinforcement learning. To mitigate this, the reward for a particular action should be computed based on the difference between the current and previous states, known as the delta reward. This can be represented as:
+**R = R(S_(t)) - R(S_(t-1))**
+
+This approach allows rewards to reflect the improvement between the current and previous states:
+**reward = current_reward - previous_reward** (Reward for maximize the current reward)
+
+If multiple factors influence the reward calculation, calculate the difference for each factor separately, then add them to the total reward. When different weights apply to each factor, calculate the difference, multiply it by the weight, and add it to the reward. For example:
+
+
+
+### General Reward Function
+
+- The reward function should work across diverse level sizes, considering varying widths and heights.
+- To generate various target shapes, avoid creating hard-coded levels.
+
+---
+
+### Format
+- Do not use "`", double quotes, and single quotes character in the reward code and notes for the parsing from the response.
+- Import the necessary library for the reward function code. (i.e., import jax.numpy as jnp)
+- Make sure the empty space of the level is represented as 1, not 0. The unpassible tile (wall) should be represented as 2.

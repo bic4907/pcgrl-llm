@@ -104,6 +104,7 @@ class Config:
     task: str = "alphabet"
 
     randomize_start_pos: bool = False
+    use_preset_level: bool = True
 
 
 @dataclass
@@ -209,6 +210,7 @@ class MultiAgentConfig(TrainConfig):
     _exp_dir: Optional[str] = None
     _ckpt_dir: Optional[str] = None
     _vid_dir: Optional[str] = None
+    _numpy_dir: Optional[str] = None
     ###########################################################################
 
 @dataclass

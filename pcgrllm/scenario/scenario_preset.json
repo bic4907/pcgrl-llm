@@ -1,0 +1,32 @@
+{
+    "base_prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: {monsters}.The players can figure out all of monsters when they play the level several times.",
+    "scenarios": {
+        "0": {
+            "prompt": "A player, a key, a door, and a bat.",
+            "important_tiles": [
+                4
+            ]
+        },
+        "1": {
+            "prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: BAT.The players can figure out all of monsters when they play the level several times.",
+            "important_tiles": [
+                4
+            ]
+        },
+        "2": {
+            "prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: BAT, SCORPION.The players can figure out all of monsters when they play the level several times.",
+            "important_tiles": [
+                4,
+                5
+            ]
+        },
+        "3": {
+            "prompt": "The 'Player' needs to obtain the Key and escape through the 'Door'.To pick up the key, the player must encounter one of monsters: BAT, SCORPION, SPIDER.The players can figure out all of monsters when they play the level several times.",
+            "important_tiles": [
+                4,
+                5,
+                6
+            ]
+        }
+    }
+}
