@@ -162,7 +162,7 @@ def init_config(config: Config):
 
     if config.task == 'scenario':
         try:
-            ScenarioPreset().scenarios[config.target_character]
+            ScenarioPreset().scenarios[str(config.target_character)]
         except:
             print(f"Could not find scenario with condition: {config.target_character}")
             exit(0)

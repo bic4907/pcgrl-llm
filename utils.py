@@ -329,7 +329,7 @@ def run_evaluation(config: Config, evaluator: LevelEvaluator, step_filter=None) 
     if config.task == TaskType.Alphabet:
         evaluator_params['target_character'] = config.target_character
     elif config.task == TaskType.Scenario:
-        evaluator_params['scenario_num'] = config.target_character
+        evaluator_params['scenario_num'] = int(config.target_character)
 
     result = evaluator.run(iteration=iteration, use_train=True,
                            step_filter=step_filter, **evaluator_params)
