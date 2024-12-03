@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 from functools import partial
@@ -8,28 +9,18 @@ import jax.numpy as jnp
 from os.path import dirname, join, basename
 from typing import Tuple
 
-from jax import jit
+from flax import struct
 
 from envs.pathfinding import calc_path_from_a_to_b, check_event, check_event_jit
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from envs.solution import get_solution_jit
-from pcgrllm.evaluation.base import *
+from pcgrllm.evaluation.base import LevelEvaluator, EvaluationResult
 from pcgrllm.scenario_preset import ScenarioPreset
+from pcgrllm.task import TaskType
+from pcgrllm.utils.cuda import get_cuda_version
 from pcgrllm.utils.storage import Iteration
 
 NOT_EXISTS = jnp.array([-1, -1])
-
-TILE_MAP_STR_ENUM = {
-    "BORDER": Dungeon3Tiles.BORDER,
-    "EMPTY": Dungeon3Tiles.EMPTY,
-    "WALL": Dungeon3Tiles.WALL,
-    "PLAYER": Dungeon3Tiles.PLAYER,
-    "BAT": Dungeon3Tiles.BAT,
-    "SCORPION": Dungeon3Tiles.SCORPION,
-    "SPIDER": Dungeon3Tiles.SPIDER,
-    "KEY": Dungeon3Tiles.KEY,
-    "DOOR": Dungeon3Tiles.DOOR,
-}
 
 ENUM_TO_ENCOUNTER_INDEX = {
     Dungeon3Tiles.BAT: 0,
@@ -39,6 +30,28 @@ ENUM_TO_ENCOUNTER_INDEX = {
 
 tile_keys = jnp.array(list(ENUM_TO_ENCOUNTER_INDEX.keys()))
 tile_indices = jnp.array(list(ENUM_TO_ENCOUNTER_INDEX.values()))
+
+CUDA_VERSION = get_cuda_version()
+
+
+@struct.dataclass
+class EvaluationResultStruct:
+    similarity: float = 0
+    diversity: float = 0
+
+    # Scenario generation task
+    playability: float = 0      # If the player can reach to the door
+    path_length: float = 0      # The path length from the player to the door
+    solvability: float = 0      # if the player can reach the door with the key
+    n_solutions: float = 0      # Number of solutions the player can reach the door
+    loss_solutions: float = 0   # Loss of between the target and the current solution count
+    reach_imp_perc: float = 0        # (reachable of important tiles <-> prompt)
+    exist_imp_perc: float = 0      # (existence of important tiles <-> prompt)
+
+    acc_imp_perc: float = 0
+    fp_imp_perc: float = 0
+    fn_imp_perc: float = 0
+
 
 def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     '''
@@ -57,6 +70,7 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     #
     passable_tiles = Dungeon3Problem.passable_tiles
     imp_tiles = ScenarioPreset().scenarios[str(scenario_num)].important_tiles
+    imp_tiles = jnp.array(imp_tiles)
 
     p_xy = jnp.argwhere(level == Dungeon3Tiles.PLAYER, size=1, fill_value=-1)[0]
     d_xy = jnp.argwhere(level == Dungeon3Tiles.DOOR, size=1, fill_value=-1)[0]
@@ -94,11 +108,11 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
             _xy
         )
 
-    # jax.debug.print('before jax.vmap(process_important_tile)(jnp.array(imp_tiles)): {}', imp_tiles)
-    # Use vmap to process all important tiles in parallel
-    imp_tiles = jnp.array([TILE_MAP_STR_ENUM[tile] for tile in imp_tiles])
-    imp_tile_results = jax.vmap(process_important_tile)(jnp.array(imp_tiles))
-    jax.debug.print('after jax.vmap(process_important_tile)(jnp.array(imp_tiles)): {}', imp_tile_results)
+    if CUDA_VERSION is None or CUDA_VERSION > 12:
+        imp_tile_results = jax.lax.map(process_important_tile, imp_tiles)
+    else:
+        imp_tile_results = jax.vmap(process_important_tile)(jnp.array(imp_tiles))
+
     # Summing results
     n_exist_imp_tiles = jnp.sum(imp_tile_results[0])  # Count of existing important tiles
     n_reach_imp_tiles = jnp.sum(imp_tile_results[1])   # Count of reachable important tiles
@@ -144,8 +158,7 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     false_positive = false_positive / len(imp_tiles)
     false_negative = false_negative / len(imp_tiles)
 
-    return EvaluationResult(
-        task=TaskType.Scenario,
+    return EvaluationResultStruct(
         playability=playability,
         path_length=path_length,
         solvability=solvability,
@@ -156,10 +169,22 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
         acc_imp_perc=correct_count,
         fp_imp_perc=false_positive,
-        fn_imp_perc=false_negative,
+        fn_imp_perc=false_negative)
 
-        sample_size=1)
 
+def eval_level_jax(levels, scenario_num):
+
+    def eval_level_wrapper(level):
+        return eval_level(level, scenario_num=scenario_num)
+
+    # CUDA 버전에 따라 병렬 처리 방식 선택
+    if CUDA_VERSION is None or CUDA_VERSION > 12:
+        results = jax.vmap(eval_level_wrapper)(levels)
+    else:
+        results = jax.lax.map(eval_level_wrapper, levels)
+
+    return (results.playability, results.path_length, results.solvability, results.n_solutions, results.loss_solutions,
+            results.reach_imp_perc, results.exist_imp_perc, results.acc_imp_perc, results.fp_imp_perc, results.fn_imp_perc)
 
 
 class SolutionEvaluator(LevelEvaluator):
@@ -167,32 +192,15 @@ class SolutionEvaluator(LevelEvaluator):
         super().__init__(**kwargs)
 
 
-    def run(self, iteration: Iteration, scenario_num: str, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
+    def run(self, iteration: Iteration, scenario_num: str = None, target_character: str = None, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
         numpy_files = iteration.get_numpy_files(train=use_train, step_filter=step_filter)
+
+        scenario_num = scenario_num if scenario_num is not None else target_character
 
         # 로드한 numpy 파일을 JAX 배열로 변환
         levels = jnp.array([numpy_file.load() for numpy_file in numpy_files])
 
-        # JAX에서 사용 가능한 eval_level 함수로 작성되어야 함
-        def eval_level_jax(level):
-            # eval_level 함수가 JAX와 호환되도록 구현되어야 함
-            result = eval_level(level, scenario_num=scenario_num)
-            return (
-                result.playability,
-                result.path_length,
-                result.solvability,
-                result.n_solutions,
-                result.loss_solutions,
-                result.reach_imp_perc,
-                result.exist_imp_perc,
-                result.acc_imp_perc,
-                result.fp_imp_perc,
-                result.fn_imp_perc
-            )
-
-        # 병렬화를 적용
-        # eval_results = jax.vmap(eval_level_jax)(levels)
-        eval_results = eval_level_jax(levels[0])
+        eval_results = eval_level_jax(levels=levels, scenario_num=scenario_num)
 
         # 결과를 개별적으로 계산
         (playability, path_length, solvability, n_solutions, loss_solutions, reach_imp_tiles,

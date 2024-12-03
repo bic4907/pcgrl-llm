@@ -122,7 +122,7 @@ def init_config(config: Config):
     # Validate if the evaluator is supported
     if config.task == TaskType.Alphabet and config.evaluator not in {'llm', 'hr', 'vit'}:
         raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")
-    elif config.task == TaskType.Scenario and config.evaluator not in {'hr'}:
+    elif config.task == TaskType.Scenario and config.evaluator not in {'hr', 'llm'}:
         raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")
 
     if config.representation in set({'wide', 'nca'}):
@@ -162,7 +162,7 @@ def init_config(config: Config):
 
     if config.task == 'scenario':
         try:
-            ScenarioPreset().scenarios[config.target_character]
+            ScenarioPreset().scenarios[str(config.target_character)]
         except:
             print(f"Could not find scenario with condition: {config.target_character}")
             exit(0)
