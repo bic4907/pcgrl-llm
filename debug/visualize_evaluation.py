@@ -96,7 +96,7 @@ if __name__ == '__main__':
 
     # levels = AllLevels[]
     levels = AllLevels[:]
-    scenario_num = 3
+    scenario_num = 2
 
     for idx, level in tqdm(enumerate(levels), desc="Processing Levels", total=len(levels)):
         # Render level as numpy array

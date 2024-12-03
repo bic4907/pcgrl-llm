@@ -31,8 +31,11 @@ class EvaluationResult:
     acc_imp_perc: float = 0
     fp_imp_perc: float = 0
     fn_imp_perc: float = 0
+    tp_imp_perc: float = 0
+    tn_imp_perc: float = 0
 
-    attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'acc_imp_perc', 'exist_imp_perc']
+    attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'reach_imp_perc',
+                     'exist_imp_perc', 'acc_imp_perc', 'fp_imp_perc', 'fn_imp_perc', 'tp_imp_perc', 'tn_imp_perc']
 
     def __init__(self, task: TaskType, **kwargs):
 
@@ -75,7 +78,9 @@ class EvaluationResult:
                 'exist_imp_perc': float(self.exist_imp_perc),
                 'acc_imp_perc': float(self.acc_imp_perc),
                 'fp_imp_perc': float(self.fp_imp_perc),
-                'fn_imp_perc': float(self.fn_imp_perc)
+                'fn_imp_perc': float(self.fn_imp_perc),
+                'tp_imp_perc': float(self.tp_imp_perc),
+                'tn_imp_perc': float(self.tn_imp_perc)
             }
         else:
             raise ValueError(f"Invalid task type: {self.task}")

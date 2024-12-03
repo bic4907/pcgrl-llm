@@ -11,7 +11,7 @@ from typing import Tuple
 
 from flax import struct
 
-from envs.pathfinding import calc_path_from_a_to_b, check_event, check_event_jit
+from envs.pathfinding import calc_path_from_a_to_b
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from envs.solution import get_solution_jit
 from pcgrllm.evaluation.base import LevelEvaluator, EvaluationResult
@@ -19,6 +19,7 @@ from pcgrllm.scenario_preset import ScenarioPreset
 from pcgrllm.task import TaskType
 from pcgrllm.utils.cuda import get_cuda_version
 from pcgrllm.utils.storage import Iteration
+from pcgrllm.utils.solution_evaluator import create_fixed_size_onehot
 
 NOT_EXISTS = jnp.array([-1, -1])
 
@@ -51,6 +52,8 @@ class EvaluationResultStruct:
     acc_imp_perc: float = 0
     fp_imp_perc: float = 0
     fn_imp_perc: float = 0
+    tp_imp_perc: float = 0
+    tn_imp_perc: float = 0
 
 
 def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
@@ -69,7 +72,6 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
         raise ValueError(f"The level must be 2D array. Got {len(level.shape)}D array.")
     #
     passable_tiles = Dungeon3Problem.passable_tiles
-
     imp_tiles = ScenarioPreset().scenarios[str(scenario_num)].important_tiles
     imp_tiles = jnp.array(imp_tiles)
 
@@ -123,27 +125,18 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     enemy_counter = solutions.enemy_encounter
     enemy_counter_type = jnp.any(jnp.where(enemy_counter > 0, 1, 0), axis=0)
 
-    def convert_to_boolean(imp_tiles):
-        # 모든 타일에 대해 초기값 False 배열 생성
-        result = jnp.zeros(len(tile_indices), dtype=bool)
+    onehot_imp_tiles = create_fixed_size_onehot(imp_tiles).astype(jnp.bool_)
 
-        # imp_tiles를 ENUM_TO_ENCOUNTER_INDEX에서 찾아 매핑
-        mapped_indices = jnp.searchsorted(tile_keys, imp_tiles)
+    correct_count = jnp.sum(onehot_imp_tiles == enemy_counter_type)
 
-        # Boolean 배열에 해당 인덱스를 True로 설정
-        result = result.at[mapped_indices].set(True)
-
-        return result
-
-    # 예제 데이터
-
-    # 호출
-    onehot_imp_tiles = convert_to_boolean(imp_tiles)
-    correct_count = jnp.sum(jnp.where(onehot_imp_tiles == enemy_counter_type, 1, 0))
-
-    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles, jnp.logical_not(enemy_counter_type)))
-    false_positive = jnp.sum(jnp.logical_and(jnp.logical_not(onehot_imp_tiles), enemy_counter_type))
-
+    # True Positive: Predicted as 1 (positive) and actually 1 (positive)
+    true_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 1))
+    # True Negative: Predicted as 0 (negative) and actually 0 (negative)
+    true_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 0))
+    # False Positive: Predicted as 1 (positive) but actually 0 (negative)
+    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0))
+    # False Negative: Predicted as 0 (negative) but actually 1 (positive)
+    false_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 1))
 
     # check if the player and door is connected
     playability = p_t_connected
@@ -157,6 +150,9 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     correct_count = correct_count / len(imp_tiles)
     false_positive = false_positive / len(imp_tiles)
     false_negative = false_negative / len(imp_tiles)
+    true_positive = true_positive / len(imp_tiles)
+    true_negative = true_negative / len(imp_tiles)
+
 
     return EvaluationResultStruct(
         playability=playability,
@@ -169,7 +165,10 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
         acc_imp_perc=correct_count,
         fp_imp_perc=false_positive,
-        fn_imp_perc=false_negative)
+        fn_imp_perc=false_negative,
+        tp_imp_perc=true_positive,
+        tn_imp_perc=true_negative
+    )
 
 
 def eval_level_jax(levels, scenario_num):
