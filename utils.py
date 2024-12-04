@@ -385,7 +385,6 @@ def make_sim_render_episode_single(config: Config, network, env: PCGRLEnv, env_p
         states = jax.tree.map(lambda x, y: jnp.concatenate([x[None], y], axis=0), init_state, states)
         # 첫 번째 환경의 상태만 선택 (2번째 차원의 첫 번째 인덱스 선택)
         first_env_state = jax.tree_map(lambda x: x[:, 0], states.env_state)
-        first_env_state = first_env_state[:-1]
         first_env_last_state = first_env_state.env_map[-1]
 
         frames = jax.vmap(env.render)(first_env_state)
