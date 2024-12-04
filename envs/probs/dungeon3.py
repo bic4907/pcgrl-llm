@@ -56,7 +56,7 @@ class Dungeon3Problem(Problem):
         Dungeon3Tiles.EMPTY: 0.58,
         Dungeon3Tiles.WALL: 0.5,
         Dungeon3Tiles.PLAYER: 0.00, # Don't place this block on initialization
-        Dungeon3Tiles.KEY: 0.005,
+        Dungeon3Tiles.KEY: 0.02,
         Dungeon3Tiles.DOOR: 0.00,  # Don't place this block on initialization
         Dungeon3Tiles.BAT: 0.01,
         Dungeon3Tiles.SCORPION: 0.01,
