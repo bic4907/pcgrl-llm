@@ -87,7 +87,7 @@ class Config:
     # Wandb
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
-    wandb_resume: str = 'auto'
+    wandb_resume: str = 'allow'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
 
     exp_group: Optional[str] = None
@@ -281,7 +281,7 @@ class TrainLLMConfig(Config):
     # Render after this many update steps
     total_timesteps: int = int(5e7)
 
-    render_freq: int = 20
+    render_freq: int = 40
     n_render_eps: int = 3
 
     # eval the model on pre-made eval freezie maps to see how it's doing
