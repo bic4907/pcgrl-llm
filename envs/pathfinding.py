@@ -748,18 +748,16 @@ def check_monster_v2(env_map: chex.Array, route_path: chex.Array, check_distance
         monster.get('6', jnp.array([])).shape[0]  # SPIDER count
     ])
     return monster_counts
-def get_range_with_distance_jax(distance):
-    range_vals = jnp.arange(-distance, distance + 1)
 
-    dx, dy = jnp.meshgrid(range_vals, range_vals, indexing="ij")
-
-    flat_dx = dx.ravel()
-    flat_dy = dy.ravel()
-
-    return flat_dx, flat_dy
 def check_monster_v2_jit(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
     max_path_len = env_map.shape[0]  # Assuming square map
-    dx, dy = get_range_with_distance_jax(distance=check_distance)
+    range_vals = jnp.arange(-check_distance, check_distance + 1)
+
+    uncom_dx, uncom_dy = jnp.meshgrid(range_vals, range_vals, indexing="ij")
+
+    dx = uncom_dx.ravel()
+    dy = uncom_dy.ravel()
+
     monster_types = jnp.array([4, 5, 6], dtype=jnp.int32)  # Define monster types
     def process_point(point, monster_counts, seen_mask):
         y, x = point
