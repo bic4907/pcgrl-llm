@@ -324,7 +324,7 @@ class TrainLLMConfig(Config):
     feedback_input_type: str = 'array' # 'array' or 'image', image requires vision-language model
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
-    n_samples: int = 10
+    n_samples: int = 30
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
     fewshot: bool = False
 
