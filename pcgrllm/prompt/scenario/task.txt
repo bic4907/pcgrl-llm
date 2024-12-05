@@ -1,4 +1,4 @@
-The task is to generate a map that fits the scenario I describe. The reward function should provide higher rewards for maps that closely resemble the scenario I describe.
+The task is to generate a map that fits the scenario. The reward function should provide higher rewards for maps that closely resemble the scenario.
 The reward function takes a level array as input and returns a reward value.
 
 Target scenario: {target_character}
