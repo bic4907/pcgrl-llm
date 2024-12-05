@@ -11,7 +11,7 @@ from typing import Tuple
 
 from flax import struct
 
-from envs.pathfinding import calc_path_from_a_to_b
+from envs.pathfinding import calc_path_from_a_to_b, FloodPath, calc_path_length
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from envs.solution import get_solution_jit
 from pcgrllm.evaluation.base import LevelEvaluator, EvaluationResult
@@ -97,8 +97,10 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
         def tile_exists(_xy):
             _passable_tiles = jnp.append(Dungeon3Problem.passable_tiles, time_num)
-            _dist, _, _ = calc_path_from_a_to_b(level, _passable_tiles, p_xy, _xy)
-            n_acc = jnp.where(_dist > 0, 1, 0)
+            flood_path_net = FloodPath()
+            flood_path_net.init_params(level.shape)
+            path_length, _, _ = calc_path_length(flood_path_net, level, _passable_tiles, Dungeon3Tiles.PLAYER, time_num)
+            n_acc = jnp.where(path_length > 0, 1, 0)
             return 1, n_acc  # Tile exists and may be reachable
 
         def tile_not_exists(_xy):
@@ -133,9 +135,9 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     true_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 1))
     # True Negative: Predicted as 0 (negative) and actually 0 (negative)
     true_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 0))
-    # False Positive: Predicted as 1 (positive) but actually 0 (negative)
-    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0))
     # False Negative: Predicted as 0 (negative) but actually 1 (positive)
+    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0))
+    # False Positive: Predicted as 1 (positive) but actually 0 (negative)
     false_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 1))
 
     # check if the player and door is connected
@@ -147,12 +149,14 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     reach_imp_tiles = n_reach_imp_tiles / len(imp_tiles)
     exist_imp_tiles = n_exist_imp_tiles / len(imp_tiles)
 
-    correct_count = correct_count / len(imp_tiles)
-    false_positive = false_positive / len(imp_tiles)
-    false_negative = false_negative / len(imp_tiles)
-    true_positive = true_positive / len(imp_tiles)
-    true_negative = true_negative / len(imp_tiles)
+    correct_count = correct_count / 3
+    false_positive = false_positive / 3
+    false_negative = false_negative / 3
+    true_positive = true_positive / 3
+    true_negative = true_negative / 3
 
+
+    # jax.debug.print("{}, {}, {}, {}", false_positive, false_negative, true_positive, true_negative)
 
     return EvaluationResultStruct(
         playability=playability,

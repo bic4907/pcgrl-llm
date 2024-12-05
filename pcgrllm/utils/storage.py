@@ -70,7 +70,7 @@ class Iteration:
         fitness = None
 
         if self.get_evaluation():
-            fitness = self.get_evaluation().fitness
+            fitness = self.get_evaluation().total
 
         return (
             f"Iteration {self.iteration_num}\n"
