@@ -2,3 +2,7 @@ The task is to generate a map that fits the scenario. The reward function should
 The reward function takes a level array as input and returns a reward value.
 
 Target scenario: {target_character}
+
+Ensure that the generated map includes a reasonable number of monsters and keys.
+First, create a reward function that minimizes the generation of monsters other than those mentioned above.
+Second, design reward function so that the map does not contain an excessive number of monsters or keys.
