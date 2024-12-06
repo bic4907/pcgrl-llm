@@ -73,7 +73,7 @@ class GraphManager:
 
         # Sort expandable nodes by fitness and select the best one
         if expandable_nodes:
-            parent_node = max(expandable_nodes, key=lambda x: self.storage.get_iteration(x.iteration).get_evaluation().fitness)
+            parent_node = max(expandable_nodes, key=lambda x: self.storage.get_iteration(x.iteration).get_evaluation().total)
 
             # Generate a new child ID by appending the child number to the parent's ID
             new_child_id = f"{parent_node.node_id}-{len(self.get_children(parent_node)) + 1}"
@@ -97,7 +97,7 @@ class GraphManager:
 
         root_node = iteration.node
         if best_marker:
-            best_node = max(self.storage.get_iterations(), key=lambda x: x.get_evaluation().fitness).node
+            best_node = max(self.storage.get_iterations(), key=lambda x: x.get_evaluation().total).node
         else:
             best_node = None
 
@@ -109,7 +109,7 @@ class GraphManager:
         """Helper function to build the tree structure as a single string."""
 
         iteration = self.storage.get_iteration(node.iteration)
-        fitness = iteration.get_evaluation().fitness if iteration else "N/A"
+        fitness = iteration.get_evaluation().total if iteration else "N/A"
 
         # Add markers for best and iteration
         marker = ""
@@ -154,7 +154,7 @@ class GraphManager:
         iterations = [iteration for iteration in iterations if iteration.iteration_num not in excludes]
 
         # Sort iterations based on fitness in descending order
-        best_iterations = sorted(iterations, key=lambda x: x.get_evaluation().fitness, reverse=True)
+        best_iterations = sorted(iterations, key=lambda x: x.get_evaluation().total, reverse=True)
 
         # Get the top n iterations, or all available iterations if there are fewer than n
         best_iteration_nums = [iteration.iteration_num for iteration in best_iterations[:min(max_n, len(best_iterations))]]
