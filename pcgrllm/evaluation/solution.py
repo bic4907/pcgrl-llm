@@ -135,6 +135,11 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     true_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 1))
     # True Negative: Predicted as 0 (negative) and actually 0 (negative)
     true_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 0))
+
+    jax.debug.print("True Positive: {}, True Negative: {}", true_positive, true_negative)
+
+
+
     # False Negative: Predicted as 0 (negative) but actually 1 (positive)
     false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0))
     # False Positive: Predicted as 1 (positive) but actually 0 (negative)
@@ -149,11 +154,11 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     reach_imp_tiles = n_reach_imp_tiles / len(imp_tiles)
     exist_imp_tiles = n_exist_imp_tiles / len(imp_tiles)
 
-    correct_count = correct_count / 3
-    false_positive = false_positive / 3
-    false_negative = false_negative / 3
-    true_positive = true_positive / 3
-    true_negative = true_negative / 3
+    correct_count = correct_count  / 3
+    false_positive = false_positive
+    false_negative = false_negative
+    true_positive = true_positive
+    true_negative = true_negative
 
 
     # jax.debug.print("{}, {}, {}, {}", false_positive, false_negative, true_positive, true_negative)
@@ -187,7 +192,8 @@ def eval_level_jax(levels, scenario_num):
         results = jax.lax.map(eval_level_wrapper, levels)
 
     return (results.playability, results.path_length, results.solvability, results.n_solutions, results.loss_solutions,
-            results.reach_imp_perc, results.exist_imp_perc, results.acc_imp_perc, results.fp_imp_perc, results.fn_imp_perc)
+            results.reach_imp_perc, results.exist_imp_perc, results.acc_imp_perc, results.fp_imp_perc, results.fn_imp_perc,
+            results.tp_imp_perc, results.tn_imp_perc)
 
 
 class SolutionEvaluator(LevelEvaluator):
@@ -207,7 +213,7 @@ class SolutionEvaluator(LevelEvaluator):
 
         # 결과를 개별적으로 계산
         (playability, path_length, solvability, n_solutions, loss_solutions, reach_imp_tiles,
-         exist_imp_tiles, acc_imp_perc, fp_imp_perc, fn_imp_perc) = eval_results
+         exist_imp_tiles, acc_imp_perc, fp_imp_perc, fn_imp_perc, tp_imp_perc, tn_imp_perc) = eval_results
 
         # 평균 계산
         playability = jnp.mean(playability)
@@ -223,6 +229,8 @@ class SolutionEvaluator(LevelEvaluator):
         acc_imp_perc = jnp.mean(acc_imp_perc)
         fp_imp_perc = jnp.mean(fp_imp_perc)
         fn_imp_perc = jnp.mean(fn_imp_perc)
+        tp_imp_perc = jnp.mean(tp_imp_perc)
+        tn_imp_perc = jnp.mean(tn_imp_perc)
 
         sample_size = len(levels)
 
@@ -238,6 +246,8 @@ class SolutionEvaluator(LevelEvaluator):
             acc_imp_perc=acc_imp_perc,
             fp_imp_perc=fp_imp_perc,
             fn_imp_perc=fn_imp_perc,
+            tp_imp_perc=tp_imp_perc,
+            tn_imp_perc=tn_imp_perc,
             sample_size=sample_size)
 
 # Example
