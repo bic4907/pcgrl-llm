@@ -529,7 +529,7 @@ def check_event_jit(
         valid_key_flag = jax.lax.fori_loop(0, exist_keys.shape[0], check_key_exists, True)
 
         def run_check_monster(whole_route):
-            encounter_monster = check_monster_v2_jit(env_map=env_map, route_path=whole_route, check_distance=2)
+            encounter_monster = check_monster_jit(env_map=env_map, route_path=whole_route, check_distance=2)
             return 1, encounter_monster, jnp.concatenate(whole_route, axis=0)
 
         return jax.lax.cond(
@@ -546,171 +546,7 @@ def check_event_jit(
         operand=None
     )
 
-def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
-
-    max_path_len = get_max_path_length_static(map_shape=env_map.shape)
-    dx = [-1, 0, 1, 0]
-    dy = [0, -1, 0, 1]
-
-    monster = {}
-    monster_types = jnp.array([4, 5, 6])
-    monster_countered = jnp.zeros(3, dtype=jnp.int32)
-    env_map = jnp.array(env_map)
-
-    for path in route_path:
-        for point in path:
-            y, x = point  # Assuming point is already a list or tuple
-
-            if x == -1 or y == -1:
-                continue
-
-            for dd in zip(dx, dy):
-                kx, ky = x + dd[0], y + dd[1]
-
-                if kx < 0 or kx >= max_path_len or ky < 0 or ky >= max_path_len:
-                    continue
-
-                key = env_map[ky, kx]
-                key_python = key.item()  # Convert JAX scalar to Python scalar
-
-                # Check for monster types
-                if key_python in monster_types:
-                    key_str = str(key_python)  # Convert to string for dictionary key
-                    if key_str in monster:
-                        monster[key_str] = jnp.unique(jnp.vstack([monster[key_str], jnp.array([(ky, kx)])]), axis=0)
-                    else:
-                        monster[key_str] = jnp.array([(ky, kx)])
-
-    monster_counts = jnp.array([
-        monster.get('4', jnp.array([])).shape[0],  # BAT count
-        monster.get('5', jnp.array([])).shape[0],  # SCORPION count
-        monster.get('6', jnp.array([])).shape[0]  # SPIDER count
-    ])
-    return monster_counts
-
-
-partial(jit, static_argnums=(0, 1))
-def check_monster_jit(env_map: chex.Array, route_path: chex.Array) -> chex.Array:
-    max_path_len = env_map.shape[0]  # Assuming square map
-    dx = jnp.array([-1, 0, 1, 0])
-    dy = jnp.array([0, -1, 0, 1])
-
-    monster_types = jnp.array([4, 5, 6], dtype=jnp.int32)  # Define monster types
-
-    # Process each point
-    def process_point(point, monster_counts, seen_mask):
-        y, x = point
-        # Skip invalid points
-        cond = jnp.logical_or(x == -1, y == -1)
-        monster_counts, seen_mask = jax.lax.cond(
-            cond,
-            lambda payload: payload,
-            lambda payload: process_neighbors(y, x, payload),
-            (monster_counts, seen_mask)
-        )
-        return monster_counts, seen_mask
-
-    # Process neighbors
-    def process_neighbors(y, x, payload):
-        monster_counts, seen_mask = payload
-        kx = x + dx
-        ky = y + dy
-        # Ensure indices are within bounds
-        valid = jnp.logical_and(
-            jnp.logical_and(0 <= kx, kx < max_path_len),
-            jnp.logical_and(0 <= ky, ky < max_path_len)
-        )
-        valid_kx = jnp.where(valid, kx, -1)  # Replace invalid indices with -1
-        valid_ky = jnp.where(valid, ky, -1)
-
-        def check_neighbor(kx, ky, monster_counts, seen_mask):
-            # Ensure kx and ky are valid
-            cond = jnp.logical_or(kx == -1, ky == -1)
-
-            def valid_case(payload):
-                counts, seen_mask = payload
-
-                tgt_tile = env_map[ky, kx]
-                indices = jnp.where(monster_types == tgt_tile, size=1, fill_value=-1)
-
-                def _check_duplicate_cell(payload, xy):
-                    """
-                    Checks if the cell at `xy` has already been seen. If not, updates `seen_mask` and `counts`.
-
-                    Args:
-                        counts: JAX array of monster counts.
-                        xy: JAX array of shape (2,) containing the coordinates [y, x].
-                        seen_mask: JAX array tracking visited cells.
-                        indices: The index of the monster type being processed.
-
-                    Returns:
-                        Updated `counts` and `seen_mask`.
-                    """
-                    counts, seen_mask = payload
-                    y, x = xy[0], xy[1]
-
-                    def not_seen_case(payload):
-                        counts, seen_mask = payload
-
-                        # Mark the cell as seen and update the monster count
-                        seen_mask = seen_mask.at[y, x].set(True)
-                        counts = counts.at[indices].add(1)
-                        return counts, seen_mask
-
-                    # Use jax.lax.cond to decide whether to update
-                    counts, seen_mask = jax.lax.cond(
-                        seen_mask[y, x],  # Check if the cell is already seen
-                        lambda payload: payload,
-                        not_seen_case,
-                        payload
-                    )
-
-                    return counts, seen_mask
-
-
-                # return counts
-                return jax.lax.cond(
-                    indices != -1,
-                    lambda payload: _check_duplicate_cell(payload, jnp.array([ky, kx])),
-                    lambda payload: payload,
-                    (counts, seen_mask)
-                )
-
-            return jax.lax.cond(cond, lambda x: x, valid_case, (monster_counts, seen_mask))
-
-        # Apply check for all neighbors using vmap
-        check_fn = jax.vmap(
-            lambda kx, ky, counts, seen_mask: check_neighbor(kx, ky, counts, seen_mask),
-            in_axes=(0, 0, None, None),
-            out_axes=(0, 0)
-        )
-
-        seen_mask = jnp.zeros_like(env_map, dtype=jnp.bool_)
-
-        result_check_fn, seen_mask = check_fn(valid_kx, valid_ky, monster_counts, seen_mask)
-        result_check_fn = result_check_fn.sum(axis=0)
-        seen_mask = seen_mask.any(axis=0)
-
-        return result_check_fn, seen_mask
-
-    monster_encountered = jnp.zeros(3, dtype=jnp.int32)  # Initialize monster count
-    seen_mask = jnp.zeros_like(env_map, dtype=jnp.bool_)
-
-    # Vectorize over all points using vmap
-    process_fn = jax.vmap(lambda point: process_point(point, monster_encountered, seen_mask), in_axes=0, out_axes=0)
-    all_points = route_path.reshape(-1, 2)  # Flatten all paths into one array
-    monster_encountered, seen_mask = process_fn(all_points)
-
-    # or seen_mask.any(axis=0)
-    seen_mask = seen_mask.any(axis=0)
-
-    bat_count = jnp.sum(jnp.logical_and(seen_mask, env_map == 4))
-    scorpion_count = jnp.sum(jnp.logical_and(seen_mask, env_map == 5))
-    spider_count = jnp.sum(jnp.logical_and(seen_mask, env_map == 6))
-
-    return jnp.array([bat_count, scorpion_count, spider_count])  # [BAT, SCORPION, SPIDER]
-
-def check_monster_v2(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
+def check_monster(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
 
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
 
@@ -749,15 +585,12 @@ def check_monster_v2(env_map: chex.Array, route_path: chex.Array, check_distance
     ])
     return monster_counts
 
-def check_monster_v2_jit(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
+def check_monster_jit(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
     max_path_len = env_map.shape[0]  # Assuming square map
     range_vals = jnp.arange(-check_distance, check_distance + 1)
-
     uncom_dx, uncom_dy = jnp.meshgrid(range_vals, range_vals, indexing="ij")
-
     dx = uncom_dx.ravel()
     dy = uncom_dy.ravel()
-
     monster_types = jnp.array([4, 5, 6], dtype=jnp.int32)  # Define monster types
     def process_point(point, monster_counts, seen_mask):
         y, x = point
