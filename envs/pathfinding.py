@@ -529,7 +529,7 @@ def check_event_jit(
         valid_key_flag = jax.lax.fori_loop(0, exist_keys.shape[0], check_key_exists, True)
 
         def run_check_monster(whole_route):
-            encounter_monster = check_monster_jit(env_map=env_map, route_path=whole_route)
+            encounter_monster = check_monster_jit(env_map=env_map, route_path=whole_route, check_distance=2)
             return 1, encounter_monster, jnp.concatenate(whole_route, axis=0)
 
         return jax.lax.cond(
@@ -546,15 +546,12 @@ def check_event_jit(
         operand=None
     )
 
-def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
+def check_monster(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
 
     max_path_len = get_max_path_length_static(map_shape=env_map.shape)
-    dx = [-1, 0, 1, 0]
-    dy = [0, -1, 0, 1]
 
     monster = {}
     monster_types = jnp.array([4, 5, 6])
-    monster_countered = jnp.zeros(3, dtype=jnp.int32)
     env_map = jnp.array(env_map)
 
     for path in route_path:
@@ -564,22 +561,22 @@ def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[int, che
             if x == -1 or y == -1:
                 continue
 
-            for dd in zip(dx, dy):
-                kx, ky = x + dd[0], y + dd[1]
+            # Define the boundary for the distance check
+            min_x, max_x_check = max(0, x - check_distance), min(max_path_len, x + check_distance + 1)
+            min_y, max_y_check = max(0, y - check_distance), min(max_path_len, y + check_distance + 1)
 
-                if kx < 0 or kx >= max_path_len or ky < 0 or ky >= max_path_len:
-                    continue
+            for ky in range(min_y, max_y_check):
+                for kx in range(min_x, max_x_check):
+                    # Check for monster types
+                    key = env_map[ky, kx]
+                    key_python = key.item()
 
-                key = env_map[ky, kx]
-                key_python = key.item()  # Convert JAX scalar to Python scalar
-
-                # Check for monster types
-                if key_python in monster_types:
-                    key_str = str(key_python)  # Convert to string for dictionary key
-                    if key_str in monster:
-                        monster[key_str] = jnp.unique(jnp.vstack([monster[key_str], jnp.array([(ky, kx)])]), axis=0)
-                    else:
-                        monster[key_str] = jnp.array([(ky, kx)])
+                    if key_python in monster_types:
+                        key_str = str(key_python)  # Convert to string for dictionary key
+                        if key_str in monster:
+                            monster[key_str] = jnp.unique(jnp.vstack([monster[key_str], jnp.array([(ky, kx)])]), axis=0)
+                        else:
+                            monster[key_str] = jnp.array([(ky, kx)])
 
     monster_counts = jnp.array([
         monster.get('4', jnp.array([])).shape[0],  # BAT count
@@ -588,16 +585,13 @@ def check_monster(env_map: chex.Array, route_path: chex.Array) -> Tuple[int, che
     ])
     return monster_counts
 
-
-partial(jit, static_argnums=(0, 1))
-def check_monster_jit(env_map: chex.Array, route_path: chex.Array) -> chex.Array:
+def check_monster_jit(env_map: chex.Array, route_path: chex.Array, check_distance: chex.Array) -> Tuple[int, chex.Array, chex.Array]:
     max_path_len = env_map.shape[0]  # Assuming square map
-    dx = jnp.array([-1, 0, 1, 0])
-    dy = jnp.array([0, -1, 0, 1])
-
+    range_vals = jnp.arange(-check_distance, check_distance + 1)
+    uncom_dx, uncom_dy = jnp.meshgrid(range_vals, range_vals, indexing="ij")
+    dx = uncom_dx.ravel()
+    dy = uncom_dy.ravel()
     monster_types = jnp.array([4, 5, 6], dtype=jnp.int32)  # Define monster types
-
-    # Process each point
     def process_point(point, monster_counts, seen_mask):
         y, x = point
         # Skip invalid points
@@ -610,7 +604,6 @@ def check_monster_jit(env_map: chex.Array, route_path: chex.Array) -> chex.Array
         )
         return monster_counts, seen_mask
 
-    # Process neighbors
     def process_neighbors(y, x, payload):
         monster_counts, seen_mask = payload
         kx = x + dx
