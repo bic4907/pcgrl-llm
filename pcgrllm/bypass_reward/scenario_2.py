@@ -67,9 +67,9 @@ def compute_reward(prev_array, unused3, curr_array, unused4) -> float:
     curr_p_d_length, _, _ = calc_path_from_a_to_b(curr_array, passible_tiles, xy_player[0], xy_door[0])
 
     is_better = jnp.bitwise_and(prev_p_d_length == -1, curr_p_d_length >= 0)
-    reward = jnp.where(is_better, reward + 5.0, reward)
+    reward = jnp.where(is_better, reward + 3.0, reward)
     is_worse = jnp.bitwise_and(prev_p_d_length >= 0, curr_p_d_length == -1)
-    reward = jnp.where(is_worse, reward - 5.0, reward)
+    reward = jnp.where(is_worse, reward - 3.0, reward)
 
 
     bat_loss = tile_loss(prev_array, curr_array, BAT, 1)
