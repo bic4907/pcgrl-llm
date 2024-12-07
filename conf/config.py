@@ -330,8 +330,8 @@ class TrainLLMConfig(Config):
 
     branch_factor: Optional[int] = 2
 
-    n_codegen_trials: int = 1
-    n_codefix_trials: int = 5
+    n_codegen_trials: int = 3
+    n_codefix_trials: int = 3
 
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
