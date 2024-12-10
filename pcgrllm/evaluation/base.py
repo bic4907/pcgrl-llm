@@ -51,7 +51,7 @@ class EvaluationResult:
         if self.task == TaskType.Alphabet:
             return self.similarity
         elif self.task == TaskType.Scenario:
-            return self.solvability
+            return self.acc_imp_perc
 
 
     def __str__(self):
