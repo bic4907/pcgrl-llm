@@ -1,5 +1,6 @@
 import copy
 import datetime
+import math
 import os, re, ast, sys, time, argparse, json, pickle
 import pprint
 import shutil
@@ -7,18 +8,13 @@ import traceback
 import warnings
 from copy import deepcopy
 
-import numpy as np
-
 from os.path import abspath, basename
 import logging
-# from sentence_transformers import SentenceTransformer
-from sklearn.cluster import KMeans
 
+import numpy as np
 
 from conf.config import TrainLLMConfig, Config
-from envs.probs.binary import BinaryTiles
 
-from envs.probs.dungeon2 import Dungeon2Tiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
 from pcgrllm.utils.path_utils import init_config
 from pcgrllm.validate_reward import run_validate, read_file
@@ -54,56 +50,25 @@ class SelfAlignment:
         self.gpt_model = config.get('gpt_model', 'gpt-3.5-turbo')
         self.gpt_max_token = config.get('gpt_max_token', 1024)
         self.verbose = config.get('verbose', False)
-        self.n_inner = 1  # Legacy
 
-        self.current_inner = config.get('current_inner', 1)
-
+        self.n_inner = config.get('n_inner', 2)
         self.n_outer = config.get('n_outer', 3)
+
         self._current_trial = 0
 
         self.n_codegen_trials = config.get('n_codegen_trials', 1)
         self.n_codefix_trials = config.get('n_codefix_trials', 3)
 
         self.iteration_num = config.get('iteration_num', 1)
-        self.branch_factor = config.get('branch_factor', None)
 
-        self.arbitrary_dataset = config.get('arbitrary_dataset', 'arbitrary_dataset.txt')
-        self.file_path = path.join(self.shared_storage_path, 'prompt', self.config['task'])
-
-        self.prev_eval_result = config.get('prev_eval_result', None)
-        self.auxiliary_prompt_path = config.get('auxiliary_prompt_path', None)
-
-        self.example_path = path.join(self.shared_storage_path, 'example')
-        self.current_state_path = path.abspath(path.join(self.shared_storage_path, 'example', 'testState.json'))
         self.reward_function_path = path.join(self.shared_storage_path, self.reward_functions_dir,
                                               (str(self.postfix) + '_inner_' + str(self.n_inner)))
-        self.initial_system = file_to_string(path.join(self.file_path, "system.txt"))
-        self.initial_user = file_to_string(path.join(self.file_path, "initial_user.txt"))
 
-        self.jax_code_tips_prompt = file_to_string(path.join(self.file_path, "jax_code_tips.txt"))
-        self.reward_code_tips_prompt = file_to_string(path.join(self.file_path, "reward_code_tips.txt"))
+        self.file_path = path.join(self.shared_storage_path, 'prompt', self.config['task'])
+        self.user_prompt = file_to_string(path.join(self.file_path, "alignment_user.txt"))
 
-        self.task_description = file_to_string(path.join(self.file_path, "task.txt"))
 
-        self.reward_function_inputs_template = file_to_string(path.join(self.file_path, "reward_function_inputs.txt"))
-
-        self.reward_template = file_to_string(path.join(self.file_path, "compute_reward_example.py"))
-
-        self.pe = config.get('pe')
-        self.feature = config.get('feature')
-
-        if self.feature is not None:
-            self.feature = self.feature.split('+')
-
-        self.task = config.get('task')
-        self.available_tiles = config.get('available_tiles')
-
-        # previous 나중에 변경하기
-        default_reward = path.join(self.file_path, "compute_reward_example.py")
-
-        self.previous_reward_function_path = config.get('previous_reward_function', None)
-        if self.previous_reward_function_path is None:
-            self.previous_reward_function_path = default_reward
+        self.previous_reward_function_path = config.get('previous_reward_function')
         self.previous_reward_function = file_to_string(self.previous_reward_function_path)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
@@ -116,6 +81,7 @@ class SelfAlignment:
         self.logging(f'Reward generation arguments:\n{pprint.pformat(config, indent=4)}', logging.INFO)
 
         os.makedirs(self.reward_function_path, exist_ok=True)
+
 
     def logging(self, message, level=logging.DEBUG):
         info_dict = {
@@ -162,20 +128,11 @@ class SelfAlignment:
 
                 client = UnifiedLLMClient()
                 ctx = ChatContext()
-                if n_response != 1:
-                    temperature = 0.5
-                else:
-                    temperature = 0
-                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response,
-                                              temperature=temperature)
-                if n_response != 1:
-                    generated_responses = [response[0] for response in responses]
-                    generated_contexts = [response[1] for response in responses]
-                    index = 1
-                    # ndex = self.response_cluster(generated_responses, n_clusters=3)
-                else:
-                    response = responses[0][0]
-                    context = responses[0][1]
+
+                responses = client.call_model(ctx, messages, model=model, seed=seed, n_response=n_response)
+
+                response = responses[0][0]
+                context = responses[0][1]
 
                 if verbose:
                     self.logging("Received the response: ", response)
@@ -192,16 +149,14 @@ class SelfAlignment:
         except KeyboardInterrupt:
             raise Exception("Keyboard Interrupt while using the OpenAI API")
 
-        if n_response != 1:
-            return generated_responses, generated_contexts, index
-        else:
-            return response, context
+
+        return response, context
 
     def run(self, return_error: bool = False):
 
         is_success = False
 
-        reward_function_name = f"{self.postfix}_inner_{self.current_inner}"
+        reward_function_name = f"{self.postfix}_inner_{self.n_inner}"
 
         for codegen_trial in range(1, self.n_codegen_trials + 1):
             self._curr_codegen_trial = codegen_trial
@@ -221,9 +176,10 @@ class SelfAlignment:
             if generating_function_path is None and self.previous_reward_function_path is not None:
                 generating_function_path = self.previous_reward_function_path
 
+
+
             self.logging(f"Generating reward function: {generating_function_path}", logging.DEBUG)
 
-            # 여기서 수정 하는것만 짜자
 
             for codefix_trial in range(0, self.n_codefix_trials + 1):
                 self._curr_codefix_trial = codefix_trial
@@ -306,19 +262,6 @@ class SelfAlignment:
         self._execution_config = config
 
 
-    def get_initial_user(self):
-        initial_user = copy.deepcopy(self.initial_user)
-
-        # get the prompt file from the task dir
-        task_file = path.join(self.file_path, 'task.txt')
-        task_prompt = file_to_string(task_file)
-
-        task_prompt.format(target_character=self.config['target_character'])
-
-        initial_user = initial_user.replace('{task}', task_prompt)
-
-        return initial_user
-
     def save_data(self, response: str, context: list, messages: list,
                   base_directory: str = '',
                   base_name: str = 'reward', branch: int = None):
@@ -358,6 +301,15 @@ class SelfAlignment:
 
         return reward_file_path
 
+    def get_reward_simulation_prompt(self, reward_function_path: str):
+        _, rewards = self.execute_reward_function(self.previous_reward_function_path)
+
+        mean = np.mean(rewards)
+        std = np.std(rewards)
+        zero_perc = np.sum(np.array(rewards) == 0) / len(rewards)
+
+        return f"Mean: {mean:.6f}, Std: {std:.6f}, Zero Value Percent: {zero_perc:.4f}%"
+
     def first_user_response(self,
                             base_name: str = 'reward',
                             base_directory: str = None,
@@ -365,145 +317,44 @@ class SelfAlignment:
                             generating_function_error: str = None,
                             trial=1):
 
-        initial_system = self.initial_system.format(
-            i='{i}',
-            reward_signature=self.reward_template,
-        )
+        initial_user = copy.deepcopy(self.user_prompt)
 
-        # Add jax code tips prompt
-        initial_system += self.jax_code_tips_prompt
-        initial_system += '\n'
-        initial_system += self.reward_code_tips_prompt
+        rollout_result = self.get_reward_simulation_prompt(self.previous_reward_function_path)
 
-        initial_user = self.get_initial_user()
-
-        reward_function_inputs = self.get_input_prompt()
 
         if generating_function_error:
             reward_code = file_to_string(generating_function_path)
 
-            sample_code = """
+            error_prompt = """
             ## Reward Code
             Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-            ```python
-            {reward_code_string}
-            ```
+
             Error Message:
             {error_message}
 
             """.format(reward_code_string=reward_code, error_message=generating_function_error)
 
             initial_user = initial_user.format(
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs,
-                target_character=self.config['target_character'],
-                thought_tips=self.get_pe_prompt(self.pe),
+                reward_function=self.previous_reward_function,
+                rollout_result=rollout_result,
+                error_prompt=error_prompt,
             )
-
-
-        elif self.config['feedback_path'] is not None:  # Feedback available
-
-            reward_code = file_to_string(generating_function_path)
-
-            sample_code = """
-               ## Previous Reward Code
-               Here is the previous reward function that you have generated. However, this code has an error. Please fix the error and generate the reward function again.
-               ```python
-               {reward_code_string}
-               ```
-
-               ### Feedback:
-               {feedback}
-                Please update the reward function based on the feedback and generate the reward function again.
-               """.format(reward_code_string=reward_code, feedback=self.get_feedback_prompt())
-
-            initial_user = initial_user.format(
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs,
-                target_character=self.config['target_character'],
-                thought_tips=self.get_pe_prompt(self.pe),
-            )
-
         else:
-            sample_code = """
-            ## Example Reward Code
-            ```python
-            {sample_reward_code}
-            ```
-            """.format(sample_reward_code=self.previous_reward_function)
-
-            # if the every first iteration, use the io prompt
-            if self.iteration_num == 1:
-                pe_prompt = self.get_pe_prompt('io')
-            else:
-                pe_prompt = self.get_pe_prompt(self.pe)
-
             initial_user = initial_user.format(
-                target_character=self.config['target_character'],
-                few_shot_code_string=sample_code,
-                reward_function_inputs=reward_function_inputs,
-                thought_tips=pe_prompt,
+                reward_function=self.previous_reward_function,
+                rollout_result=rollout_result,
+                error_prompt='',
             )
 
         # 피드백 받는 부분 작성 필요함
 
         messages = [
-            {"role": "system", "content": initial_system},
             {"role": "user", "content": initial_user}
         ]
 
         self.logging(f'Input to the reward generation model:\n{json.dumps(messages, indent=2)}', logging.DEBUG)
 
-        if self.pe == 'cotsc':
-            responses, contexts, index = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial,
-                                                         n_response=5)
-
-            for i, (response, context) in enumerate(zip(responses, contexts)):
-                self.logging(context, logging.INFO)
-                self.logging(response, logging.DEBUG)
-
-                response_file_path = path.join(base_directory, f"{base_name}_branch_{i}.response.pkl")
-                with open(response_file_path, 'wb') as f:
-                    pickle.dump(response, f)
-
-                context_file_path = path.join(base_directory, f"{base_name}_branch_{i}.context.pkl")
-                with open(context_file_path, 'wb') as f:
-                    pickle.dump(context, f)
-
-                log_dict = {
-                    'request': messages,
-                    'response': response,
-                }
-
-                parsed_reward_function = parse_reward_function(response)
-
-                # Save reward function to .py
-                reward_file_path = path.join(base_directory, f"{base_name}_branch_{i}.py")
-                with open(reward_file_path, 'w') as f:
-                    f.write(parsed_reward_function)
-
-                # Save the log to .json file
-                log_file_path = path.join(base_directory, f"{base_name}_branch_{i}.json")
-                with open(log_file_path, 'w') as f:
-                    json.dump(log_dict, f, indent=4)
-
-                self.save_data(response=response,
-                               context=context,
-                               base_directory=base_directory,
-                               base_name=base_name,
-                               messages=messages, branch=i)
-
-            log_dict = {
-                'selected_branch': f'branch_{index}'
-            }
-            log_file_path = path.join(self.reward_function_path, "selected_branch.json")
-            with open(log_file_path, 'w') as f:
-                json.dump(log_dict, f, indent=4)
-
-            response = responses[index]
-            context = contexts[index]
-        else:
-            response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
+        response, context = self.start_chat(self.gpt_model, messages, self.gpt_max_token, seed=trial)
 
         self.logging(context, logging.INFO)
         self.logging(response, logging.DEBUG)
@@ -538,7 +389,7 @@ class SelfAlignment:
         config.reward_function_path = reward_function_path
 
         try:
-            result = run_validate(config)
+            result, rewards = run_validate(config, return_reward=True, length=math.pow(config.map_width, 2) * 3)
         except Exception as e:
             code = read_file(reward_function_path)
 
@@ -550,7 +401,7 @@ class SelfAlignment:
 
             raise RewardExecutionException(code, f'{filtered_traceback}\n{e}')
 
-        return result
+        return result, rewards
 
 
 def generate_reward(config: Config, generate_args: dict, return_error: bool = False):
@@ -565,15 +416,14 @@ if __name__ == "__main__":
     parser.add_argument('--shared_storage_path', type=str, default=abspath('.'))
     parser.add_argument('--postfix', type=str, default=datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
     parser.add_argument('--reward_functions_dir', type=str, default='reward_functions')
-    parser.add_argument('--gpt_model', type=str, default='gpt-4o')
+    parser.add_argument('--gpt_model', type=str, default='gpt-4o-mini')
     parser.add_argument('--gpt_max_token', type=int, default=4096)
     parser.add_argument('--current_inner', type=int, default=1)
-    parser.add_argument('--n_codegen_trials', type=int, default=1)
-    parser.add_argument('--n_codefix_trials', type=int, default=5)
+    parser.add_argument('--task', type=str, default='alphabet')
+    parser.add_argument('--n_codegen_trials', type=int, default=3)
+    parser.add_argument('--n_codefix_trials', type=int, default=3)
     parser.add_argument('--iteration_num', type=int, default=1)
-    parser.add_argument('--previous_reward_function', type=str, default=None)
-
-
+    parser.add_argument('--previous_reward_function', type=str, default=None, required=True)
 
     args = parser.parse_args()
 
