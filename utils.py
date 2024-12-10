@@ -445,7 +445,7 @@ def render_callback(frames,
         if not os.path.exists(numpy_dir):
             os.makedirs(numpy_dir, exist_ok=True)
 
-        levels = states.env_state.env_map[-1, :10, ...]
+        levels = states.env_state.env_map[-2, :10, ...]
 
         # save with level_0.npy, level_1.npy, ...
         for idx, level in enumerate(levels):
