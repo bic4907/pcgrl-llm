@@ -129,19 +129,25 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
 
     onehot_imp_tiles = create_fixed_size_onehot(imp_tiles).astype(jnp.bool_)
 
-    correct_count = jnp.sum(onehot_imp_tiles == enemy_counter_type)
+    correct_count = jax.lax.cond(solutions.n > 0, lambda _: jnp.sum(onehot_imp_tiles == enemy_counter_type), lambda _: 0, operand=None)
 
     # True Positive: Predicted as 1 (positive) and actually 1 (positive)
     true_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 1))
     # True Negative: Predicted as 0 (negative) and actually 0 (negative)
-    true_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 0))
+    true_negative = jax.lax.cond(solutions.n > 0,
+                                 lambda _: jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 0)),
+                                 lambda _: 0,
+                                 operand=None)
 
     jax.debug.print("True Positive: {}, True Negative: {}", true_positive, true_negative)
 
 
 
     # False Negative: Predicted as 0 (negative) but actually 1 (positive)
-    false_negative = jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0))
+    false_negative = jax.lax.cond(solutions.n > 0,
+                                  lambda _: jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0)),
+                                  lambda _: jnp.sum(enemy_counter_type == 0),
+                                  operand=None)
     # False Positive: Predicted as 1 (positive) but actually 0 (negative)
     false_positive = jnp.sum(jnp.logical_and(onehot_imp_tiles == 0, enemy_counter_type == 1))
 
