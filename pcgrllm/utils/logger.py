@@ -39,7 +39,7 @@ def text_to_html(text):
 
     return html_text
 
-def log_reward_generation_data(logger, target_path: str, iteration: int):
+def log_reward_generation_data(logger, target_path: str, iteration: int, name: str = "reward_generation"):
     if wandb.run is None: return None
 
     # get the image files
@@ -48,11 +48,8 @@ def log_reward_generation_data(logger, target_path: str, iteration: int):
 
     for idx, items in enumerate(zip(json_files, python_files)):
         # log the json file
-
-
-        wandb.log({f'Iteration_{iteration}/reward_generation/json': wandb.Html(open(items[0], 'r').read())})
-        wandb.log({f'Iteration_{iteration}/reward_generation/code': wandb.Html(text_to_html(open(items[1], 'r').read()))})
-
+        wandb.log({f'Iteration_{iteration}/{name}/json': wandb.Html(open(items[0], 'r').read())})
+        wandb.log({f'Iteration_{iteration}/{name}/code': wandb.Html(text_to_html(open(items[1], 'r').read()))})
 
     # Log the count of json files using logger
 

@@ -594,9 +594,6 @@ class Experiment:
                     self.exit("Reward function generation failed. Exiting.", code=1)
 
 
-                reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
-                log_reward_generation_data(logger=self.logger, target_path=reward_function_dir,
-                                           iteration=self._iteration)
 
                 if self.config.n_self_alignment > 0:
                     self._stage = Stage.SelfAlignment
@@ -605,12 +602,18 @@ class Experiment:
 
             if self._stage == Stage.SelfAlignment:
                 for i in range(self.config.n_self_alignment):
-                    al_result = self.process_self_alignment()
+                    inner_num = i + 2
+                    al_result = self.process_self_alignment(n_inner=inner_num)
 
                     # Exit condition
                     if al_result is False:
                         self.logging("Self-alignment failed. Use current reward function instead.", level=logging.WARNING)
                     else:
+                        reward_function_dir = path.join(self.reward_functions_dir,
+                                                        f'reward_outer_{self._iteration}_inner_{inner_num}')
+                        log_reward_generation_data(logger=self.logger, target_path=reward_function_dir,
+                                                   iteration=self._iteration, name=f'inner_{inner_num}')
+
                         self._current_reward_function_filename = al_result
 
 

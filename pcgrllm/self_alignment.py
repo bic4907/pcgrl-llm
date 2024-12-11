@@ -86,7 +86,6 @@ class SelfAlignment:
     def logging(self, message, level=logging.DEBUG):
         info_dict = {
             'outer_loop': self.iteration_num if hasattr(self, 'iteration_num') else -1,
-            # 'innen_innerr_loop': self.current_inner,
             'n_inner': self.n_inner,
             'codegen_total': self.n_codegen_trials,
             'codegen_trial': self._curr_codegen_trial if hasattr(self, '_curr_codegen_trial') else -1,
@@ -95,7 +94,7 @@ class SelfAlignment:
         }
 
         # Define the prefix format
-        prefix = '[iter: {outer_loop}, codegen: {codegen_trial}/{codegen_total}, fixing: {fix_trial}/{fix_total}]'.format(
+        prefix = '[iter: {outer_loop}, inner: {n_inner} codegen: {codegen_trial}/{codegen_total}, fixing: {fix_trial}/{fix_total}]'.format(
             **info_dict)
 
         # Split the message by line breaks and log each line with the prefix
