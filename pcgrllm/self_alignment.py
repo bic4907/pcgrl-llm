@@ -302,11 +302,13 @@ class SelfAlignment:
         return reward_file_path
 
     def get_reward_simulation_prompt(self, reward_function_path: str):
-        _, rewards = self.execute_reward_function(self.previous_reward_function_path)
+        _, rewards = self.execute_reward_function(reward_function_path)
+
+        rewards = np.array(rewards).reshape(-1)
 
         mean = np.mean(rewards)
         std = np.std(rewards)
-        zero_perc = np.sum(np.array(rewards) == 0) / len(rewards)
+        zero_perc = np.sum(rewards == 0) / len(rewards) * 100
 
         return f"Mean: {mean:.6f}, Std: {std:.6f}, Zero Value Percent: {zero_perc:.4f}%"
 
@@ -404,7 +406,7 @@ class SelfAlignment:
         return result, rewards
 
 
-def generate_reward(config: Config, generate_args: dict, return_error: bool = False):
+def self_alignment(config: Config, generate_args: dict, return_error: bool = False):
     aligner = SelfAlignment(generate_args)
     aligner.set_execution_config(config)
     return aligner.run(return_error=return_error)

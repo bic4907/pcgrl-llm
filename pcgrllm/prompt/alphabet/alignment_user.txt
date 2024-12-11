@@ -1,6 +1,5 @@
-Here is your generated reward function and the result of the code execution with random action agent.
-Consider the scale (magnitude) of the reward function output and sparsity of the rewards when designing your reward function.
-Rather than change large part of the reward function, you can add or adjust some weights to the existing reward function.
+Here is your generated reward function and the result of the code execution (Code Result) with random action agent.
+Keep the existing function structure and tune small components like weights to adjust the reward values, ensuring the logic remains intact. Focus on reward scale and sparsity.
 
 ### Reward Function Code
 
