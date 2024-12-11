@@ -94,7 +94,7 @@ class SelfAlignment:
         }
 
         # Define the prefix format
-        prefix = '[iter: {outer_loop}, inner: {n_inner} codegen: {codegen_trial}/{codegen_total}, fixing: {fix_trial}/{fix_total}]'.format(
+        prefix = '[iter: {outer_loop}, inner: {n_inner}, codegen: {codegen_trial}/{codegen_total}, fixing: {fix_trial}/{fix_total}]'.format(
             **info_dict)
 
         # Split the message by line breaks and log each line with the prefix
