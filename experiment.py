@@ -375,6 +375,23 @@ class Experiment:
 
         return media_dir
 
+    def differ_type_feedback(self, iteration_num: int):
+        # copy the reward function
+
+        os.makedirs(self.feedback_dir, exist_ok=True)
+        if self.config.feedback_type == 'no':
+            reward_filename = f'{basename(self.config.feedback_type)}.txt'
+        else:
+            reward_filename = f'{basename(self.config.feedback_type + "_" + self.config.task + "_feedback")}.txt'
+
+        origin_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_feedback', reward_filename)
+        target_dir = path.join(self.config.exp_dir, 'iteration_' + str(iteration_num))
+        target_path = path.join(target_dir, 'feedback.txt')
+
+        self.logging(f"Copying feedback to the experiment directory: {origin_path} -> {target_path}", logging.WARNING)
+        shutil.copy(origin_path, target_path)
+
+        return target_path
     # 파일 분석
     def analyze_output(self, iteration_num: int) -> None:
 
@@ -659,6 +676,8 @@ class Experiment:
 
                 if self.config.bypass_feedback_path is not None:
                     feedback_generation_fn = self.bypass_feedback
+                elif self.config.feedback_type != 'default':
+                    feedback_generation_fn = self.differ_type_feedback
                 else:
                     feedback_generation_fn = self.analyze_output
 

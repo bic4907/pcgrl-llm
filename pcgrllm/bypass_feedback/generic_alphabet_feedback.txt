@@ -1,0 +1,12 @@
+You recently generated a reward function for a Procedural Content Generation via Reinforcement Learning (PCGRL) task aimed at creating 2D maze-like maps.
+Based on the feedback provided below, refine the reward function with greater attention to detail and adjust the weights for each reward term accordingly.
+
+1. Ensure the generated maze accurately resembles the intended alphabet shape, with minimal distortion or irregularities.
+
+2. Maintain a clear and valid path structure within the maze, ensuring it aligns with the overall alphabet shape.
+
+3. Optimize the distribution of empty and wall tiles to balance visual clarity and functional navigability of the maze.
+
+4. Prevent unnecessary overlaps or disconnected regions that could hinder the maze's readability as an alphabet.
+
+5. Design the reward function to encourage variety in the generated mazes while maintaining adherence to the target alphabet shape.

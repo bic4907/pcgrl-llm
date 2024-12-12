@@ -139,10 +139,6 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
                                  lambda _: 0,
                                  operand=None)
 
-    jax.debug.print("True Positive: {}, True Negative: {}", true_positive, true_negative)
-
-
-
     # False Negative: Predicted as 0 (negative) but actually 1 (positive)
     false_negative = jax.lax.cond(solutions.n > 0,
                                   lambda _: jnp.sum(jnp.logical_and(onehot_imp_tiles == 1, enemy_counter_type == 0)),

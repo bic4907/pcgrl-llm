@@ -105,7 +105,12 @@ def get_exp_name(config):
 
     target_character = get_short_target(config.target_character) if config.task == 'scenario' else config.target_character
 
-    return f'{exp_group}_chr-{target_character}_s-{config.seed}'
+    if config.feedback_type == "default":
+        return f'{exp_group}_chr-{target_character}_s-{config.seed}'
+    elif config.feedback_type == "no":
+        return f'{exp_group}_chr-{target_character}_fb-{config.feedback_type}_s-{config.seed}'
+    else:
+        return f'{exp_group}_chr-{target_character}_fb-{config.feedback_type[:3]}_s-{config.seed}'
 
 
 def get_exp_dir(config):
@@ -166,6 +171,8 @@ def init_config(config: Config):
         except:
             print(f"Could not find scenario with condition: {config.target_character}")
             exit(0)
+
+
 
 
     return config

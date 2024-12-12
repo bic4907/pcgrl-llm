@@ -329,6 +329,7 @@ class TrainLLMConfig(Config):
     n_samples: int = 30
     reward_feature: str = 'array' # 'array', 'stats', 'array+stats'
     fewshot: bool = False
+    feedback_type: str = 'default' # 'default', 'no', 'generic'
 
     branch_factor: Optional[int] = 2
 
