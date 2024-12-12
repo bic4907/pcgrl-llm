@@ -354,7 +354,7 @@ class Experiment:
         if self.config.feedback_type == 'no':
             reward_filename = f'{basename(self.config.feedback_type)}.txt'
         else:
-            reward_filename = f'{basename(self.config.feedback_type + "_" + self.config.type + "_feedback")}.txt'
+            reward_filename = f'{basename(self.config.feedback_type + "_" + self.config.task + "_feedback")}.txt'
 
         origin_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_feedback', reward_filename)
         target_path = path.join(self.feedback_dir, reward_filename)
