@@ -385,7 +385,8 @@ class Experiment:
             reward_filename = f'{basename(self.config.feedback_type + "_" + self.config.task + "_feedback")}.txt'
 
         origin_path = path.join(dirname(__file__), 'pcgrllm', 'bypass_feedback', reward_filename)
-        target_path = path.join(self.feedback_dir, reward_filename)
+        target_dir = path.join(self.config.exp_dir, 'iteration_' + str(iteration_num))
+        target_path = path.join(target_dir, 'feedback.txt')
 
         self.logging(f"Copying feedback to the experiment directory: {origin_path} -> {target_path}", logging.WARNING)
         shutil.copy(origin_path, target_path)
