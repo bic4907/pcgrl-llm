@@ -1,0 +1,14 @@
+Here is your generated reward function and the result of the code execution (Code Result) with random action agent.
+Keep the existing function structure and tune small components like weights to adjust the reward values, ensuring the logic remains intact. Focus on reward scale and sparsity.
+
+### Reward Function Code
+
+{reward_function}
+
+### Code Result
+
+{rollout_result}
+
+{error_prompt}
+
+### Response: Revised Reward Function Code
