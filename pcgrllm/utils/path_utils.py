@@ -108,9 +108,9 @@ def get_exp_name(config):
     if config.feedback_type == "default":
         return f'{exp_group}_chr-{target_character}_s-{config.seed}'
     elif config.feedback_type == "no":
-        return f'{exp_group}_chr-{target_character}_ft-{config.feedback_type}_s-{config.seed}'
+        return f'{exp_group}_chr-{target_character}_dft-{config.feedback_type}_s-{config.seed}'
     else:
-        return f'{exp_group}_chr-{target_character}_ft-{config.feedback_type[:3]}_s-{config.seed}'
+        return f'{exp_group}_chr-{target_character}_dft-{config.feedback_type[:3]}_s-{config.seed}'
 
 
 def get_exp_dir(config):
