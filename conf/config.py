@@ -146,6 +146,7 @@ class TrainConfig(Config):
     target_character: str = 'A'
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     total_iterations: int = 1
+    n_self_alignment: int = 0
 
 
 @dataclass
@@ -297,6 +298,7 @@ class TrainLLMConfig(Config):
 
     # LLM experiment setting
     total_iterations: int = int(1)
+    n_self_alignment: int = int(0)
 
     # Eval rollout setting
     random_agent: bool = False

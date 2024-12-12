@@ -26,7 +26,7 @@ def read_file(file_path: str) -> Any:
         return f.read()
 
 
-def run_validate(config: TrainLLMConfig):
+def run_validate(config: TrainLLMConfig, return_reward=False, length=100):
     """Validates the environment setup and checks for NaN or Inf in rewards."""
     rng = jax.random.PRNGKey(30)
 
@@ -82,7 +82,7 @@ def run_validate(config: TrainLLMConfig):
 
         return carry, reward  # Return updated carry and current rewards
 
-    _, rewards = jax.lax.scan(step_fn, carry, None, length=100)  # Run for 100 steps
+    _, rewards = jax.lax.scan(step_fn, carry, None, length=length)  # Run for 100 steps
 
     # Ensure final state is ready
     jax.block_until_ready(env_state)
@@ -97,7 +97,10 @@ def run_validate(config: TrainLLMConfig):
     if np.isinf(rewards).any():
         raise ValueError("Found Inf in the reward values")
 
-    return True
+    if return_reward:
+        return True, rewards
+    else:
+        return True
 
 @hydra.main(version_base=None, config_path='../conf', config_name='train_pcgrllm')
 def main(config: TrainLLMConfig) -> None:

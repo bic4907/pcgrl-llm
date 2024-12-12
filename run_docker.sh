@@ -64,13 +64,7 @@ echo "  Free Memory: ${selected_gpu_free_mem}MiB" | tee -a "$log_file"
 
 
 # 제외할 인자 목록
-exclude_args=("wandb_key" "wandb_project" "n_envs" "overwrite")
-
-# 컨테이너 이름 초기화
-container_name="pcgrllm"
-
-# 제외할 인자 목록
-exclude_args=("wandb_key" "wandb_project" "n_envs" "overwrite")
+exclude_args=("wandb_project" "n_envs" "overwrite")
 
 # 컨테이너 이름 초기화
 container_name="pcgrllm"

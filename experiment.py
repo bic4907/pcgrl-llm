@@ -239,6 +239,7 @@ class Experiment:
 
         return reward_name
 
+
     def bypass_reward_function(self):
         # copy the reward function
 
@@ -252,6 +253,33 @@ class Experiment:
         shutil.copy(origin_path, target_path)
 
         return target_path
+
+    def process_self_alignment(self, n_inner: int = 2) -> str:
+
+        self.logging(f"Self-alignment reward function for iteration {self._iteration}", level=logging.INFO)
+
+        args_dict = {
+            'shared_storage_path': self._experiment_path,
+            'postfix': f"reward_outer_{self._iteration}",
+            'reward_functions_dir': 'reward_functions',
+            'gpt_model': self.config.gpt_model,
+            'gpt_max_token': 4096,
+            'verbose': None,
+            'previous_reward_function': self._current_reward_function_filename,
+            'trial_count': self.config.n_generation_trials,
+            'n_inner': n_inner,
+            'iteration_num': self._iteration,
+            'n_codegen_trials': self.config.n_codegen_trials,
+            'n_codefix_trials': self.config.n_codefix_trials,
+            'task': self.config.task,
+        }
+
+        self.logging(f"Self-alignment arguments:\n{pprint.pformat(args_dict, indent=4)}", level=logging.INFO)
+
+        from pcgrllm.self_alignment import self_alignment
+        reward_name = self_alignment(config=self.config, generate_args=args_dict)
+
+        return reward_name
 
     def bypass_feedback(self, iteration_num: int):
         # copy the reward function
@@ -539,6 +567,7 @@ class Experiment:
         iteration = self.storage.get_iteration(iteration_num)
         return iteration.get_evaluation()
 
+
     def run(self):
 
         self.logging("Running experiment", level=logging.INFO)
@@ -562,7 +591,7 @@ class Experiment:
 
                 if self.config.fewshot is True and self._iteration == 1:
                     fewshot_reward = path.join(dirname(__file__), 'pcgrllm', 'bypass_reward', 'fewshot', f'shape_{self.config.target_character.lower()}.py')
-                    self.logging(f"Fewshot reward function: {fewshot_reward}", level=logging.INFO)
+                    self.logging(f"Few-shot reward function: {fewshot_reward}", level=logging.INFO)
                     self.previous_reward_function_path = fewshot_reward
 
                 self._stage = Stage.RewardGeneration
@@ -576,13 +605,35 @@ class Experiment:
 
                 self._current_reward_function_filename = reward_generation_fn()
 
+                # Exit condition
                 if self._current_reward_function_filename is False:
                     self.exit("Reward function generation failed. Exiting.", code=1)
-                else:
 
-                    reward_function_dir = path.join(self.reward_functions_dir, f'reward_outer_{self._iteration}_inner_1')
-                    log_reward_generation_data(logger=self.logger, target_path=reward_function_dir, iteration=self._iteration)
+
+
+                if self.config.n_self_alignment > 0:
+                    self._stage = Stage.SelfAlignment
+                else:
                     self._stage = Stage.TrainPCGRL
+
+            if self._stage == Stage.SelfAlignment:
+                for i in range(self.config.n_self_alignment):
+                    inner_num = i + 2
+                    al_result = self.process_self_alignment(n_inner=inner_num)
+
+                    # Exit condition
+                    if al_result is False:
+                        self.logging("Self-alignment failed. Use current reward function instead.", level=logging.WARNING)
+                    else:
+                        reward_function_dir = path.join(self.reward_functions_dir,
+                                                        f'reward_outer_{self._iteration}_inner_{inner_num}')
+                        log_reward_generation_data(logger=self.logger, target_path=reward_function_dir,
+                                                   iteration=self._iteration, name=f'inner_{inner_num}')
+
+                        self._current_reward_function_filename = al_result
+
+
+                self._stage = Stage.TrainPCGRL
 
             elif self._stage == Stage.TrainPCGRL:
                 # Run ML-Agents
