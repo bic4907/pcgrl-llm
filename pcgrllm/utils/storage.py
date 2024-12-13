@@ -1,6 +1,7 @@
 import json
 import os
-from os.path import abspath, join, basename, isdir
+import re
+from os.path import abspath, join, basename, isdir, isfile
 from glob import glob
 from typing import List, Optional
 import numpy as np
@@ -126,9 +127,17 @@ class Iteration:
         return [NumpyResource(path) for path in numpy_paths]
 
     def get_reward_function_path(self) -> Optional[str]:
-        reward_path = join(self.root_path, f'reward_outer_{self.iteration_num}_inner_1.py')
-        if not isdir(reward_path):
-            return reward_path
+        # 파일 패턴 설정
+        pattern = re.compile(rf"reward_outer_{self.iteration_num}_inner_\d+\.py")
+
+        # root_path에 있는 모든 파일 검색
+        for file_name in os.listdir(self.root_path):
+            if pattern.match(file_name):  # 정규식에 맞는 파일 찾기
+                reward_path = join(self.root_path, file_name)
+                if isfile(reward_path):  # 파일 존재 여부 확인
+                    return reward_path
+
+        # 파일을 찾지 못했을 경우 None 반환
         return None
 
     def get_evaluation_dir(self) -> str:
