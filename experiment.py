@@ -503,6 +503,8 @@ class Experiment:
         if self.config.evaluator == 'hr':
             log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
         else:
+            self.logging(f"LLM Evaluation Result: {result}", level=logging.INFO)
+
             log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=self.config.evaluator)
 
             # Get the evaluation result
@@ -510,7 +512,7 @@ class Experiment:
             sol_result = sol_evaluator.run(iteration=iteration, target_character=self.config.target_character)
 
             # Save the evaluation result to the iteration file
-            result_path = path.join(exp_dir, 'evaluation.vit.json')
+            result_path = path.join(exp_dir, 'evaluation.hr.json')
             with open(result_path, 'w') as f:
                 json.dump(sol_result.to_dict(), f)
 
