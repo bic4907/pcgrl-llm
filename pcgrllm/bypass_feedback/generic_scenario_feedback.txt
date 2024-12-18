@@ -1,14 +1,1 @@
-You recently generated a reward function for a Procedural Content Generation via Reinforcement Learning (PCGRL) task aimed at creating 2D maze-like maps.
-Based on the feedback provided below, refine the reward function with greater attention to detail and adjust the weights for each reward term accordingly.
-
-1. Ensure there is at least one valid path from the start point to the end point in the map.
-
-2. Keys should be placed to guarantee their associated paths do not overlap or intersect unnecessarily.
-
-3. Monsters should be positioned in a way that aligns with the intended scenario and gameplay objectives.
-
-4. Balance the complexity of the maze with its accessibility, ensuring it matches the intended difficulty level. Avoid designs that are overly complex or overly simplistic.
-
-5. Optimize the distribution of tiles, such as walls and empty spaces, to enhance both the maze's aesthetic appeal and its functionality in gameplay.
-
-6. Prevent the creation of isolated or unreachable areas within the map, as they can disrupt the gameplay flow and reduce the effectiveness of the design.
+Adjust the reward function and its weights appropriately to generate maps that align with the scenario.

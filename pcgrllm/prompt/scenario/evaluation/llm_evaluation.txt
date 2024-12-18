@@ -6,21 +6,12 @@ The scenario involves a player who must pick up a key and reach the door to comp
 While traversing the level, the player may encounter enemies specified in the "Generation Goal" prompt (e.g., BAT, SCORPION).
 The "important tiles" refer to the tiles described in the "Generation Goal."
 The player can only pass through empty tiles, as well as tiles containing the key and the door.
-You must validate which enemy tiles the player could encounter when traversing the "Generated Contents."
-Encounters are defined as enemy tiles within a 3x3 area surrounding the player's path as they move along the shortest route to pick up the key and reach the door.
-The player should not encounter any enemy tiles that are not described in the "Generation Goal."
 
-Each score is measured with the score range of 0 to 1, excluding the `path length`:
-- **Playability (`playability`)**: Indicates whether the player can reach the door from the starting point. (0/1)
-- **Path Length (`path_length`)**: The number of steps (tiles) in the shortest path from the starting point to the door. (Integer)
-- **Solvability (`solvability`)**: Indicates whether the player can reach both the key and the door. (0/1)
-- **Accuracy of Important Tiles (`acc_imp_perc`)**: Measures the inclusion of only necessary tiles (including enemies) in the shortest path from start to key to door. (0-1)
-- **Reach Important Tile Percentage (`acc_imp_perc`)**: The ratio of reachable "important tiles" for the player. (0-1)
-- **Existence Important Tile Percentage (`acc_imp_perc`)**: The ratio of "important tiles" that exist anywhere in the level. (0-1)
-- **True Positive Important Tile Percentage (`tp_imp_perc`)**: The ratio of correctly placed enemies encountered by the player while collecting the key and reaching the door. (0-1)
-- **True Negative Important Tile Percentage (`tn_imp_perc`)**: The ratio of correctly identified non-enemy tiles that the player does not encounter while collecting the key and reaching the door. (0-1)
-- **False Positive Important Tile Percentage (`fp_imp_perc`)**: The ratio of tiles incorrectly marked as enemies that the player encounters while collecting the key and reaching the door. (0-1)
-- **False Negative Important Tile Percentage (`fn_imp_perc`)**: The ratio of enemies that are missing or misclassified as non-enemies along the player's path from start to key to door. (0-1)
+Each score is measured with the score range of 0 to 1.
+- **Accuracy of Important Tiles (`acc_imp_perc`)**:
+How much the "Generated Contents" satisfy the "Generation Goal", the higher value denotes the better accuracy and looks like reasonable game level.
+Measures the percentage of important tiles that are the player encounters until clearing the level.
+The player should not encounter any enemies which not included in the "important tiles".
 
 ## Output
 Return the similarity and diversity scores as a json string.
@@ -30,17 +21,7 @@ If there are multiple content in the "Generated Contents", response with average
 ### Output Example (JSON)
 ```
 {
-    "playability": 0.85,
-    "path_length": 22,
-    "solvability": 0.90,
-    "n_solutions": 0.68,
-    "reach_imp_perc": 0.80,
-    "exist_imp_perc": 0.92,
-    "acc_imp_perc": 0.88,
-    "fp_imp_perc": 0.10,
-    "fn_imp_perc": 0.07,
-    "tp_imp_perc": 0.83,
-    "tn_imp_perc": 0.90`
+    "acc_imp_perc": (0.00 ~ 1.00, 3-point float)
 }
 ```
 
@@ -64,4 +45,5 @@ class Dungeon3Tiles(IntEnum):
 {evaluation_criteria}
 
 **Response**
-Output a JSON string with scores for each metric. Include a brief reason for the scores in plain text after the JSON output.
+You have to response with step-by-step from some reasons with sub-scores to the total score.
+"""
