@@ -18,3 +18,6 @@ wandb
 .DS_Store
 wandb_cache
 wandb_output_*
+
+output_logs
+error_logs
