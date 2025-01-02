@@ -1,0 +1,21 @@
+\begin{table*}[!t]
+\caption{Ablation study results for framework architecture, comparing accuracy across prompt engineering methods and scenarios.}
+\label{tab:result_pe}
+\begin{tabular}{p{1.5cm}p{1.5cm}|p{1.3cm}p{1.3cm}p{1.3cm}p{1.3cm}|p{1.3cm}p{1.3cm}p{1.3cm}p{1.3cm}}
+\toprule
+ & LLM Model & \multicolumn{4}{c|}{\texttt{gpt-4o-2024-08-06}} & \multicolumn{4}{c}{\texttt{chatgpt-4o-latest} (Dec 2024)} \\
+ &  & \textbf{Base} & \textbf{+SA} & \textbf{+FB} & \textbf{+FB, SA} & \textbf{Base} & \textbf{+SA} & \textbf{+FB} & \textbf{+FB, SA} \\
+Scenario & PE &  &  &  &  &  &  &  &  \\
+\midrule
+\multirow[t]{3}{*}{1} & CoT & 0.064 & 0.013 & 0.011 & 0.093 & 0.002 & 0.067 & 0.062 & 0.100 \\
+ & ToT & 0.040 & 0.094 & 0.333 & 0.121 & 0.236 & 0.000 & 0.076 & 0.150 \\
+ & GoT & 0.013 & 0.081 & 0.017 & 0.054 & 0.258 & 0.117 & 0.094 & 0.096 \\
+\midrule
+\multirow[t]{3}{*}{2} & CoT & 0.002 & 0.007 & 0.300 & 0.140 & 0.409 & 0.124 & 0.327 & 0.349 \\
+ & ToT & 0.014 & 0.000 & 0.324 & 0.073 & 0.393 & 0.311 & 0.140 & 0.420 \\
+ & GoT & 0.059 & 0.054 & 0.156 & 0.168 & 0.649 & 0.314 & 0.464 & 0.400 \\
+\midrule
+\multicolumn{2}{c|}{\textbf{Mean}} & 0.032 & 0.042 & 0.190 & 0.108 & 0.325 & 0.155 & 0.194 & 0.253 \\
+\bottomrule
+\end{tabular}
+\end{table*}
