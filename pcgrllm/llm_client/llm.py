@@ -66,6 +66,20 @@ class UnifiedLLMClient:
                    seed=42,
                    top_p=0.99,
                    temperature=0):
+
+        if 'sonnet' in model or 'llama' in model:
+            return self.call_aws_interface(ctx, messages, model, n_response, seed, top_p, temperature)
+        else:
+            return self.call_gpt_interface(ctx, messages, model, n_response, seed, top_p, temperature)
+
+    def call_gpt_interface(self, ctx: ChatContext,
+                   messages: list,
+                   model=None,
+                   n_response=1,
+                   seed=42,
+                   top_p=0.99,
+                   temperature=0):
+
         model_config = self.config[model]
         api_host = model_config["api_host"]
 
@@ -115,6 +129,72 @@ class UnifiedLLMClient:
 
         return responses
 
+    def call_aws_interface(self, ctx: ChatContext,
+                   messages: list,
+                   model=None,
+                   n_response=1,
+                   seed=42,
+                   top_p=0.99,
+                   temperature=0):
+
+        model_config = self.config[model]
+
+        full_model_name = model_config["full-model-name"]
+        # extra_body = model_config.get("extra_body", {})
+        import boto3
+        client = boto3.client("bedrock-runtime", region_name=model_config['region_name'],
+                              aws_access_key_id=model_config['aws_access_key_id'],
+                              aws_secret_access_key=model_config['aws_secret_access_key'])
+
+
+        start_time = time.time()
+
+        system_messages = [{'text': m['content']} for m in messages if m['role'] in ['system']]
+        regular_messages = list()
+
+        for m in messages:
+            if m['role'] in ['user', 'assistant']:
+                regular_messages.append({
+                    "role": m['role'],
+                    "content": [
+                        {
+                            "text": m['content']
+                        }
+                    ]
+                })
+
+        # Send the message to the model, using a basic inference configuration.
+        response = client.converse(
+            modelId=full_model_name,
+            system=system_messages,
+            messages=regular_messages,
+            inferenceConfig={"maxTokens": 4096, "temperature": temperature, "topP": top_p},
+        )
+
+
+        end_time = time.time()
+
+        responses = list()
+
+        response_time = end_time - start_time
+        input_tokens = response['usage']['inputTokens']
+        output_tokens = response['usage']['outputTokens']
+        assistant_message = response["output"]["message"]["content"][0]["text"]
+
+
+        _ctx = copy.deepcopy(ctx)
+        _ctx.add_interaction(
+            user_message=messages[-1]['content'],
+            assistant_message=assistant_message,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            response_time=response_time,
+            model_name=model
+        )
+        responses.append((assistant_message, _ctx))
+
+        return responses
+
 
 if __name__ == "__main__":
 
@@ -136,13 +216,13 @@ if __name__ == "__main__":
         }
     ]
 
-    responses = client.call_model(ctx, messages, model='llama3-70b-instruct', n_response=1)
+    responses = client.call_model(ctx, messages, model='sonnet-35', n_response=1)
     #
     print(f"Response:", responses[0][1])
-
-    ctx = ChatContext()
-
-    responses = client.call_model(ctx, messages, model='llama3-70b-instruct', n_response=1)
-
-    print(f"Response:", responses[0][1])
+    #
+    # ctx = ChatContext()
+    #
+    # responses = client.call_model(ctx, messages, model='llama3-70b-instruct', n_response=1)
+    #
+    # print(f"Response:", responses[0][1])
 
