@@ -142,9 +142,13 @@ class UnifiedLLMClient:
         full_model_name = model_config["full-model-name"]
         # extra_body = model_config.get("extra_body", {})
         import boto3
+        from botocore.config import Config
+
+        config = Config(read_timeout=3600)
         client = boto3.client("bedrock-runtime", region_name=model_config['region_name'],
                               aws_access_key_id=model_config['aws_access_key_id'],
-                              aws_secret_access_key=model_config['aws_secret_access_key'])
+                              aws_secret_access_key=model_config['aws_secret_access_key'],
+                              config=config)
 
 
         start_time = time.time()
