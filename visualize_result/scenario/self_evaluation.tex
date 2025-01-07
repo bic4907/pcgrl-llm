@@ -1,14 +1,16 @@
 \begin{table}[!h]
-\caption{Ablation study results for framework architecture, comparing accuracy across prompt engineering methods and scenarios.}
+\caption{Results of an ablation study comparing the performance of heuristic and LLM-based evaluators when feedback is applied to each PE method.}
 \label{tab:self_evaluation}
 \begin{tabular}{p{1.5cm}|p{0.73cm}p{0.73cm}p{0.73cm}|p{0.73cm}p{0.73cm}p{0.73cm}}
 \toprule
-exp_name & \multicolumn{3}{c}{def} & \multicolumn{3}{c}{vision} \\
+\textbf{Evaluator} & \multicolumn{3}{c|}{\textbf{Heuristic (Oracle)}} & \multicolumn{3}{c}{\textbf{LLM (Self-evaluate)}} \\
  & Base & +FB & $\Delta{}$ & Base & +FB & $\Delta{}$ \\
 PE &  &  &  &  &  &  \\
 \midrule
-CoT & 0.033 & 0.156 & +0.122 & 0.142 & 0.199 & +0.057 \\
-\bottomrule
+ToT & 0.028 & 0.329 & +0.301 & 0.106 & 0.071 & -0.034 \\
+GoT & 0.033 & 0.076 & +0.044 & 0.062 & 0.018 & -0.044 \\
 \midrule
+\textbf{Mean} & 0.030 & 0.203 & +0.172 & 0.084 & 0.044 & -0.039 \\
+\bottomrule
 \end{tabular}
 \end{table}

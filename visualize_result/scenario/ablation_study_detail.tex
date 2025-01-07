@@ -1,21 +1,15 @@
 \begin{table*}[!t]
 \caption{Ablation study results for framework architecture, comparing accuracy across prompt engineering methods and scenarios.}
-\label{tab:result_pe}
+\label{tab:ablation_study}
 \begin{tabular}{p{1.5cm}p{1.5cm}|p{1.3cm}p{1.3cm}p{1.3cm}p{1.3cm}|p{1.3cm}p{1.3cm}p{1.3cm}p{1.3cm}}
 \toprule
- & LLM ($\mathcal{M}$) & \multicolumn{4}{c|}{\texttt{gpt-4o-2024-08-06}} & \multicolumn{4}{c}{\texttt{chatgpt-4o-latest} (Dec 2024)} \\
+ & LLM ($\mathcal{M}$) & \multicolumn{4}{c|}{\texttt{gpt-4o-2024-08-06}} & \multicolumn{4}{c}{\texttt{llama3.2-90b-instruct}} \\
  &  & Base & + SA & + FB & + FB \& SA & Base & + SA & + FB & + FB \& SA \\
 Scenario & PE &  &  &  &  &  &  &  &  \\
 \midrule
-\multirow[t]{3}{*}{1} & CoT & 0.064 & 0.013 & 0.011 & 0.093 & 0.002 & 0.104 & 0.062 & 0.059 \\
- & ToT & 0.040 & 0.094 & 0.333 & 0.121 & 0.044 & 0.185 & 0.050 & 0.154 \\
- & GoT & 0.013 & 0.081 & 0.017 & 0.054 & 0.329 & 0.117 & 0.076 & 0.096 \\
-\midrule
-\multirow[t]{3}{*}{2} & CoT & 0.002 & 0.007 & 0.300 & 0.140 & 0.159 & 0.178 & 0.202 & 0.322 \\
- & ToT & 0.014 & 0.000 & 0.324 & 0.073 & 0.263 & 0.311 & 0.230 & 0.420 \\
- & GoT & 0.059 & 0.054 & 0.156 & 0.168 & 0.269 & 0.209 & 0.182 & 0.348 \\
-\midrule
-\multicolumn{2}{c|}{\textbf{Mean}} & 0.032 & 0.042 & 0.190 & 0.108 & 0.178 & 0.184 & 0.134 & 0.233 \\
+\multicolumn{2}{c|}{\textbf{Mean}} & 0.031 & 0.045 & 0.187 & 0.110 & 0.251 & 0.289 & 0.260 & 0.406 \\
 \bottomrule
 \end{tabular}
+\midrule
 \end{table*}
+\midrule
