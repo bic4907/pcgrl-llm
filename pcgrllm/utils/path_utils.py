@@ -86,6 +86,10 @@ def get_exp_group(config):
         exp_group = os.path.join(
             config.env_name
         )
+
+    if not (config.n_aux_best == 2 and config.n_aux_worst == 0):
+        exp_group += f'_aux-b{config.n_aux_best}w{config.n_aux_worst}'
+
     return exp_group
 
 def get_short_target(target: str) -> str:
@@ -109,9 +113,6 @@ def get_exp_name(config):
 
     if config.feedback_type != "default":
         exp_name += f'_fb-{config.feedback_type[:3]}'
-
-    if not (config.n_aux_best == 2 and config.n_aux_worst == 0):
-        exp_name += f'_aux-b{config.n_aux_best}w{config.n_aux_worst}'
 
     exp_name += f'_s-{config.seed}'
 
