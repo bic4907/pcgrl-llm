@@ -102,15 +102,21 @@ def get_short_target(target: str) -> str:
 
 def get_exp_name(config):
     exp_group = get_exp_group(config)
+    exp_name = exp_group
 
     target_character = get_short_target(config.target_character) if config.task == 'scenario' else config.target_character
+    exp_name += f'_chr-{target_character}'
 
-    if config.feedback_type == "default":
-        return f'{exp_group}_chr-{target_character}_s-{config.seed}'
-    elif config.feedback_type == "no":
-        return f'{exp_group}_chr-{target_character}_fb-{config.feedback_type}_s-{config.seed}'
-    else:
-        return f'{exp_group}_chr-{target_character}_fb-{config.feedback_type[:3]}_s-{config.seed}'
+    if config.feedback_type != "default":
+        exp_name += f'_fb-{config.feedback_type[:3]}'
+
+    if not (config.n_aux_best == 2 and config.n_aux_worst == 0):
+        exp_name += f'_aux-b{config.n_aux_best}w{config.n_aux_worst}'
+
+    exp_name += f'_s-{config.seed}'
+
+    return exp_name
+
 
 
 def get_exp_dir(config):

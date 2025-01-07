@@ -187,7 +187,11 @@ class Experiment:
 
         if self.config.pe in ['got'] and self._iteration >= 2:
             prev_eval_result = self.get_evaluation_result(self._iteration - 1).to_prompt()
-            self.auxiliary_iter_nums = self.graph_manager.get_best_iteration_nums(max_n=2, excludes=[self._iteration - 1])
+            self.auxiliary_iter_nums = self.graph_manager.get_best_and_worst_iteration_nums(
+                best_n=self.config.n_aux_best,
+                worst_n=self.config.n_aux_worst,
+                excludes=[self._iteration - 1]
+            )
 
             auxiliary_prompt = get_reward_score_paired_examples(self.storage, self.auxiliary_iter_nums)
             auxiliary_prompt_path = self.storage.set_auxiliary_prompt(self._iteration, auxiliary_prompt)

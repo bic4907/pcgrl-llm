@@ -336,6 +336,10 @@ class TrainLLMConfig(Config):
     n_codegen_trials: int = 3
     n_codefix_trials: int = 3
 
+    n_aux_best: int = 2
+    n_aux_worst: int = 0
+
+
 cs = ConfigStore.instance()
 cs.store(name="config", node=Config)
 cs.store(name="ma_config", node=MultiAgentConfig)

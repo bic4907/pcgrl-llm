@@ -160,3 +160,30 @@ class GraphManager:
         best_iteration_nums = [iteration.iteration_num for iteration in best_iterations[:min(max_n, len(best_iterations))]]
 
         return best_iteration_nums
+
+    def get_best_and_worst_iteration_nums(self, best_n: int, worst_n: int, excludes: list = list()) -> List[int]:
+        """
+        Returns the best n and worst n iteration numbers as a unique list,
+        excluding the ones in the excludes list.
+        """
+        iterations = self.storage.get_iterations()
+        # Exclude specified iteration numbers
+        iterations = [iteration for iteration in iterations if iteration.iteration_num not in excludes]
+
+        # Sort iterations based on fitness in descending order for best and ascending for worst
+        sorted_iterations = sorted(iterations, key=lambda x: x.get_evaluation().total, reverse=True)
+
+        # Get the best n iterations
+        best_iteration_nums = [iteration.iteration_num for iteration in sorted_iterations[:best_n]]
+
+        # Get the worst n iterations
+        worst_iteration_nums = [iteration.iteration_num for iteration in sorted_iterations[-worst_n:]]
+
+        # Combine the best and worst iteration numbers and remove duplicates using set
+        combined_iteration_nums = list(set(best_iteration_nums + worst_iteration_nums))
+
+        # Sort the list if ordering is necessary (optional)
+        combined_iteration_nums.sort()
+
+        return combined_iteration_nums
+
