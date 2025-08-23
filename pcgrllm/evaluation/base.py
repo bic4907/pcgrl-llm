@@ -34,8 +34,12 @@ class EvaluationResult:
     tp_imp_perc: float = 0
     tn_imp_perc: float = 0
 
+    is_closed: float = 0         # If the door is closed (not reachable from the player without the key)
+
+
     attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'reach_imp_perc',
-                     'exist_imp_perc', 'acc_imp_perc', 'fp_imp_perc', 'fn_imp_perc', 'tp_imp_perc', 'tn_imp_perc']
+                     'exist_imp_perc', 'acc_imp_perc', 'fp_imp_perc', 'fn_imp_perc', 'tp_imp_perc', 'tn_imp_perc',
+                     'is_closed']
 
     def __init__(self, task: TaskType, **kwargs):
 
@@ -81,6 +85,13 @@ class EvaluationResult:
                 'fn_imp_perc': float(self.fn_imp_perc),
                 'tp_imp_perc': float(self.tp_imp_perc),
                 'tn_imp_perc': float(self.tn_imp_perc)
+            }
+        elif self.task == TaskType.Scenario2:
+            result_dict = {
+                'playability': float(self.playability), # check the door
+                'solvability': float(self.solvability), # check the key + door
+                'acc_imp_perc': float(self.acc_imp_perc),
+                'is_closed': float(self.is_closed)
             }
         else:
             raise ValueError(f"Invalid task type: {self.task}")

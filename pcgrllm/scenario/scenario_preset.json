@@ -27,6 +27,20 @@
                 5,
                 6
             ]
+        },
+        "5": {
+            "prompt": "The player must pick up the key to unlock the door and discover the treasure inside.",
+            "important_tiles": [
+                7
+            ]
+        },
+        "6": {
+            "prompt": "The bat holds the key, and only by defeating it can the player open the door and reach the treasure.",
+            "important_tiles": [
+                4
+            ]
         }
+
+
     }
 }

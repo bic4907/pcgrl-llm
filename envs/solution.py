@@ -7,7 +7,7 @@ import chex
 import jax.numpy as jnp
 from jax import jit
 
-from envs.pathfinding import check_event, check_event_jit, get_max_path_length_static
+from envs.pathfinding import check_event, check_event_jit, get_max_path_length_static, calc_path_from_a_to_b
 from envs.probs.dungeon3 import Dungeon3Tiles, Dungeon3Problem
 from envs.utils import generate_color_palette, generate_offset_palette
 
@@ -207,6 +207,70 @@ def get_solution_jit(env_map) -> Solutions:
 
     return solutions
 
+
+@jax.jit
+def get_min_distance_jit(env_map, source_tile, target_tile, passable_tiles, max_targets: int = 5) -> int:
+    """
+    Compute the minimum distance from a source_tile to any of the target_tile positions.
+
+    Args:
+        env_map: 2D jnp.array, the environment map
+        source_tile: int, tile ID for the source (e.g., PLAYER)
+        target_tile: int, tile ID for the target (e.g., DOOR, TREASURE)
+        passable_tiles: 1D jnp.array, list of passable tile IDs
+        max_targets: int, maximum number of targets to consider
+
+    Returns:
+        min_distance: int
+            shortest distance from source_tile to a target_tile
+            -1 if no target is reachable
+    """
+    # Source 위치 (하나만 있다고 가정, 없으면 [-1, -1])
+    src_xy = jnp.argwhere(env_map == source_tile, size=1, fill_value=-1)[0]
+
+    # 최대 max_targets 개의 target_tile 좌표
+    targets = jnp.argwhere(env_map == target_tile, size=max_targets, fill_value=-1)
+
+
+    def process_target(i, carry):
+        min_dist = carry
+        trg = targets[i]
+
+        def skip_invalid(_):
+            return min_dist
+
+        def process_valid(_):
+            dist, _, _ = calc_path_from_a_to_b(env_map, passable_tiles, src_xy, trg)
+            dist = dist.astype(jnp.int32)
+
+            return jax.lax.cond(
+                dist >= 0,
+                lambda _: jnp.minimum(min_dist, dist).astype(jnp.int32),
+                lambda _: min_dist.astype(jnp.int32),
+                operand=None,
+            )
+
+        return jax.lax.cond(
+            jnp.all(trg == jnp.array([-1, -1])),  # invalid target
+            skip_invalid,
+            process_valid,
+            operand=None,
+        )
+
+    # 초기값: 큰 값
+    init_min = int(16 ** 3)  # 4096, 맵 크기보다 충분히 큰 값
+
+    min_distance = jax.lax.fori_loop(0, targets.shape[0], process_target, init_min)
+
+    # reachable target이 없으면 -1 반환
+    min_distance = jax.lax.cond(
+        min_distance == init_min,
+        lambda _: -1,
+        lambda _: min_distance,
+        operand=None,
+    )
+
+    return min_distance
 
 if __name__ == '__main__':
     from debug.scenario_levels import AllLevels
