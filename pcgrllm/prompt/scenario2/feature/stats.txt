@@ -1,0 +1,37 @@
+### 'prev_array' and 'curr_array': (dict[int]): ({stats_keys})
+
+prev_stats: dict : statistics of the previous game level
+curr_stats: dict : statistics of the current game level
+
+** Global Features (Values in `jnp.array`) **
+1. **DIAMETER** (Scalar, shape: `(1,)`)
+   - The longest distance between any two points within the level, normalized.
+
+2. **N_REGIONS** (Scalar, shape: `(1,)`)
+   - The number of distinct regions within the level.
+
+3. **H_SYMMETRY** (Scalar, shape: `(1,)`)
+   - The degree of symmetry when the level is reflected horizontally.
+
+4. **V_SYMMETRY** (Scalar, shape: `(1,)`)
+   - The degree of symmetry when the level is reflected vertically.
+
+5. **LR_DIAGONAL_SYMMETRY** (Scalar, shape: `(1,)`)
+   - The degree of symmetry when the level is reflected along the left-to-right diagonal.
+
+6. **RL_DIAGONAL_SYMMETRY** (Scalar, shape: `(1,)`)
+   - The degree of symmetry when the level is reflected along the right-to-left diagonal.
+
+7. **LARGEST_COMPONENT** (Scalar, shape: `(1,)`)
+   - The size of the largest connected component, normalized to the level size.
+
+Usage: h_symmetry = curr_stats['H_SYMMETRY']
+
+** Regional Features (4x4 array per region) **
+1. **EMPTY_RATE** (4x4 array, shape: `(4, 4)`)
+   - The proportion of empty blocks in each 4x4 subregion of the level.
+
+2. **SHANNON_ENTROPY** (4x4 array, shape: `(4, 4)`)
+   - The Shannon entropy for each 4x4 subregion, reflecting the diversity of patterns.
+
+Usage: empty_arr = curr_stats['EMPTY_RATE']; empty_arr[:, 0]

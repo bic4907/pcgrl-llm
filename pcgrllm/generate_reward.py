@@ -19,6 +19,7 @@ from conf.config import TrainLLMConfig, Config
 from envs.probs.binary import BinaryTiles
 
 from envs.probs.dungeon2 import Dungeon2Tiles
+from envs.probs.dungeon_door import DungeonDoorFakeTiles
 from pcgrllm.utils.exceptions import RewardExecutionException, RewardParsingException
 from pcgrllm.utils.path_utils import init_config
 from pcgrllm.validate_reward import run_validate, read_file
@@ -359,7 +360,11 @@ class RewardGenerator:
         available_tiles = set(self.available_tiles) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
 
         # Filter the enum members based on available_tiles
-        tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in Dungeon2Tiles if tile in available_tiles)
+        #  if the task is scenario, use Dungeon3Tiles
+        if self.task == 'dungeon_door':
+            tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in DungeonDoorFakeTiles if tile in available_tiles)
+        else:
+            tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in Dungeon2Tiles if tile in available_tiles)
 
         # Format the prompt with values
         return prompt.format(

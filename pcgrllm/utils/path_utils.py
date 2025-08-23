@@ -124,6 +124,10 @@ def init_config(config: Config):
         config.problem = 'dungeon3'
         logger.log(logging.INFO, f"Changing config.problem to dungeon3 for scenario task")
 
+    if config.task == 'scenario2' and config.problem != 'dungeon_door':
+        config.problem = 'dungeon_door'
+        logger.log(logging.INFO, f"Changing config.problem to dungeon_door for scenario2 task")
+
     # Validate if the evaluator is supported
     if config.task == TaskType.Alphabet and config.evaluator not in {'llm', 'hr', 'vit'}:
         raise ValueError(f"Unsupported evaluator for task {config.task}: {config.evaluator}")

@@ -29,6 +29,7 @@ import pprint
 from conf.config import TrainConfig
 from envs.pcgrl_env import get_prob_cls, ProbEnum, get_available_tiles
 from pcgrllm.evaluation.base import EvaluationResult
+from pcgrllm.evaluation.dooropen import DooropenEvaluator
 from pcgrllm.evaluation.heuristic import HeuristicEvaluator
 from pcgrllm.evaluation.llm_evaluator import LLMEvaluator
 from pcgrllm.evaluation.solution import SolutionEvaluator
@@ -432,6 +433,8 @@ class Experiment:
             result = self._run_alphabet_evaluation(iteration=iteration, target_character=self.config.target_character)
         elif self.config.task == TaskType.Scenario:
             result = self._run_scenario_evaluation(iteration=iteration, scenario_num=self.config.target_character)
+        elif self.config.task == TaskType.Scenario2:
+            result = self._run_scenario2_evaluation(iteration=iteration, scenario_num=self.config.target_character)
         else:
             raise ValueError(f"Invalid task type: {self.config.task}")
 
@@ -522,6 +525,42 @@ class Experiment:
 
         return result
 
+    def _run_scenario2_evaluation(self, iteration: Iteration, scenario_num: str) -> EvaluationResult:
+
+        exp_dir = path.join(self.config.exp_dir, f'iteration_{self._iteration}')
+
+        if self.config.evaluator == 'hr':
+            evaluator = DooropenEvaluator(task=self.config.task, logger=self.logger)
+        elif self.config.evaluator == 'llm':
+            evaluator = LLMEvaluator(task=self.config.task, logger=self.logger,
+                                     gpt_model=self.config.gpt_model, seed=self.config.seed,
+                                     n_generation_trials=self.config.n_generation_trials)
+        else:
+            raise ValueError(f"Invalid evaluator type: {self.config.evaluator}")
+
+        result = evaluator.run(iteration=iteration, target_character=scenario_num)
+
+        if self.config.evaluator == 'hr':
+            log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=None)
+        else:
+            self.logging(f"LLM Evaluation Result: {result}", level=logging.INFO)
+
+            log_evaluation_result(logger=self.logger, result=result, iteration=self._iteration, evaluator_type=self.config.evaluator)
+
+            # Get the evaluation result
+            sol_evaluator = DooropenEvaluator(task=self.config.task, logger=self.logger)
+            sol_result = sol_evaluator.run(iteration=iteration, target_character=self.config.target_character)
+
+            # Save the evaluation result to the iteration file
+            result_path = path.join(exp_dir, 'evaluation.hr.json')
+            with open(result_path, 'w') as f:
+                json.dump(sol_result.to_dict(), f)
+
+            # Log the evaluation result
+            log_evaluation_result(logger=self.logger, result=sol_result, iteration=self._iteration, evaluator_type=None)
+            self.logging(f"Solution Result: {sol_result}", level=logging.INFO)
+
+        return result
 
     def save_state(self):
         """Saves all instance variables to a YAML file, excluding specified keys."""

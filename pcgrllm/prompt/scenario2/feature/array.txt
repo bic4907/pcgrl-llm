@@ -1,0 +1,11 @@
+### 'prev_array' and 'curr_array' (jnp.array, int32): shape: (h, w), two-dimensional array representing the game level with tile numbers.
+The range of width is different by the array input (e.g., 10-20), so write a function works on any width and height.
+
+prev_array: jnp.array : previous game level represented with tile numbers
+curr_array: jnp.array : current game level represented with tile numbers
+
+The array is a 2D array with the shape of (height, width) to represent the game level.
+The level is represented with tile numbers. The tile number is an integer value.
+
+[Tile Number]
+{tile_enum}
