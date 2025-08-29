@@ -15,7 +15,9 @@ from os.path import abspath, basename, join, dirname
 
 
 from conf.config import Config
+from envs.pcgrl_env import ProbEnum
 from envs.probs.binary import BinaryTiles
+from envs.probs.dungeon4 import Dungeon3Tiles, DungeonDoorFakeTiles
 from pcgrllm.llm_client.llm import UnifiedLLMClient, ChatContext
 from pcgrllm.utils.storage import Storage
 
@@ -93,12 +95,16 @@ class FeedbackGenerator:
         if input_type == FeedbackInputType.Array:
             available_tiles = set(self.config['available_tiles']) | {BinaryTiles.EMPTY, BinaryTiles.WALL}
 
-            # Filter the enum members based on available_tiles
-            tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in BinaryTiles if tile in available_tiles)
+            if self.config['task'] == 'scenario':
+                tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in Dungeon3Tiles if tile in available_tiles)
+            elif self.config['task'] == 'scenario2':
+                tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in DungeonDoorFakeTiles if tile in available_tiles)
+            else:
+                tile_enum = ', '.join(f"{tile.name} = {tile.value}" for tile in BinaryTiles if tile in available_tiles)
             content = f'Available tiles: {tile_enum}\n\n{content}'
 
         user_prompt = user_prompt.format(
-            evaluation_criteria=self.config['condition_prompt'] ,
+            evaluation_criteria=self.config['condition_prompt'].prompt, # check error
             reward_function_prompt=reward_function_prompt,
             content=content
         )

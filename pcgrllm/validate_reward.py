@@ -32,12 +32,16 @@ def run_validate(config: TrainLLMConfig, return_reward=False, length=100):
 
     # Set up the environment
     env, env_params = gymnax_pcgrl_make(config.env_name, config=config)
+
+    print_log(logger, f"env_params: {env_params}", level=logging.INFO)
+
     env = LLMRewardWrapper(env)
     env = LogWrapper(env)
 
     # Setup reward function
     if config.reward_function_path is None:
-        config.reward_function_path = path.abspath(path.join(path.dirname(__file__), 'example', 'bypass_reward.py'))
+        config.reward_function_path = path.abspath(path.join(path.dirname(__file__), 'bypass_reward', 'bypass_reward.py'))
+        print_log(logger, f"No reward function path provided. Using default: {config.reward_function_path}", level=logging.WARNING)
 
     print_log(logger, f"Reward validation path: {config.reward_function_path}", level=logging.INFO)
     reward_fn_str = read_file(config.reward_function_path)
@@ -61,15 +65,14 @@ def run_validate(config: TrainLLMConfig, return_reward=False, length=100):
     reward = jnp.zeros((config.n_envs, ), dtype=jnp.float32)
 
     # Prepare step function for lax.scan
-    carry = (rng_step, env_state, reward, env_params)
-
-
+    carry = (rng_step, env_state, reward)
     vmap_step_fn = jax.vmap(env.step, in_axes=(0, 0, 0, None))
 
     def step_fn(carry, _):
         """Step function for lax.scan that performs one step in the environment."""
-        rng_step, env_state, reward, env_params = carry
+        rng_step, env_state, reward = carry
 
+        # jax.debug.print("{}", env_params)
 
         action = jax.vmap(env.rep.action_space.sample, in_axes=0)(rng_step)
         action = action.reshape(-1, 1, 1, 1)
@@ -77,8 +80,8 @@ def run_validate(config: TrainLLMConfig, return_reward=False, length=100):
         obsv, env_state, reward, done, info = vmap_step_fn(
             rng_step, env_state, action, env_params
         )
-
-        carry = (rng_step, env_state, reward, env_params)  # Update carry with new state
+        # jax.debug.print("2222")
+        carry = (rng_step, env_state, reward)  # Update carry with new state
 
         return carry, reward  # Return updated carry and current rewards
 

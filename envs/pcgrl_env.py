@@ -17,7 +17,7 @@ from envs.probs.binary import BinaryMetrics, BinaryProblem
 from envs.probs.dungeon import DungeonProblem
 from envs.probs.dungeon2 import Dungeon2Problem
 from envs.probs.dungeon3 import Dungeon3Problem
-from envs.probs.dungeon_door import DungeonDoorProblem
+from envs.probs.dungeon4 import Dungeon4Problem
 from envs.probs.maze import MazeProblem
 from envs.probs.maze_play import MazePlayProblem
 from envs.probs.problem import MapData, Problem, ProblemState
@@ -40,7 +40,7 @@ class ProbEnum(IntEnum):
     MAZE_PLAY = 3
     DUNGEON2 = 4
     DUNGEON3 = 5
-    DUNGEON_DOOR = 6
+    DUNGEON4 = 6
 
 PROB_CLASSES = {
     ProbEnum.BINARY: BinaryProblem,
@@ -49,7 +49,7 @@ PROB_CLASSES = {
     ProbEnum.DUNGEON2: Dungeon2Problem,
     ProbEnum.MAZE_PLAY: MazePlayProblem,
     ProbEnum.DUNGEON3: Dungeon3Problem,
-    ProbEnum.DUNGEON_DOOR: DungeonDoorProblem
+    ProbEnum.DUNGEON4: Dungeon4Problem
 }
 
 class RepEnum(IntEnum):
@@ -184,6 +184,7 @@ def get_prob_cls(problem: str):
 
 def get_available_tiles(problem_str: str) -> list:
     prob = get_prob_cls(getattr(ProbEnum, problem_str.upper()))
+
     tiles = [int(tile) for tile in prob.tile_enum]
 
     # remove 0 from tiles
@@ -216,7 +217,7 @@ class PCGRLEnv(Environment):
         prob_cls = PROB_CLASSES[problem]
 
         env_kwargs = dict()
-        if problem in [ProbEnum.DUNGEON3, ProbEnum.DUNGEON_DOOR]:
+        if problem in [ProbEnum.DUNGEON3, ProbEnum.DUNGEON4]:
             env_kwargs['randomize_start_pos'] = env_params.randomize_start_pos
 
         self.prob: Problem = prob_cls(map_shape=map_shape, ctrl_metrics=env_params.ctrl_metrics,

@@ -398,10 +398,11 @@ class Experiment:
 
         if self.config.task == TaskType.Alphabet:
             condition_prompt = f'Make a level looks like "{self.config.target_character}"'
-        elif self.config.task == TaskType.Scenario:
+        elif self.config.task in [TaskType.Scenario, TaskType.Scenario2]:
             condition_prompt = ScenarioPreset().scenarios.get(self.config.target_character)
         else:
             raise ValueError(f"Invalid task type: {self.config.task}")
+
 
         args_dict = {
             'exp_path': self.config.exp_dir,
@@ -411,7 +412,7 @@ class Experiment:
             'reward_function': self._current_reward_function_filename,
             'available_tiles': get_available_tiles(self.config.problem),
             'iteration': self._iteration,
-            'task': self.config.task
+            'task': self.config.task,
         }
 
         feedback = generate_feedback(self.config, args_dict)

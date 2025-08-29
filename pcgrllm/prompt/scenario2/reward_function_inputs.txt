@@ -1,5 +1,7 @@
 
 ### Reward Function Inputs
+#### Do not use 'unused' parameters since they are deprecated. However, keep them in the parameter list for compatibility.
+
 def compute_reward(prev_array, prev_stats, curr_array, curr_stats) -> float:
     reward = 0.0
 

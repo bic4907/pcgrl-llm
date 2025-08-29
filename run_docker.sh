@@ -99,6 +99,7 @@ docker_command="docker run --rm -it
     --gpus all
     -e CUDA_VISIBLE_DEVICES=$available_gpu
     -v $(pwd)/.netrc:/.netrc
+    -v $(pwd)/.config:/.config
     --network=host
     -e HF_HOME=/workspace/cache/huggingface
     --name \"$container_name\"

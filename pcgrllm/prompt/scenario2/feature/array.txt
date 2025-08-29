@@ -4,6 +4,8 @@ The range of width is different by the array input (e.g., 10-20), so write a fun
 prev_array: jnp.array : previous game level represented with tile numbers
 curr_array: jnp.array : current game level represented with tile numbers
 
+* Do not use 'prev_stats' and 'curr_stats' in the parameter since they are deprecated.
+
 The array is a 2D array with the shape of (height, width) to represent the game level.
 The level is represented with tile numbers. The tile number is an integer value.
 

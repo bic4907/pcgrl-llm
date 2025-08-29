@@ -516,9 +516,16 @@ def init_checkpointer(config: Config) -> Tuple[Any, dict]:
 
         runner_state = target['runner_state']
         try:
-            restored_ckpt = checkpoint_manager.restore(
-                # steps_prev_complete, items=target)
-                steps_prev_complete, args=ocp.args.StandardRestore(target))
+
+            try:
+                restored_ckpt = checkpoint_manager.restore(
+                    steps_prev_complete, args=ocp.args.StandardRestore(target, strict=False)
+                )
+            except Exception:
+                restored_ckpt = checkpoint_manager.restore(
+                    steps_prev_complete, args=ocp.args.StandardRestore(target)
+                )
+
         except KeyError:
             # HACK
             runner_state = runner_state.replace(

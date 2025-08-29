@@ -13,12 +13,34 @@ import numpy as np
 
 from envs.pathfinding import FloodPath, FloodPathState, FloodRegions, FloodRegionsState, calc_diameter, calc_n_regions, calc_path_length, get_max_n_regions, get_max_path_length, get_max_path_length_static, get_path_coords
 from envs.probs.dungeon2 import Dungeon2Metrics
-from envs.probs.dungeon3 import Dungeon3Tiles
 from envs.probs.problem import Problem, ProblemState, draw_path, get_max_loss, get_reward, gen_init_map, MapData
 from envs.utils import idx_dict_to_arr, Tiles
 
 
 __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
+
+
+class Dungeon3Tiles(IntEnum):
+    BORDER = 0
+    EMPTY = 1
+    WALL = 2
+    PLAYER = 3
+    BAT = 4
+    SCORPION = 5
+    SPIDER = 6
+    KEY = 7
+    DOOR = 8
+
+class DungeonDoorFakeTiles(IntEnum):
+    BORDER = 0
+    EMPTY = 1
+    WALL = 2
+    PLAYER = 3
+    BAT = 4
+    SCORPION = 5
+    DOOR = 6
+    KEY = 7
+    TREASURE = 8
 
 class Dungeon3Metrics(IntEnum):
     N_REGIONS = 0
@@ -27,20 +49,7 @@ class Dungeon3Metrics(IntEnum):
 class Dungeon3State(ProblemState):
     pass
 
-class DungeonDoorFakeTiles(IntEnum):
-    BORDER = 0
-    EMPTY = 1
-    WALL = 2
-    PLAYER = 3
-    BAT = 4
-    DOOR = 5
-    SPIDER = 6
-    KEY = 7
-    TREASURE = 8
-
-
-
-class DungeonDoorProblem(Problem):
+class Dungeon4Problem(Problem):
     tile_enum = Dungeon3Tiles
     metrics_enum = Dungeon3Metrics
 
@@ -203,7 +212,7 @@ class DungeonDoorProblem(Problem):
                 f"{__location__}/tile_ims/key.png"
             ).convert('RGBA'),
             Dungeon3Tiles.DOOR: Image.open(
-                f"{__location__}/tile_ims/treasure.png" # render door as treasure for clarity
+                f"{__location__}/tile_ims/treasure.png"
             ).convert('RGBA'),
             Dungeon3Tiles.PLAYER: Image.open(
                 f"{__location__}/tile_ims/player.png"
@@ -215,7 +224,7 @@ class DungeonDoorProblem(Problem):
                 f"{__location__}/tile_ims/scorpion.png"
             ).convert('RGBA'),
             Dungeon3Tiles.SPIDER: Image.open(
-                f"{__location__}/tile_ims/door.png" # render spider as door for clarity
+                f"{__location__}/tile_ims/door.png"
             ).convert('RGBA'),
             len(Dungeon3Tiles): Image.open(f"{__location__}/tile_ims/path_g.png").convert(
                 'RGBA'

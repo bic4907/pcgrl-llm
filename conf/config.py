@@ -88,6 +88,7 @@ class Config:
     wandb_key: Optional[str] = None
     wandb_project: Optional[str] = 'pcgrl-llm'
     wandb_resume: str = 'allow'
+    wandb_entity: Optional[str] = 'inchangbaek4907'
     evaluator: str = 'vit' # 'vit', 'hr' (heuristic)
 
     exp_group: Optional[str] = None
@@ -147,6 +148,8 @@ class TrainConfig(Config):
     pe: str = 'io' # 'zs', 'cot', 'cotsc', 'tot', 'got'
     total_iterations: int = 1
     n_self_alignment: int = 0
+
+    feedback_type: str = 'default' # 'default', 'no', 'generic'
 
 
 @dataclass

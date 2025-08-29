@@ -21,6 +21,7 @@ class EvaluationResult:
 
     # Scenario generation task
     playability: float = 0      # If the player can reach to the door
+    naive_playability: float = 0 # If the player can reach to the door without the key
     path_length: float = 0      # The path length from the player to the door
     solvability: float = 0      # if the player can reach the door with the key
     n_solutions: float = 0      # Number of solutions the player can reach the door
@@ -37,7 +38,8 @@ class EvaluationResult:
     is_closed: float = 0         # If the door is closed (not reachable from the player without the key)
 
 
-    attr_scenario = ['playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions', 'reach_imp_perc',
+    attr_scenario = ['playability', 'naive_playability', 'path_length', 'solvability', 'n_solutions', 'loss_solutions',
+                     'reach_imp_perc',
                      'exist_imp_perc', 'acc_imp_perc', 'fp_imp_perc', 'fn_imp_perc', 'tp_imp_perc', 'tn_imp_perc',
                      'is_closed']
 
@@ -89,6 +91,7 @@ class EvaluationResult:
         elif self.task == TaskType.Scenario2:
             result_dict = {
                 'playability': float(self.playability), # check the door
+                'naive_playability': float(self.naive_playability), # check without the key
                 'solvability': float(self.solvability), # check the key + door
                 'acc_imp_perc': float(self.acc_imp_perc),
                 'is_closed': float(self.is_closed)

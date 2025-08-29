@@ -48,6 +48,7 @@ CUDA_VERSION = get_cuda_version()
 @struct.dataclass
 class EvaluationResultStruct:
     playability: float = 0
+    naive_playability: float = 0
     solvability: float = 0
     is_closed: float = 0
     imp_reachable: float = 0
@@ -77,32 +78,35 @@ def eval_level(level: np.ndarray, scenario_num) -> Tuple[float, float]:
     p_d_length, _, _ = calc_path_from_a_to_b(level, passable_tiles_wo_spider, p_xy, d_xy)
     is_closed = jnp.where(p_d_length < 0, 1, 0)  # 길이 0보다 크면 연결되어있음
 
-    p_s_length = get_min_distance_jit(env_map=level,
+
+    #
+    p_d_length = get_min_distance_jit(env_map=level,
                                     source_tile=Dungeon3Tiles.PLAYER,
-                                    target_tile=Dungeon3Tiles.SPIDER,
+                                    target_tile=Dungeon3Tiles.SPIDER, # door
                                     passable_tiles=passable_tiles)
-    is_p_d_reachable = jnp.where(p_s_length > 0, 1, 0)
-
-    d_s_length = get_min_distance_jit(env_map=level,
-                                    source_tile=Dungeon3Tiles.DOOR,
-                                    target_tile=Dungeon3Tiles.SPIDER,
-                                    passable_tiles=passable_tiles)
-    is_d_s_reachable = jnp.where(d_s_length > 0, 1, 0)
-
-    structure_ok = (is_closed == 1) & (is_p_d_reachable == 1) & (is_d_s_reachable == 1)
-
-    # Check the reachability of important tiles from the player
+    is_p_d_reachable = jnp.where(p_d_length > 0, 1, 0)
+    #
     p_i_dist = get_min_distance_jit(env_map=level,
                                     source_tile=Dungeon3Tiles.PLAYER,
                                     target_tile=imp_tile,
                                     passable_tiles=passable_tiles)
     is_p_i_reachable = jnp.where(p_i_dist > 0, 1, 0)
 
-    is_solvable = (structure_ok == 1) & (is_p_i_reachable == 1)
+
+    t_d_length = get_min_distance_jit(env_map=level,
+                                    source_tile=Dungeon3Tiles.DOOR, # treasure
+                                    target_tile=Dungeon3Tiles.SPIDER, # door
+                                    passable_tiles=passable_tiles)
+    is_t_d_reachable = jnp.where(t_d_length > 0, 1, 0)
+
+    is_solvable =(is_p_d_reachable == 1) & (is_p_i_reachable == 1)
+    is_naive_playable = (is_solvable == 1) & (is_t_d_reachable == 1)
+    is_playable = (is_naive_playable == 1) & (is_closed == 1)
 
     return EvaluationResultStruct(
-        playability=structure_ok,
-        solvability=is_solvable,
+        playability=is_playable, # 열쇠를 주워서 문을 열 수 있고, 문안에 있는 treasure을 만날 수 있는지
+        naive_playability=is_naive_playable, # 플레이어가 문까지 도달할 수 있는지
+        solvability=is_solvable, # 열쇠를 주워서 문을 열 수 있는데 까지
         is_closed=is_closed,
         imp_reachable=is_p_i_reachable,
     )
@@ -119,46 +123,43 @@ def eval_level_jax(levels, scenario_num):
     else:
         results = jax.lax.map(eval_level_wrapper, levels)
 
-    return (results.playability, results.solvability, results.is_closed, results.imp_reachable)
-
+    # return (results.playability, results.solvability, results.is_closed, results.imp_reachable)
+    return (results.playability, results.naive_playability, results.solvability,
+            results.is_closed, results.imp_reachable)
 
 class DooropenEvaluator(LevelEvaluator):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
-
     def run(self, iteration: Iteration, scenario_num: str = None, target_character: str = None, visualize: bool = False, use_train: bool = False, step_filter=None) -> EvaluationResult:
+
         numpy_files = iteration.get_numpy_files(train=use_train, step_filter=step_filter)
 
         scenario_num = scenario_num if scenario_num is not None else target_character
-
-        # 로드한 numpy 파일을 JAX 배열로 변환
         levels = jnp.array([numpy_file.load() for numpy_file in numpy_files])
 
         eval_results = eval_level_jax(levels=levels, scenario_num=scenario_num)
 
-        # 결과를 개별적으로 계산
-        (playability, solvability, is_closed, imp_reachable) = eval_results
+
+        (playability, naive_playability, solvability, is_closed, imp_reachable) = eval_results
 
         # 평균 계산
         playability = jnp.mean(playability)
+        naive_playability = jnp.mean(naive_playability)
         solvability = jnp.mean(solvability)
-        imp_reachable = jnp.mean(imp_reachable)
         is_closed = jnp.mean(is_closed)
-
+        imp_reachable = jnp.mean(imp_reachable)
         sample_size = len(levels)
 
         return EvaluationResult(
             task=self.task,
             playability=playability,
+            naive_playability=naive_playability,
             solvability=solvability,
-            acc_imp_perc=imp_reachable,
             is_closed=is_closed,
+            acc_imp_perc=imp_reachable,
             sample_size=sample_size,
         )
-
-# Example
-
 
 if __name__ == '__main__':
     # Initialize logger

@@ -103,7 +103,7 @@ def get_short_target(target: str) -> str:
 def get_exp_name(config):
     exp_group = get_exp_group(config)
 
-    target_character = get_short_target(config.target_character) if config.task == 'scenario' else config.target_character
+    target_character = config.target_character
 
     if config.feedback_type == "default":
         return f'{exp_group}_chr-{target_character}_s-{config.seed}'
@@ -124,9 +124,13 @@ def init_config(config: Config):
         config.problem = 'dungeon3'
         logger.log(logging.INFO, f"Changing config.problem to dungeon3 for scenario task")
 
-    if config.task == 'scenario2' and config.problem != 'dungeon_door':
-        config.problem = 'dungeon_door'
-        logger.log(logging.INFO, f"Changing config.problem to dungeon_door for scenario2 task")
+    if config.task == 'scenario' and config.target_character in ['5', '6']:
+        config.task = 'scenario2'
+        logger.log(logging.INFO, f"Changing config.problem to scenario2 for target_character {config.target_character}")
+
+    if config.task == 'scenario2' and config.problem != 'dungeon4':
+        config.problem = 'dungeon4'
+        logger.log(logging.INFO, f"Changing config.problem to dungeon4 for scenario2 task")
 
     # Validate if the evaluator is supported
     if config.task == TaskType.Alphabet and config.evaluator not in {'llm', 'hr', 'vit'}:

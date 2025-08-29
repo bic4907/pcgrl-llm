@@ -19,6 +19,7 @@ def start_wandb(config: Config):
         run = wandb.init(
             project=config.wandb_project,
             resume=config.wandb_resume,
+            entity=config.wandb_entity,
             # id=get_wandb_name(config),
             name=get_wandb_name(config),
             save_code=True)
