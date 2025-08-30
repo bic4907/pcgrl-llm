@@ -58,6 +58,8 @@ class EvaluationResult:
             return self.similarity
         elif self.task == TaskType.Scenario:
             return self.acc_imp_perc
+        elif self.task == TaskType.Scenario2:
+            return self.playability
 
 
     def __str__(self):
@@ -118,6 +120,9 @@ class EvaluationResult:
             return (f"Solvability: {self.solvability}, "
                     f"Number of Solutions: {self.n_solutions}, "
                     f"Reachable Important Tiles: {self.reach_imp_perc}, ")
+        elif self.task == TaskType.Scenario2:
+            return (f"Playability: {self.playability}, "
+                    f"Accuracy of Important Tiles: {self.acc_imp_perc}")
 
 
     def sample(self) -> 'EvaluationResult':
