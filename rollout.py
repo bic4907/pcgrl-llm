@@ -10,8 +10,10 @@ import numpy as np
 
 from conf.config import EnjoyConfig
 from envs.pcgrl_env import PCGRLEnv, render_stats, gen_dummy_queued_state
+from envs.probs.dungeon3 import Dungeon3Tiles
 from envs.probs.problem import get_loss, draw_solutions
 from envs.solution import get_solution, get_solution_jit
+from envs.solution2 import get_solution2_jit
 from pcgrllm.task import TaskType
 from purejaxrl.experimental.s5.wrappers import LossLogWrapper
 from train import init_checkpointer
@@ -92,6 +94,17 @@ def main_rollout(enjoy_config: EnjoyConfig):
 
             if enjoy_config.task == TaskType.Scenario:
                 solution = get_solution_jit(final_level)
+
+                final_frame = draw_solutions(final_frame, solution, env.prob.tile_size, np.array((1, 1)))
+                final_frame = np.array(final_frame)
+
+            elif enjoy_config.task == TaskType.Scenario2:
+                if enjoy_config.target_character == '5':
+                    imp_tile = Dungeon3Tiles.KEY
+                elif enjoy_config.target_character == '6':
+                    imp_tile = Dungeon3Tiles.BAT
+
+                solution = get_solution2_jit(final_level, imp_tile=imp_tile)
 
                 final_frame = draw_solutions(final_frame, solution, env.prob.tile_size, np.array((1, 1)))
                 final_frame = np.array(final_frame)

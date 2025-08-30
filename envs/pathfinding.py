@@ -12,7 +12,6 @@ from flax.linen.initializers import constant, orthogonal
 import chex
 from jax import jit, lax
 
-from envs.utils import Tiles
 from pcgrllm.utils.cuda import get_cuda_version
 
 @struct.dataclass
@@ -718,3 +717,98 @@ def erase_unnecessary_arr(unprocess_arr: chex.Array):
     filtered_arr = arr[valid_mask]
 
     return filtered_arr
+
+
+def remove_item_from_array(array, item):
+    mask = array != item
+    idx = jnp.where(mask, size=array.shape[0], fill_value=-1)[0]
+    return array[idx][:-1]
+
+
+@jax.jit
+def check_event2_jit(
+    env_map: chex.Array,
+    passable_tiles: chex.Array,
+    src: chex.Array,      # PLAYER 위치
+    key: chex.Array,      # KEY 위치
+    trg: chex.Array,      # TARGET (예: SPIDER)
+    door_xy: chex.Array   # DOOR 위치
+) -> Tuple[int, chex.Array, chex.Array]:
+    """
+    Compound event:
+      PLAYER -> KEY -> TARGET -> DOOR
+    Returns:
+      - has_solution (int: 0/1)
+      - enemy_encounter (dummy [0,0,0])
+      - whole_route (Array of path coords, padded with -1)
+    """
+    max_path_len = get_max_path_length_static(map_shape=env_map.shape)
+    target_len = 2 * max_path_len  # 항상 288
+    #
+    no_spider_passable = passable_tiles.copy()
+    no_spider_passable = remove_item_from_array(no_spider_passable, 6)
+
+    # 세 구간 경로 계산
+    pk_path_length, pk_flood_state, _ = calc_path_from_a_to_b(env_map, no_spider_passable, src, key)
+    kt_path_length, kt_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, key, trg)
+    td_path_length, td_flood_state, _ = calc_path_from_a_to_b(env_map, passable_tiles, trg, door_xy)
+
+    pt_path_length, pt_flood_state, _ = calc_path_from_a_to_b(env_map, no_spider_passable, src, door_xy)
+    is_closed = (pt_path_length < 0)  # PLAYER -> TARGET 경로가 없으면 문이 닫힌 것
+
+    valid_paths = (pk_path_length > 0) & (kt_path_length > 0) & (td_path_length > 0) & is_closed
+
+    enemy_encounter_default = jnp.zeros(3, dtype=jnp.int32)  # [0,0,0]
+    whole_route_default = jnp.full((target_len, 2), -1, dtype=jnp.int32)
+
+    def compute_route_and_concat(_):
+        pk_coords = get_path_coords(pk_flood_state.flood_count, max_path_len, pk_flood_state.trg)
+        kt_coords = get_path_coords(kt_flood_state.flood_count, max_path_len, kt_flood_state.trg)
+        td_coords = get_path_coords(td_flood_state.flood_count, max_path_len, td_flood_state.trg)
+
+        # 길이 계산 (유효 좌표 개수)
+        len_pk = jnp.sum(jnp.any(pk_coords != -1, axis=1))
+        len_kt = jnp.sum(jnp.any(kt_coords != -1, axis=1))
+
+        # 결과 배열 준비
+        whole_route = jnp.full((target_len, 2), -1, dtype=jnp.int32)
+
+        # PLAYER→KEY
+        def body_fun1(i, carry):
+            out = carry
+            return jax.lax.cond(
+                jnp.any(pk_coords[i] != -1),
+                lambda: out.at[i].set(pk_coords[i]),
+                lambda: out,
+            )
+        whole_route = jax.lax.fori_loop(0, max_path_len, body_fun1, whole_route)
+
+        # KEY→TARGET (첫 좌표는 KEY → 중복 제거)
+        def body_fun2(i, carry):
+            out = carry
+            return jax.lax.cond(
+                (i > 0) & jnp.any(kt_coords[i] != -1),
+                lambda: out.at[len_pk + i - 1].set(kt_coords[i]),
+                lambda: out,
+            )
+        whole_route = jax.lax.fori_loop(0, max_path_len, body_fun2, whole_route)
+
+        # TARGET→DOOR (첫 좌표는 TARGET → 중복 제거)
+        def body_fun3(i, carry):
+            out = carry
+            return jax.lax.cond(
+                (i > 0) & jnp.any(td_coords[i] != -1),
+                lambda: out.at[len_pk + len_kt + i - 2].set(td_coords[i]),
+                lambda: out,
+            )
+        whole_route = jax.lax.fori_loop(0, max_path_len, body_fun3, whole_route)
+
+        # 최종 결과는 항상 (288, 2)
+        return 1, enemy_encounter_default, whole_route
+
+    return jax.lax.cond(
+        valid_paths,
+        compute_route_and_concat,
+        lambda _: (0, enemy_encounter_default, whole_route_default),
+        operand=None
+    )
